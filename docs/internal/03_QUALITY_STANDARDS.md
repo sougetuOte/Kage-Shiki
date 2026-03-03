@@ -66,7 +66,18 @@
 ### 判断基準
 「このコードを3ヶ月後の自分が読んで、すぐに理解できるか？」
 
-## 6. Technology Trend Awareness (トレンド適応)
+## 6. Python Coding Conventions (Python コーディング規約)
+
+本プロジェクトは **Python 3.12+** を使用する。以下の規約に従うこと。
+
+- **PEP 8**: Python 標準コーディングスタイルに準拠する。
+- **Type Hints**: 全ての関数シグネチャに型アノテーションを付与する（`def func(x: int) -> str:`）。
+  複雑な型は `from __future__ import annotations` または `typing` モジュールを活用する。
+- **Linter/Formatter**: `ruff` を使用する（linting + formatting）。
+  <!-- TODO(Phase1): ruff 設定（pyproject.toml）の詳細は設定確定後に更新 -->
+- **Docstrings**: モジュール・クラス・関数レベルで Google スタイルの docstring を記述する。
+
+## 7. Technology Trend Awareness (トレンド適応)
 
 - ライブラリの Deprecated 状況を定期的に確認する。
 - 長期保守性を最優先し、枯れた技術と最新技術のバランスをとる。

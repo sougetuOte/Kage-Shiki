@@ -17,8 +17,9 @@
 | :--------------------- | :------------------------------------------------------------ | :--------------------------------- |
 | **File System (Read)** | `ls`, `cat`, `grep`, `find`, `pwd`, `du`, `file`              | ファイル内容の読み取り、検索。     |
 | **Git (Read)**         | `git status`, `git log`, `git diff`, `git show`, `git branch` | リポジトリ状態の確認。             |
-| **Testing (Local)**    | `pytest`, `npm test`, `go test`                               | **ローカルでの**テスト実行。       |
-| **Package Info**       | `npm list`, `pip list`, `gem list`                            | インストール済みパッケージの確認。 |
+| **Testing (Local)**    | `pytest`, `pytest -v`, `pytest --tb=short`                    | **ローカルでの**テスト実行。       |
+| **Linting (Read)**     | `ruff check`, `ruff format --check`                           | コードスタイル確認（変更なし）。   |
+| **Package Info**       | `pip list`, `pip show`                                        | インストール済みパッケージの確認。 |
 | **Process Info**       | `ps`, `top` (batch mode)                                      | プロセス状態の確認。               |
 
 ### B. Deny List (User Approval Required)
@@ -31,7 +32,9 @@
 | **Git (Remote/Write)**  | `git push`, `git pull`, `git fetch`, `git clone`, `git commit`, `git merge` | リモートリポジトリへの影響、コンフリクト発生。               |
 | **System Mutation**     | `apt`, `yum`, `brew`, `systemctl`, `service`, `reboot`, `shutdown`          | システム設定の変更、パッケージ導入、再起動。                 |
 | **Network**             | `curl`, `wget`, `ssh`, `ping`, `nc`                                         | 外部へのデータ送信、不正なスクリプトのダウンロード。         |
-| **Build/Run**           | `npm start`, `npm run build`, `python main.py`                              | アプリケーションの実行（無限ループやリソース枯渇のリスク）。 |
+| **Build/Run**           | `python main.py`, `python -m kage_shiki`                                    | アプリケーションの実行（無限ループやリソース枯渇のリスク）。 |
+| **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。                       |
+| **Package Install**     | `pip install`, `pip uninstall`                                              | 環境への変更。                                               |
 
 > **Note**: ファイルリネームが必要な場合、`mv` は Deny List に含まれるため以下の代替手段を用いる:
 > - `Read` → `Write`（新名称で作成）→ `Write`（旧ファイルを空にするか削除依頼）

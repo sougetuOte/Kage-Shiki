@@ -8,9 +8,9 @@
 ```
 /
 ├── src/                    # ソースコード (実装)
-│   ├── backend/            # バックエンド (Python/FastAPI)
-│   └── frontend/           # フロントエンド (React/Vite)
-├── tests/                  # テストコード
+│   └── kage_shiki/         # Python パッケージ (詳細構造は TODO)
+│       # TODO(Phase1): モジュール構成確定後に更新
+├── tests/                  # テストコード (pytest)
 ├── docs/                   # ドキュメント資産
 │   ├── specs/              # 要求仕様書 (Source of Truth)
 │   ├── adr/                # アーキテクチャ決定記録 (Why)
@@ -48,5 +48,5 @@
 ## 3. File Naming Conventions (命名規則)
 
 - **Directories**: `snake_case` (例: `user_auth`)
-- **Files (Code)**: 言語標準に従う (Python: `snake_case.py`, JS/TS: `PascalCase.tsx` or `camelCase.ts`)
+- **Files (Code)**: 言語標準に従う (Python: `snake_case.py`)
 - **Files (Docs)**: `snake_case.md` または `kebab-case.md` (プロジェクト内で統一)
