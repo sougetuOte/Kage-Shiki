@@ -19,15 +19,14 @@ build/
 dist/
 *.egg-info/
 
-# Node.js
-node_modules/
-dist/
-build/
+# Environment
 .env
 .env.local
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
 
 # Agent
 .agent/
