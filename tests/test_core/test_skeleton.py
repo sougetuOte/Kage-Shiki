@@ -1,0 +1,59 @@
+"""T-01: プロジェクト骨格の検証テスト."""
+
+from pathlib import Path
+
+
+def test_kage_shiki_package_importable():
+    """kage_shiki パッケージがインポート可能であること."""
+    import kage_shiki
+
+    assert hasattr(kage_shiki, "__version__")
+
+
+def test_version_is_string():
+    """__version__ が文字列であること."""
+    from kage_shiki import __version__
+
+    assert isinstance(__version__, str)
+    assert len(__version__) > 0
+
+
+def test_subpackages_importable():
+    """全サブパッケージがインポート可能であること."""
+    import kage_shiki.core
+    import kage_shiki.agent
+    import kage_shiki.memory
+    import kage_shiki.persona
+    import kage_shiki.gui
+    import kage_shiki.tray
+
+
+def test_directory_structure():
+    """D-1 で定義されたディレクトリ構成が存在すること."""
+    project_root = Path(__file__).parent.parent.parent
+    src_root = project_root / "src" / "kage_shiki"
+
+    expected_dirs = [
+        src_root / "core",
+        src_root / "agent",
+        src_root / "memory",
+        src_root / "persona",
+        src_root / "gui",
+        src_root / "tray",
+    ]
+
+    for d in expected_dirs:
+        assert d.is_dir(), f"Directory {d} does not exist"
+        assert (d / "__init__.py").is_file(), f"{d}/__init__.py does not exist"
+
+
+def test_pyproject_toml_exists():
+    """pyproject.toml が存在すること."""
+    project_root = Path(__file__).parent.parent.parent
+    assert (project_root / "pyproject.toml").is_file()
+
+
+def test_env_example_exists():
+    """.env.example テンプレートが存在すること."""
+    project_root = Path(__file__).parent.parent.parent
+    assert (project_root / ".env.example").is_file()
