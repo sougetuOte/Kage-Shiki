@@ -1,13 +1,12 @@
-# Living Architect Model チートシート
+# 影式 (Kage-Shiki) チートシート
 
-## はじめに（初めて使う方へ）
+## はじめに
 
-> まず [概念説明スライド](docs/slides/index.html) で LAM の全体像を掴むことをお勧めします。
+> LAM（Living Architect Model）の概要は [概念説明スライド](docs/slides/index.html) を参照。
 
 1. Claude Code CLI を起動する
 2. プロジェクトルートで Claude が `CLAUDE.md` を読み込む
-3. 「Living Architect Model として初期化してください」と指示する
-4. `/planning` で設計フェーズを開始する
+3. `/planning` で設計フェーズを開始する
 
 ```
 典型的な流れ:
@@ -15,6 +14,18 @@
   /building → TDD実装（Red → Green → Refactor）→ [承認]
   /auditing → 品質監査 → [承認] → 完了
 ```
+
+## プロジェクト技術スタック
+
+| 要素 | 選定 |
+|------|------|
+| 言語 | Python 3.12+ |
+| GUI | tkinter → MascotView Protocol で差し替え可 |
+| トレイ常駐 | pystray |
+| LLM API | anthropic（公式SDK） |
+| DB | SQLite + FTS5 |
+| 設定 | TOML（tomllib） |
+| テスト | pytest |
 
 ## ディレクトリ構造
 
@@ -27,11 +38,12 @@
 ├── states/                # 機能ごとの進捗状態
 └── current-phase.md       # 現在のフェーズ
 
-CLAUDE.md                  # 憲法（コア原則のみ）
-CHEATSHEET.md              # このファイル（クイックリファレンス）
+CLAUDE.md                  # 憲法（コア原則 + 技術スタック）
+CHEATSHEET.md              # このファイル
 docs/internal/             # プロセス SSOT
 docs/specs/                # 仕様書
 docs/adr/                  # アーキテクチャ決定記録
+docs/memos/middle-draft/   # 設計中間文書
 ```
 
 ## Rules ファイル一覧
@@ -94,7 +106,7 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `task-decomposer` | 「タスクを分割して」 | PLANNING |
 | `tdd-developer` | 「TASK-001を実装して」 | BUILDING |
 | `quality-auditor` | 「src/を監査して」 | AUDITING |
-| `doc-writer` | 「ドキュメントを更新して」「仕様を策定して」 | ALL |
+| `doc-writer` | 「ドキュメントを更新して」 | ALL |
 | `test-runner` | 「テストを実行して」 | BUILDING |
 | `code-reviewer` | 「コードレビューして」 | AUDITING |
 
@@ -108,6 +120,17 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `adr-template` | ADR作成テンプレート | `/adr-create` 実行時に自動適用 |
 | `spec-template` | 仕様書作成テンプレート | 仕様書作成時に自動適用 |
 
+## ワークフローコマンド
+
+| コマンド | 用途 |
+|---------|------|
+| `/ship` | 変更の棚卸し → 論理グループ分け → コミット → 手動作業通知 |
+| `/focus` | 現在のタスクに集中 |
+| `/daily` | 日次振り返り |
+| `/adr-create` | ADR作成支援 |
+| `/security-review` | セキュリティレビュー |
+| `/impact-analysis` | 変更の影響分析 |
+
 ## 状態管理
 
 | ファイル | 用途 |
@@ -115,16 +138,6 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `.claude/current-phase.md` | 現在のフェーズ |
 | `.claude/states/<feature>.json` | 機能ごとの進捗・承認状態 |
 | `SESSION_STATE.md` | セッション間の引き継ぎ（自動生成） |
-
-## 補助コマンド
-
-| コマンド | 用途 |
-|---------|------|
-| `/focus` | 現在のタスクに集中 |
-| `/daily` | 日次振り返り |
-| `/adr-create` | ADR作成支援 |
-| `/security-review` | セキュリティレビュー |
-| `/impact-analysis` | 変更の影響分析 |
 
 ## 参照ドキュメント (SSOT)
 
@@ -153,11 +166,6 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 3. Synthesis: 統合結論 → 実装
 ```
 
-**Atom テーブル形式**
-```
-| Atom | 内容 | 依存 | 並列可否(任意) |
-```
-
 ## クイックリファレンス
 
 **PLANNINGで実装を頼まれたら？**
@@ -172,15 +180,11 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 **コンテキストが少なくなったら？**
 → `/quick-save` でセーブして `exit`
 
-**次のセッションを始めるときは？**
-→ `/quick-load` で前回の続きから（日常）
-→ `/full-load` で詳細な状態確認（数日ぶり）
+**変更をコミットしたい？**
+→ `/ship` で棚卸し・グループ分け・コミット
 
 **仕様書はどこ？**
 → `docs/specs/`
 
-**ADRはどこ？**
-→ `docs/adr/`
-
-**Rulesはどこ？**
-→ `.claude/rules/`
+**設計中間文書はどこ？**
+→ `docs/memos/middle-draft/`
