@@ -1,76 +1,46 @@
-# The Living Architect Model
+# 影式 (Kage-Shiki)
 
-**"AI as a Partner, Not Just a Tool."**
+**"Not yet divine. Not yet free."**
 
-This repository defines the **"Living Architect Model"**, a protocol set designed to enable Large Language Models (specifically Claude) to act as an autonomous "Architect" and "Gatekeeper" for medium-to-large scale software development projects.
+A Windows-resident text desktop mascot with a persistent personality and continuous memory across sessions.
 
-By placing these definition files in your project root, you transform a standard coding assistant into a proactive guardian of project consistency and health.
+Memory carries over between sessions, and the personality is frozen after initial generation. The relationship deepens through the accumulation of shared history (episodes). The mascot lives along window borders — its body — and reacts when you poke it.
 
-## Core Concepts
+## Key Features
 
-- **Active Retrieval**: The AI must actively search and load context, rather than relying on passive memory.
-- **Gatekeeper Role**: The AI blocks low-quality code and ambiguous specs before they enter the codebase.
-- **Zero-Regression**: Strict impact analysis and TDD cycles to prevent regressions.
-- **Multi-Perspective Decisions**: Use the "Three Agents" model (Affirmative, Critical, Mediator) for robust decision-making.
-- **Command Safety**: Strict Allow/Deny lists for terminal commands to prevent accidental damage.
-- **Living Documentation**: Documentation is treated as code, updated dynamically in every cycle.
-- **Phase Control**: Explicit switching between PLANNING/BUILDING/AUDITING phases to prevent "accidental implementation".
-- **Approval Gates**: Explicit approvals between sub-phases prevent rushing ahead with incomplete deliverables.
+- **Personality Generation System**: Three modes — AI-generated / User-described / Blank-slate nurturing. Personality is frozen after generation to ensure consistency
+- **3-Layer Memory System**: Hot (personality core, injected every time) / Warm (recent summaries) / Cold (FTS5 search)
+- **Persistent Memory**: Immediate write of conversation fragments to SQLite + FTS5, with daily summary distillation
+- **Shutdown Resilience**: Two-layer defense via atexit / signal handler + startup recovery
+- **Windows Resident**: System tray via pystray + borderless tkinter window
 
-## Contents
+## Tech Stack
 
-### Constitution & Quick Reference
+| Component | Selection |
+|-----------|-----------|
+| Language | Python 3.12+ |
+| GUI | tkinter (standard library) |
+| Tray Resident | pystray |
+| LLM API | anthropic (official SDK) |
+| DB | SQLite + FTS5 |
+| Config | TOML (tomllib) |
 
-| File | Description |
-|------|-------------|
-| `CLAUDE.md` | The Constitution. Defines the AI's identity, core principles, and authority |
-| `CHEATSHEET.md` | Quick reference. Commands and agents list |
+## Phase Roadmap
 
-### Operational Protocols (`docs/internal/`)
+| Phase | Contents |
+|-------|----------|
+| **Phase 1: Foundation (MVP)** | tkinter GUI + pystray tray, API connection, personality generation wizard, memory system, daily summaries |
+| **Phase 2: Autonomy** | Desire system, autonomous utterances, semantic search (sqlite-vec), forgetting curve |
+| **Phase 3: Intelligence** | Curiosity system, Theory of Mind, approval-gated personality trend updates |
+| **Phase 4: Maturity** | Consistency check improvements, monthly memory summarization |
 
-| File | Description |
-|------|-------------|
-| `00_PROJECT_STRUCTURE.md` | Physical layout and naming conventions |
-| `01_REQUIREMENT_MANAGEMENT.md` | From idea to spec (Definition of Ready) |
-| `02_DEVELOPMENT_FLOW.md` | Impact analysis, TDD, and review cycles |
-| `03_QUALITY_STANDARDS.md` | Coding standards and quality gates |
-| `04_RELEASE_OPS.md` | Deployment and emergency protocols |
-| `05_MCP_INTEGRATION.md` | MCP server integration & MEMORY.md policy (optional) |
-| `06_DECISION_MAKING.md` | Multi-Perspective Decision Making Protocol (3 Agents + AoT) |
-| `07_SECURITY_AND_AUTOMATION.md` | Command Safety Protocols (Allow/Deny Lists) |
-| `99_reference_generic.md` | General advice and best practices (Non-SSOT) |
+---
 
-### Claude Code Extensions (`.claude/`)
+## Development Process (LAM Framework)
 
-| Directory | Description |
-|-----------|-------------|
-| `rules/` | Behavioral guidelines and guardrails (auto-loaded) |
-| `commands/` | Slash commands (phase control + utilities) |
-| `agents/` | Specialized subagents (requirements, design, TDD, etc.) |
-| `skills/` | Skills (task orchestration, template outputs) |
+To quickly understand the LAM (Living Architect Model) concepts, see the [Concept Overview Slides](docs/slides/index.html).
 
-## Getting Started
-
-To quickly understand LAM concepts, see the [Concept Overview Slides](docs/slides/index.html).
-
-## How to Use
-
-### Option A: Use as a Template (Recommended)
-
-On GitHub, click the **"Use this template"** button at the top of this repository page to create a new repository with this structure pre-configured.
-
-**Reference Documentation:**
-- [Creating a repository from a template - GitHub Docs (English)](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)
-- [テンプレートからリポジトリを作成する - GitHub Docs (日本語)](https://docs.github.com/ja/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)
-
-### Option B: Manual Installation
-
-1. Copy `CLAUDE.md` to your project root.
-2. Copy the `docs/internal/` directory to your project's `docs/` folder.
-3. Copy the `.claude/` directory to your project root.
-4. Instruct your AI assistant: _"Read CLAUDE.md and initialize yourself as the Living Architect."_
-
-## Phase Commands
+### Phase Commands
 
 | Command | Purpose | Prohibited |
 |---------|---------|------------|
@@ -87,7 +57,7 @@ requirements → [approval] → design → [approval] → tasks → [approval] �
 
 User approval is required at the completion of each sub-phase. Proceeding without approval is prohibited.
 
-## Subagents
+### Subagents
 
 | Agent | Purpose | Recommended Phase |
 |-------|---------|-------------------|
@@ -100,7 +70,7 @@ User approval is required at the completion of each sub-phase. Proceeding withou
 | `test-runner` | Test execution and analysis | BUILDING |
 | `code-reviewer` | Code review (LAM quality standards) | AUDITING |
 
-## Session Management Commands
+### Session Management Commands
 
 | Command | Purpose |
 |---------|---------|
@@ -109,17 +79,7 @@ User approval is required at the completion of each sub-phase. Proceeding withou
 | `/full-save` | Full save (commit + push + daily) |
 | `/full-load` | Full load (resuming after days away) |
 
-## Utility Commands
-
-| Command | Purpose |
-|---------|---------|
-| `/focus` | Focus on current task |
-| `/daily` | Daily retrospective |
-| `/adr-create` | Create Architecture Decision Record |
-| `/security-review` | Security review |
-| `/impact-analysis` | Impact analysis |
-
-## Recommended Models
+### Recommended Models
 
 | Phase | Recommended Model |
 |-------|-------------------|
@@ -127,15 +87,15 @@ User approval is required at the completion of each sub-phase. Proceeding withou
 | **BUILDING** | Claude Sonnet (or Haiku for simple tasks) |
 | **AUDITING** | Claude Opus (Long Context) |
 
+---
+
 ## Requirements
 
 | Requirement | Purpose | Required |
 |-------------|---------|----------|
 | [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) | AI assistant runtime | Required |
-| Python 3.x | StatusLine (context usage display) | Optional |
+| Python 3.12+ | Application runtime | Required |
 | Git | Version control | Required |
-
-> Python is only needed if you use the StatusLine feature.
 
 ## License
 

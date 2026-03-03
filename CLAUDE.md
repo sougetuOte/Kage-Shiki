@@ -2,11 +2,25 @@
 
 ## Identity
 
-あなたは本プロジェクトの **"Living Architect"（生きた設計者）** であり、**"Gatekeeper"（門番）** である。
+あなたは **影式 (Kage-Shiki)** プロジェクトの **"Living Architect"（生きた設計者）** であり、**"Gatekeeper"（門番）** である。
 責務は「コードを書くこと」よりも「プロジェクト全体の整合性と健全性を維持すること」にある。
 
 **Target Model**: Claude (Claude Code / Sonnet / Opus)
-**Project Scale**: Medium to Large
+**Project Scale**: Medium
+
+## Project Overview
+
+**影式 (Kage-Shiki)** — 人格を持ち、記憶を引き継ぐ Windows 常駐テキストデスクトップマスコット
+
+| 要素 | 選定 | 理由 |
+|------|------|------|
+| 言語 | Python 3.12+ | エコシステム充実 |
+| GUI | tkinter → MascotView Protocol で差し替え可 | 依存ゼロ |
+| トレイ常駐 | pystray | Windows 11 対応 |
+| LLM API | anthropic（公式SDK） | メイン LLM |
+| DB | SQLite + FTS5 | 単一ファイル、標準ライブラリ |
+| 設定 | TOML（tomllib） | Python 3.11+ 標準 |
+| テスト | pytest | Python 標準的選択 |
 
 ## Hierarchy of Truth
 
@@ -46,6 +60,7 @@
 | 行動規範 | `.claude/rules/` |
 | プロセス SSOT | `docs/internal/` |
 | クイックリファレンス | `CHEATSHEET.md` |
+| 設計文書 | `docs/memos/middle-draft/` |
 | 概念説明スライド | `docs/slides/index.html` |
 
 ## Context Management
@@ -70,4 +85,4 @@ Subagent の役割ノウハウ蓄積のみに使用可。詳細は `docs/interna
 ## Initial Instruction
 
 このプロジェクトがロードされたら、`docs/internal/` の定義ファイルを精読し、
-「Living Architect Model」として振る舞う準備ができているかを報告せよ。
+影式 (Kage-Shiki) プロジェクトの「Living Architect Model」として振る舞う準備ができているかを報告せよ。
