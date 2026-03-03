@@ -20,12 +20,19 @@ def test_version_is_string():
 
 def test_subpackages_importable():
     """全サブパッケージがインポート可能であること."""
-    import kage_shiki.core
-    import kage_shiki.agent
-    import kage_shiki.memory
-    import kage_shiki.persona
-    import kage_shiki.gui
-    import kage_shiki.tray
+    import importlib
+
+    subpackages = [
+        "kage_shiki.core",
+        "kage_shiki.agent",
+        "kage_shiki.memory",
+        "kage_shiki.persona",
+        "kage_shiki.gui",
+        "kage_shiki.tray",
+    ]
+    for pkg in subpackages:
+        mod = importlib.import_module(pkg)
+        assert mod is not None, f"Failed to import {pkg}"
 
 
 def test_directory_structure():

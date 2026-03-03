@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from kage_shiki.core.config import (
-    AppConfig,
     ApiConfig,
+    AppConfig,
     ConversationConfig,
     GeneralConfig,
     GuiConfig,
@@ -27,7 +27,6 @@ from kage_shiki.core.config import (
     get_max_tokens,
     load_config,
 )
-
 
 # ---------------------------------------------------------------------------
 # フィクスチャ
