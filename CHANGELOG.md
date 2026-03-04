@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 1: 基盤（MVP）— BUILDING 進行中
 
+#### Wave 6 (2026-03-04)
+
+- **T-13**: AgentCore ReAct ループ（FTS5 検索 + プロンプト構築 + LLM 呼出 + observations 書込 + 整合性チェック）
+- **T-18**: MemoryWorker（日次サマリー生成 + 欠損日補完 + EM-009 フォールバック）
+- **T-21**: WizardController 方式 B（自由記述 → AI 整形補完 → C1-C11 + S1-S7）
+- **T-22**: プレビュー会話 + 凍結処理（freeze_and_save 公開 API 追加）
+- **audit**: full-review 12件修正（カプセル化違反修正、例外ログ強化、タイムスタンプ分離 等）
+
 #### Wave 5 (2026-03-04)
 
 - **T-06**: session_id 生成（ハイブリッド形式）+ observations CRUD 5関数 + FTS5 検索

@@ -36,7 +36,7 @@
 
 ### Phase 1 進捗
 
-テスト: 404 passed / カバレッジ: 99%
+テスト: 449 passed / カバレッジ: 98%
 
 実装済みモジュール:
 - `core/config.py` — TOML 設定パーサー + バリデーション
@@ -44,10 +44,11 @@
 - `core/errors.py` — エラーメッセージ定義（EM-001〜EM-011）
 - `core/logging_setup.py` — ログ設定（RotatingFileHandler）
 - `agent/llm_client.py` — LLM クライアント（purpose ベースモデルスロット）
-- `agent/agent_core.py` — session_id 生成 + PromptBuilder
+- `agent/agent_core.py` — AgentCore ReAct ループ + 整合性チェック
 - `memory/db.py` — SQLite + FTS5 CRUD + リトライ
-- `persona/persona_system.py` — 3段階ペルソナロード + 凍結制御
-- `persona/wizard.py` — ウィザードモード A コントローラ
+- `memory/memory_worker.py` — 日次サマリー生成 + 欠損日補完
+- `persona/persona_system.py` — 3段階ペルソナロード + 凍結制御 + freeze_and_save
+- `persona/wizard.py` — ウィザードモード A/B + プレビュー + 凍結
 - `gui/tkinter_view.py` — MascotView Protocol + 枠なしウィンドウ
 - `tray/system_tray.py` — pystray 統合 + メニュー + 通知
 

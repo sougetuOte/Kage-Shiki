@@ -36,7 +36,7 @@ Memory carries over between sessions, and the personality is frozen after initia
 
 ### Phase 1 Progress
 
-Tests: 404 passed / Coverage: 99%
+Tests: 449 passed / Coverage: 98%
 
 Implemented modules:
 - `core/config.py` — TOML config parser + validation
@@ -44,10 +44,11 @@ Implemented modules:
 - `core/errors.py` — Error message definitions (EM-001 to EM-011)
 - `core/logging_setup.py` — Log configuration (RotatingFileHandler)
 - `agent/llm_client.py` — LLM client (purpose-based model slots)
-- `agent/agent_core.py` — session_id generation + PromptBuilder
+- `agent/agent_core.py` — AgentCore ReAct loop + consistency check
 - `memory/db.py` — SQLite + FTS5 CRUD + retry
-- `persona/persona_system.py` — 3-stage persona loading + freeze control
-- `persona/wizard.py` — Wizard mode A controller
+- `memory/memory_worker.py` — Daily summary generation + missing date backfill
+- `persona/persona_system.py` — 3-stage persona loading + freeze control + freeze_and_save
+- `persona/wizard.py` — Wizard mode A/B + preview + freeze
 - `gui/tkinter_view.py` — MascotView Protocol + borderless window
 - `tray/system_tray.py` — pystray integration + menu + notifications
 
