@@ -23,6 +23,37 @@
 除外候補: [秘密情報ファイルがあれば列挙]
 ```
 
+## Phase 1.5: ドキュメント同期（Doc Sync）
+
+Phase 1 の棚卸し結果を踏まえ、以下のドキュメントを現状と照合する:
+
+### 対象ファイル
+
+| ファイル | 更新条件 | 更新内容 |
+|---------|---------|---------|
+| `CHANGELOG.md` | **毎回** | 変更内容を `[Unreleased]` セクションに追記 |
+| `README.md` | 新モジュール追加・フェーズ進行時 | Phase 進捗セクションの更新 |
+| `README_en.md` | README.md と同期 | 英語版の対応箇所を更新 |
+| `CHEATSHEET.md` | 新コマンド・ルール・スキル追加時 | 該当テーブルに追記 |
+
+### 判断フロー
+
+1. **CHANGELOG.md**: 今回の変更内容を要約し、適切なカテゴリ（feat/fix/docs/chore 等）で追記する
+2. **README.md / README_en.md**: 新規 `src/` モジュールの追加や Phase の進行があれば進捗セクションを更新する。なければスキップ
+3. **CHEATSHEET.md**: `.claude/rules/`, `.claude/commands/`, `.claude/skills/` に変更があれば該当テーブルを更新する。なければスキップ
+
+### 出力
+
+```
+--- Doc Sync ---
+CHANGELOG.md: 更新（X エントリ追記）
+README.md: スキップ（新モジュールなし）
+README_en.md: スキップ
+CHEATSHEET.md: 更新（ルール1件追加）
+```
+
+ドキュメント更新があった場合、Phase 2 のグループ分けに `docs` グループとして含める。
+
 ## Phase 2: 論理グループ分け（Grouping）
 
 変更を以下の基準で論理グループに分類（最大5グループ）:
