@@ -126,7 +126,7 @@ class WizardConfig:
         association_count: 連想キーワード数。
         temperature: サンプリング温度（0.0〜2.0）。
         candidate_count: 候補生成数。
-        blank_freeze_threshold: 空白フリーズ閾値（分）。
+        blank_freeze_threshold: 空白フリーズ閾値（会話数）。
     """
 
     association_count: int = 5
@@ -176,7 +176,7 @@ class MemoryConfig:
     Attributes:
         warm_days: ウォームメモリ保持日数。
         cold_top_k: コールドメモリ上位 K 件。
-        consistency_interval: 一貫性チェック間隔（分）。
+        consistency_interval: 一貫性チェック間隔（メッセージ数）。
     """
 
     warm_days: int = 5
@@ -277,6 +277,9 @@ def _is_valid_type(value: Any, expected_type: type) -> bool:
     if expected_type is int and isinstance(value, bool):
         # bool は int のサブクラスだが、int フィールドには bool を受け付けない
         return False
+    if expected_type is float and isinstance(value, int) and not isinstance(value, bool):
+        # TOML では 1 は int、1.0 は float だが、float フィールドには int も許容する
+        return True
     return isinstance(value, expected_type)
 
 
@@ -315,6 +318,10 @@ def _coerce_field(
             default_value,
         )
         return default_value
+
+    # TOML int → float 変換（_is_valid_type が許容した場合）
+    if expected_type is float and isinstance(raw_value, int):
+        raw_value = float(raw_value)
 
     # 範囲チェック
     if min_value is not None and raw_value < min_value:
@@ -534,7 +541,7 @@ def _parse_memory(data: dict[str, Any]) -> MemoryConfig:
         consistency_interval=_coerce_field(
             "memory", "consistency_interval",
             data.get("consistency_interval", defaults.consistency_interval),
-            int, defaults.consistency_interval, min_value=1,
+            int, defaults.consistency_interval, min_value=0,
         ),
     )
 
@@ -680,7 +687,7 @@ association_count = {d.wizard.association_count}
 temperature = {d.wizard.temperature}
 # 候補生成数
 candidate_count = {d.wizard.candidate_count}
-# 空白フリーズ閾値（分）
+# 空白フリーズ閾値（会話数）
 blank_freeze_threshold = {d.wizard.blank_freeze_threshold}
 
 [conversation]
@@ -708,7 +715,7 @@ font_family = "{d.gui.font_family}"
 warm_days = {d.memory.warm_days}
 # コールドメモリ上位 K 件
 cold_top_k = {d.memory.cold_top_k}
-# 一貫性チェック間隔（分）
+# 一貫性チェック間隔（メッセージ数）
 consistency_interval = {d.memory.consistency_interval}
 
 [api]

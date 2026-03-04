@@ -104,7 +104,8 @@ CREATE TABLE observations (
 CREATE VIRTUAL TABLE observations_fts USING fts5(
     content,
     content='observations',
-    content_rowid='id'
+    content_rowid='id',
+    tokenize='trigram'
 );
 
 -- 日次要約（memory_worker が生成）

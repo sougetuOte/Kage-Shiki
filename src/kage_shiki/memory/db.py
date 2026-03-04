@@ -1,19 +1,22 @@
-"""SQLite DB 初期化 + スキーマ定義 + FTS5 トリガー (T-05).
+"""SQLite DB 初期化 + スキーマ定義 + FTS5 トリガー + CRUD 操作.
 
 対応 FR:
-    FR-3.1: SQLite DB を初期化し、observations / observations_fts /
-            day_summary / curiosity_targets テーブルを作成
-    FR-3.2: FTS5 INSERT トリガーにより observations 書込時に
-            全文検索インデックスを自動同期
+    FR-3.1: SQLite DB を初期化し、テーブルを作成
+    FR-3.2: FTS5 INSERT トリガーにより全文検索インデックスを自動同期
+    FR-3.3: observations テーブルへの即時書込
+    FR-3.4: FTS5 全文検索（Cold Memory 取得）
 
 対応設計:
     D-4: INSERT トリガー方式（Phase 1 は INSERT のみ）
     D-7: WAL モード、VACUUM なし
 """
 
+import functools
 import logging
 import re
 import sqlite3
+import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -26,6 +29,13 @@ _PRAGMA_SETTINGS: dict[str, str] = {
     "journal_mode": "WAL",
     "cache_size": "-2000",
 }
+
+# ---------------------------------------------------------------------------
+# DB ロックリトライ設定（FR-7.3, EM-008）
+# ---------------------------------------------------------------------------
+
+_DB_RETRY_MAX = 5
+_DB_RETRY_INTERVAL_SEC = 0.1  # 100ms
 
 # ---------------------------------------------------------------------------
 # スキーマ定義（requirements.md Section 4.2 + D-4 Section 5.2）
@@ -148,7 +158,8 @@ class Database:
 # ---------------------------------------------------------------------------
 
 
-_PRAGMA_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+# ハイフンは負の数値（例: "-2000"）を許容するためリテラルとして含める
+_PRAGMA_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
 
 
 def _configure_pragmas(conn: sqlite3.Connection) -> None:
@@ -169,6 +180,42 @@ def _configure_pragmas(conn: sqlite3.Connection) -> None:
     logger.debug("PRAGMA configured: %s", _PRAGMA_SETTINGS)
 
 
+def _retry_on_lock(func):
+    """DB ロック時のリトライデコレータ (FR-7.3, EM-008).
+
+    最大 _DB_RETRY_MAX 回リトライし、各試行間で _DB_RETRY_INTERVAL_SEC 秒待機する。
+    「database is locked」以外の OperationalError はリトライせずそのまま送出する。
+
+    Args:
+        func: ラップする DB 操作関数。
+
+    Returns:
+        リトライロジックを追加したラッパー関数。
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        for attempt in range(_DB_RETRY_MAX):
+            try:
+                return func(*args, **kwargs)
+            except sqlite3.OperationalError as e:
+                if "locked" not in str(e).lower():
+                    raise
+                if attempt == _DB_RETRY_MAX - 1:
+                    logger.error(
+                        "DB locked after %d retries", _DB_RETRY_MAX,
+                    )
+                    raise
+                time.sleep(_DB_RETRY_INTERVAL_SEC)
+                logger.warning(
+                    "DB locked, retry %d/%d",
+                    attempt + 1, _DB_RETRY_MAX,
+                )
+        raise RuntimeError("Unreachable")  # pragma: no cover
+
+    return wrapper
+
+
 # ---------------------------------------------------------------------------
 # 公開 API
 # ---------------------------------------------------------------------------
@@ -185,3 +232,154 @@ def initialize_db(conn: sqlite3.Connection) -> None:
     """
     conn.executescript(_SCHEMA_SQL)
     logger.info("DB schema initialized")
+
+
+# ---------------------------------------------------------------------------
+# CRUD 操作（FR-3.3, FR-3.4, FR-3.12）
+# ---------------------------------------------------------------------------
+
+
+@_retry_on_lock
+def save_observation(
+    conn: sqlite3.Connection,
+    content: str,
+    speaker: str,
+    created_at: float,
+    session_id: str | None = None,
+) -> int:
+    """observations テーブルに即時書込する (FR-3.3).
+
+    FTS5 INSERT トリガーにより、全文検索インデックスが自動同期される。
+
+    Args:
+        conn: DB 接続。
+        content: 会話内容テキスト。
+        speaker: 発言者識別子（"user" or "mascot"）。
+        created_at: Unix タイムスタンプ（time.time() の戻り値）。
+        session_id: セッション ID（省略時は NULL）。
+
+    Returns:
+        挿入されたレコードの rowid。
+    """
+    cursor = conn.execute(
+        "INSERT INTO observations (content, speaker, created_at, session_id) "
+        "VALUES (?, ?, ?, ?)",
+        (content, speaker, created_at, session_id),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+@_retry_on_lock
+def search_observations_fts(
+    conn: sqlite3.Connection,
+    query: str,
+    top_k: int = 5,
+) -> list[dict]:
+    """FTS5 全文検索を実行し BM25 スコアリングで上位 top_k 件を返す (FR-3.4).
+
+    trigram トークナイザを使用しているため、最低3文字のクエリが必要。
+    3文字未満の場合は空リストを返す。
+
+    Args:
+        conn: DB 接続。
+        query: 検索クエリ文字列（3文字以上推奨）。
+        top_k: 取得する上位件数（デフォルト 5）。
+
+    Returns:
+        検索結果のリスト。各要素は dict (content, speaker, created_at, session_id)。
+        BM25 スコアの降順（関連度が高い順）。
+    """
+    if len(query) < 3:
+        return []
+    rows = conn.execute(
+        "SELECT o.content, o.speaker, o.created_at, o.session_id "
+        "FROM observations_fts "
+        "JOIN observations o ON observations_fts.rowid = o.id "
+        "WHERE observations_fts MATCH ? "
+        "ORDER BY bm25(observations_fts) "
+        "LIMIT ?",
+        (query, top_k),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@_retry_on_lock
+def get_day_observations(
+    conn: sqlite3.Connection,
+    date_str: str,
+) -> list[dict]:
+    """指定日の observations を取得する（日次サマリー生成用）.
+
+    日の境界はローカルタイムゾーンで判定する。
+
+    Args:
+        conn: DB 接続。
+        date_str: 日付文字列（YYYY-MM-DD 形式）。
+
+    Returns:
+        observations のリスト。各要素は dict (content, speaker, created_at, session_id)。
+        created_at の昇順。
+    """
+    d = date.fromisoformat(date_str)
+    start_dt = datetime.combine(d, datetime.min.time())
+    end_dt = start_dt + timedelta(days=1)
+    rows = conn.execute(
+        "SELECT content, speaker, created_at, session_id "
+        "FROM observations "
+        "WHERE created_at >= ? AND created_at < ? "
+        "ORDER BY created_at",
+        (start_dt.timestamp(), end_dt.timestamp()),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@_retry_on_lock
+def get_missing_summary_dates(conn: sqlite3.Connection) -> list[str]:
+    """observations に存在するが day_summary に存在しない日を検出する.
+
+    日の判定はローカルタイムゾーン基準。今日の日付は除外する
+    （1日が終了していないため、サマリー生成対象外）。
+
+    Args:
+        conn: DB 接続。
+
+    Returns:
+        YYYY-MM-DD 形式の日付文字列リスト（昇順）。
+    """
+    today = date.today().isoformat()
+    rows = conn.execute(
+        "SELECT DISTINCT date(created_at, 'unixepoch', 'localtime') AS d "
+        "FROM observations "
+        "ORDER BY d",
+    ).fetchall()
+    obs_dates = {row[0] for row in rows if row[0] != today}
+
+    rows = conn.execute("SELECT date FROM day_summary").fetchall()
+    summary_dates = {row[0] for row in rows}
+
+    return sorted(obs_dates - summary_dates)
+
+
+@_retry_on_lock
+def save_day_summary(
+    conn: sqlite3.Connection,
+    date_str: str,
+    summary: str,
+) -> None:
+    """日次サマリーを day_summary テーブルに保存する.
+
+    Args:
+        conn: DB 接続。
+        date_str: 日付文字列（YYYY-MM-DD 形式）。
+        summary: サマリーテキスト。
+
+    Raises:
+        sqlite3.IntegrityError: 同一日のサマリーが既に存在する場合（UNIQUE 制約）。
+    """
+    now = time.time()
+    conn.execute(
+        "INSERT INTO day_summary (date, summary, created_at) VALUES (?, ?, ?)",
+        (date_str, summary, now),
+    )
+    conn.commit()

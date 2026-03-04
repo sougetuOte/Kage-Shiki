@@ -527,6 +527,7 @@ class PersonaSystem:
         for match in matches:
             c_num = int(match.group(1))
             if c_num not in _FIELD_MAP:
+                logger.debug("未知の C%d セクションをスキップ", c_num)
                 continue
 
             body_start = match.end()

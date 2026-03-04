@@ -131,6 +131,17 @@ class TestLoadStyleSamples:
         result = ps.load_style_samples(path)
         assert result == ""
 
+    def test_load_os_error_returns_empty(self, tmp_path: Path) -> None:
+        """OSError 発生時は空文字列を返すこと."""
+        from unittest.mock import patch
+
+        path = tmp_path / "style_samples.md"
+        path.write_text("content", encoding="utf-8")
+        ps = PersonaSystem()
+        with patch.object(Path, "read_text", side_effect=OSError("read fail")):
+            result = ps.load_style_samples(path)
+        assert result == ""
+
     def test_save_frozen_raises(self, tmp_path: Path) -> None:
         """凍結状態で style_samples 書き込みが拒否されること."""
         path = tmp_path / "style_samples.md"

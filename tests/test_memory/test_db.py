@@ -13,11 +13,22 @@
 
 import sqlite3
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from kage_shiki.memory.db import Database, initialize_db
+from kage_shiki.memory.db import (
+    Database,
+    _retry_on_lock,
+    get_day_observations,
+    get_missing_summary_dates,
+    initialize_db,
+    save_day_summary,
+    save_observation,
+    search_observations_fts,
+)
 
 # ---------------------------------------------------------------------------
 # FR-3.1: DB 初期化 — テーブル作成
@@ -350,10 +361,8 @@ class TestInitializeDbIdempotent:
 class TestPragmaValidation:
     """PRAGMA バリデーションテスト（W-1: SQL インジェクション防止）."""
 
-    def test_unsafe_pragma_name_raises(self, tmp_path: Path) -> None:
+    def test_unsafe_pragma_name_raises(self) -> None:
         """不正な PRAGMA 名で ValueError が発生すること."""
-        from unittest.mock import patch
-
         from kage_shiki.memory.db import _configure_pragmas
 
         conn = sqlite3.connect(":memory:")
@@ -366,10 +375,8 @@ class TestPragmaValidation:
         finally:
             conn.close()
 
-    def test_unsafe_pragma_value_raises(self, tmp_path: Path) -> None:
+    def test_unsafe_pragma_value_raises(self) -> None:
         """不正な PRAGMA 値で ValueError が発生すること."""
-        from unittest.mock import patch
-
         from kage_shiki.memory.db import _configure_pragmas
 
         conn = sqlite3.connect(":memory:")
@@ -465,3 +472,324 @@ def _get_column_info(conn: sqlite3.Connection, table_name: str) -> list[dict]:
         }
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# FR-3.3: save_observation — observations 即時書込 (T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestSaveObservation:
+    """save_observation 関数のテスト (FR-3.3)."""
+
+    def test_save_and_retrieve(self, db_conn: sqlite3.Connection) -> None:
+        """INSERT 後に SELECT で取得できること."""
+        now = time.time()
+        rowid = save_observation(db_conn, "テスト内容", "user", now, "session_001")
+        assert rowid > 0
+        row = db_conn.execute(
+            "SELECT content, speaker, created_at, session_id "
+            "FROM observations WHERE id = ?",
+            (rowid,),
+        ).fetchone()
+        assert row["content"] == "テスト内容"
+        assert row["speaker"] == "user"
+        assert row["created_at"] == now
+        assert row["session_id"] == "session_001"
+
+    def test_save_without_session_id(self, db_conn: sqlite3.Connection) -> None:
+        """session_id なしで保存できること."""
+        now = time.time()
+        rowid = save_observation(db_conn, "内容", "mascot", now)
+        row = db_conn.execute(
+            "SELECT session_id FROM observations WHERE id = ?", (rowid,),
+        ).fetchone()
+        assert row["session_id"] is None
+
+    def test_fts5_sync_after_save(self, db_conn: sqlite3.Connection) -> None:
+        """save_observation 後に FTS5 検索可能であること."""
+        now = time.time()
+        save_observation(
+            db_conn, "今日はプログラミングを楽しんだ", "user", now, "s1",
+        )
+        results = search_observations_fts(db_conn, "プログラミング")
+        assert len(results) == 1
+        assert results[0]["content"] == "今日はプログラミングを楽しんだ"
+
+    def test_returns_incrementing_rowid(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """連続 INSERT で rowid が増加すること."""
+        now = time.time()
+        rowid1 = save_observation(db_conn, "one", "user", now)
+        rowid2 = save_observation(db_conn, "two", "user", now)
+        assert rowid2 > rowid1
+
+
+# ---------------------------------------------------------------------------
+# FR-3.4: search_observations_fts — FTS5 検索 (T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestSearchObservationsFts:
+    """search_observations_fts 関数のテスト (FR-3.4)."""
+
+    def test_bm25_ordering(self, db_conn: sqlite3.Connection) -> None:
+        """BM25 スコアリングで関連度順に並ぶこと."""
+        now = time.time()
+        # 低関連度: 「プログラミング」が1回 + 他の話題
+        save_observation(
+            db_conn,
+            "今日はプログラミングをした。天気も良かった。散歩にも行った。",
+            "user", now, "s1",
+        )
+        # 高関連度: 「プログラミング」が3回
+        save_observation(
+            db_conn,
+            "プログラミングが好きです。プログラミングは楽しい。"
+            "プログラミングを毎日やっています",
+            "mascot", now, "s1",
+        )
+        results = search_observations_fts(db_conn, "プログラミング")
+        assert len(results) == 2
+        assert "プログラミングが好きです" in results[0]["content"]
+
+    def test_top_k_limit(self, db_conn: sqlite3.Connection) -> None:
+        """top_k でヒット数が制限されること."""
+        now = time.time()
+        for i in range(10):
+            save_observation(
+                db_conn, f"テスト用の文章番号{i:03d}です", "user", now, "s1",
+            )
+        results = search_observations_fts(db_conn, "テスト用の", top_k=3)
+        assert len(results) == 3
+
+    def test_empty_results(self, db_conn: sqlite3.Connection) -> None:
+        """ヒットなしの場合空リストを返すこと."""
+        now = time.time()
+        save_observation(db_conn, "プログラミング最高", "user", now, "s1")
+        results = search_observations_fts(db_conn, "存在しないキーワード")
+        assert results == []
+
+    def test_short_query_returns_empty(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """3文字未満のクエリで空リストを返すこと."""
+        now = time.time()
+        save_observation(db_conn, "テスト内容です", "user", now, "s1")
+        assert search_observations_fts(db_conn, "テス") == []
+        assert search_observations_fts(db_conn, "テ") == []
+        assert search_observations_fts(db_conn, "") == []
+
+    def test_result_dict_fields(self, db_conn: sqlite3.Connection) -> None:
+        """結果の dict に必要なフィールドが含まれること."""
+        now = time.time()
+        save_observation(
+            db_conn, "テスト用コンテンツです", "mascot", now, "sess_123",
+        )
+        results = search_observations_fts(db_conn, "テスト用コンテンツ")
+        assert len(results) == 1
+        r = results[0]
+        assert r["content"] == "テスト用コンテンツです"
+        assert r["speaker"] == "mascot"
+        assert r["created_at"] == now
+        assert r["session_id"] == "sess_123"
+
+
+# ---------------------------------------------------------------------------
+# get_day_observations — 日次サマリー生成用 (T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestGetDayObservations:
+    """get_day_observations 関数のテスト."""
+
+    def test_returns_observations_for_date(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """指定日の observations を返すこと."""
+        today = date.today()
+        start_ts = datetime.combine(today, datetime.min.time()).timestamp()
+        save_observation(db_conn, "朝の挨拶", "user", start_ts + 3600, "s1")
+        save_observation(db_conn, "おはよう", "mascot", start_ts + 3660, "s1")
+        results = get_day_observations(db_conn, today.isoformat())
+        assert len(results) == 2
+        assert results[0]["content"] == "朝の挨拶"
+        assert results[1]["content"] == "おはよう"
+
+    def test_excludes_other_dates(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """他の日の observations を含まないこと."""
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        today_ts = datetime.combine(today, datetime.min.time()).timestamp()
+        yesterday_ts = datetime.combine(
+            yesterday, datetime.min.time(),
+        ).timestamp()
+        save_observation(db_conn, "今日", "user", today_ts + 100, "s1")
+        save_observation(db_conn, "昨日", "user", yesterday_ts + 100, "s1")
+
+        results = get_day_observations(db_conn, today.isoformat())
+        assert len(results) == 1
+        assert results[0]["content"] == "今日"
+
+    def test_no_observations(self, db_conn: sqlite3.Connection) -> None:
+        """該当日に observations がない場合空リストを返すこと."""
+        results = get_day_observations(db_conn, "2099-01-01")
+        assert results == []
+
+    def test_ordered_by_created_at(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """created_at の昇順で返すこと."""
+        today = date.today()
+        base_ts = datetime.combine(today, datetime.min.time()).timestamp()
+        save_observation(db_conn, "後", "user", base_ts + 7200, "s1")
+        save_observation(db_conn, "先", "user", base_ts + 3600, "s1")
+
+        results = get_day_observations(db_conn, today.isoformat())
+        assert results[0]["content"] == "先"
+        assert results[1]["content"] == "後"
+
+
+# ---------------------------------------------------------------------------
+# get_missing_summary_dates — 欠損日検出 (T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestGetMissingSummaryDates:
+    """get_missing_summary_dates 関数のテスト."""
+
+    def test_detects_missing_date(self, db_conn: sqlite3.Connection) -> None:
+        """summary がない過去の日を検出すること."""
+        yesterday = date.today() - timedelta(days=1)
+        ts = datetime.combine(
+            yesterday, datetime.min.time(),
+        ).timestamp() + 3600
+        save_observation(db_conn, "昨日の会話", "user", ts, "s1")
+
+        missing = get_missing_summary_dates(db_conn)
+        assert yesterday.isoformat() in missing
+
+    def test_excludes_summarized_date(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """summary がある日は含まないこと."""
+        yesterday = date.today() - timedelta(days=1)
+        ts = datetime.combine(
+            yesterday, datetime.min.time(),
+        ).timestamp() + 3600
+        save_observation(db_conn, "昨日", "user", ts, "s1")
+        save_day_summary(db_conn, yesterday.isoformat(), "昨日のまとめ")
+
+        missing = get_missing_summary_dates(db_conn)
+        assert yesterday.isoformat() not in missing
+
+    def test_excludes_today(self, db_conn: sqlite3.Connection) -> None:
+        """今日の日付は含まないこと."""
+        today = date.today()
+        ts = datetime.combine(today, datetime.min.time()).timestamp() + 3600
+        save_observation(db_conn, "今日の会話", "user", ts, "s1")
+
+        missing = get_missing_summary_dates(db_conn)
+        assert today.isoformat() not in missing
+
+    def test_empty_when_no_observations(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """observations がない場合空リストを返すこと."""
+        missing = get_missing_summary_dates(db_conn)
+        assert missing == []
+
+    def test_sorted_ascending(self, db_conn: sqlite3.Connection) -> None:
+        """結果が昇順ソートされること."""
+        base = date.today() - timedelta(days=5)
+        for i in [3, 1, 2]:
+            d = base + timedelta(days=i)
+            ts = datetime.combine(d, datetime.min.time()).timestamp() + 3600
+            save_observation(
+                db_conn, f"day {i}", "user", ts, "s1",
+            )
+
+        missing = get_missing_summary_dates(db_conn)
+        assert missing == sorted(missing)
+
+
+# ---------------------------------------------------------------------------
+# save_day_summary (T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestSaveDaySummary:
+    """save_day_summary 関数のテスト."""
+
+    def test_save_and_retrieve(self, db_conn: sqlite3.Connection) -> None:
+        """保存したサマリーが取得できること."""
+        save_day_summary(db_conn, "2026-03-01", "今日は楽しい一日でした。")
+        row = db_conn.execute(
+            "SELECT date, summary FROM day_summary WHERE date = ?",
+            ("2026-03-01",),
+        ).fetchone()
+        assert row["date"] == "2026-03-01"
+        assert row["summary"] == "今日は楽しい一日でした。"
+
+    def test_duplicate_date_raises(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """同一日のサマリーを重複 INSERT すると IntegrityError."""
+        save_day_summary(db_conn, "2026-03-01", "初回")
+        with pytest.raises(sqlite3.IntegrityError):
+            save_day_summary(db_conn, "2026-03-01", "重複")
+
+
+# ---------------------------------------------------------------------------
+# _retry_on_lock — DB ロックリトライ (FR-7.3, T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestRetryOnLock:
+    """_retry_on_lock デコレータのテスト (FR-7.3, EM-008)."""
+
+    @patch("kage_shiki.memory.db.time.sleep")
+    def test_succeeds_after_retries(self, mock_sleep) -> None:
+        """リトライ後に成功すること."""
+        call_count = 0
+
+        @_retry_on_lock
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise sqlite3.OperationalError("database is locked")
+            return "success"
+
+        result = flaky()
+        assert result == "success"
+        assert call_count == 3
+        assert mock_sleep.call_count == 2
+
+    @patch("kage_shiki.memory.db.time.sleep")
+    def test_raises_after_max_retries(self, mock_sleep) -> None:
+        """最大リトライ回数超過で例外が送出されること."""
+
+        @_retry_on_lock
+        def always_locked():
+            raise sqlite3.OperationalError("database is locked")
+
+        with pytest.raises(sqlite3.OperationalError, match="locked"):
+            always_locked()
+
+    def test_non_lock_error_not_retried(self) -> None:
+        """locked 以外の OperationalError はリトライしないこと."""
+        call_count = 0
+
+        @_retry_on_lock
+        def other_error():
+            nonlocal call_count
+            call_count += 1
+            raise sqlite3.OperationalError("no such table")
+
+        with pytest.raises(sqlite3.OperationalError, match="no such table"):
+            other_error()
+        assert call_count == 1
