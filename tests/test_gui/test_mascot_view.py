@@ -1,4 +1,4 @@
-"""T-10: MascotView Protocol + TkinterMascotView テスト.
+"""T-10, T-24: MascotView Protocol + TkinterMascotView テスト.
 
 対応 FR:
     - FR-2.1: 枠なし透過ウィンドウ（overrideredirect）
@@ -6,6 +6,7 @@
     - FR-2.3: テキスト入力欄と送信ボタン
     - FR-2.4: マスコットのセリフをテキスト表示
     - FR-2.6: MascotView Protocol の6メソッドを実装
+    - FR-7.1〜7.5: エラー表示 UI（専用エラー画面 + 警告バー）
 """
 
 from collections.abc import Callable
@@ -263,3 +264,161 @@ class TestTkinterMascotViewSetBodyState:
         view.set_body_state("idle")
         view.set_body_state("talking")
         view.set_body_state("unknown_state")
+
+
+# ---------------------------------------------------------------------------
+# T-24: エラー表示 UI テスト（FR-7.1〜7.5, D-6 Section 5.4）
+# ---------------------------------------------------------------------------
+
+
+class TestSetCharacterName:
+    """set_character_name のテスト (W-6)."""
+
+    def test_updates_name_label(self, tk_root, input_queue, gui_config) -> None:
+        """set_character_name でキャラクター名ラベルが更新されること."""
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        view.set_character_name("テストキャラ")
+
+        assert view._name_var.get() == "テストキャラ"
+
+    def test_default_name_is_kageshiki(self, tk_root, input_queue, gui_config) -> None:
+        """初期状態のキャラクター名が「影式」であること."""
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+
+        assert view._name_var.get() == "影式"
+
+
+class TestShowErrorScreen:
+    """show_error_screen の専用エラー画面テスト (D-6 Section 5.4.1)."""
+
+    def test_creates_toplevel_window(self, tk_root, input_queue, gui_config) -> None:
+        """show_error_screen が Toplevel ウィンドウを生成すること."""
+        import tkinter as tk
+
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        view.show_error_screen("テストエラー")
+
+        assert view._error_window is not None
+        assert isinstance(view._error_window, tk.Toplevel)
+        view._error_window.destroy()
+
+    def test_error_window_title(self, tk_root, input_queue, gui_config) -> None:
+        """エラー画面のタイトルが仕様通りであること."""
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        view.show_error_screen("テストエラー")
+
+        assert view._error_window.title() == "影式 — エラー"
+        view._error_window.destroy()
+
+    def test_initial_error_window_is_none(self, tk_root, input_queue, gui_config) -> None:
+        """初期状態で _error_window が None であること."""
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        assert view._error_window is None
+
+    def test_with_open_log_callback(self, tk_root, input_queue, gui_config) -> None:
+        """on_open_log コールバック指定時に「ログを開く」ボタンが存在すること."""
+        import tkinter as _tk
+
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        callback = MagicMock()
+        view.show_error_screen("テストエラー", on_open_log=callback)
+
+        error_win = view._error_window
+        btn_frame = [w for w in error_win.winfo_children()
+                     if isinstance(w, _tk.Frame)][0]
+        btn_texts = [b.cget("text") for b in btn_frame.winfo_children()]
+        assert "ログを開く" in btn_texts
+        assert "閉じる" in btn_texts
+        error_win.destroy()
+
+    def test_without_open_log_callback(self, tk_root, input_queue, gui_config) -> None:
+        """on_open_log 未指定時に「ログを開く」ボタンが非表示であること."""
+        import tkinter as _tk
+
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        view.show_error_screen("テストエラー")
+
+        error_win = view._error_window
+        btn_frame = [w for w in error_win.winfo_children()
+                     if isinstance(w, _tk.Frame)][0]
+        btn_texts = [b.cget("text") for b in btn_frame.winfo_children()]
+        assert "ログを開く" not in btn_texts
+        assert "閉じる" in btn_texts
+        error_win.destroy()
+
+
+class TestShowWarningBar:
+    """show_warning_bar の警告バーテスト (D-6 Section 5.4.2)."""
+
+    def test_creates_frame(self, tk_root, input_queue, gui_config) -> None:
+        """show_warning_bar が Frame を生成すること."""
+        import tkinter as tk
+
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        view.show_warning_bar("テスト警告")
+
+        assert view._warning_bar is not None
+        assert isinstance(view._warning_bar, tk.Frame)
+        view._warning_bar.destroy()
+
+    def test_initial_warning_bar_is_none(self, tk_root, input_queue, gui_config) -> None:
+        """初期状態で _warning_bar が None であること."""
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        assert view._warning_bar is None
+
+    def test_shows_first_line_initially(self, tk_root, input_queue, gui_config) -> None:
+        """複数行メッセージの場合、初期表示は先頭行のみであること."""
+        import tkinter as _tk
+
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        view.show_warning_bar("警告の概要\n詳細情報1\n詳細情報2")
+
+        bar = view._warning_bar
+        labels = [w for w in bar.winfo_children() if isinstance(w, _tk.Label)]
+        assert labels[0].cget("text") == "[!] 警告の概要"
+        bar.destroy()
+
+    def test_toggle_expands_and_collapses(self, tk_root, input_queue, gui_config) -> None:
+        """トグル操作で全文展開/折りたたみが動作すること."""
+        import tkinter as _tk
+
+        from kage_shiki.gui.tkinter_view import TkinterMascotView
+
+        view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
+        full_msg = "警告の概要\n詳細情報"
+        view.show_warning_bar(full_msg)
+
+        bar = view._warning_bar
+        label = [w for w in bar.winfo_children() if isinstance(w, _tk.Label)][0]
+
+        # 初期状態: 先頭行のみ
+        assert label.cget("text") == "[!] 警告の概要"
+
+        # トグルで展開
+        bar._toggle_expand()
+        assert label.cget("text") == f"[!] {full_msg}"
+
+        # 再トグルで折りたたみ
+        bar._toggle_expand()
+        assert label.cget("text") == "[!] 警告の概要"
+        bar.destroy()

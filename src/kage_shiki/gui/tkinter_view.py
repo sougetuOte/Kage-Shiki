@@ -6,6 +6,7 @@
     FR-2.3: テキスト入力欄と送信ボタン
     FR-2.4: マスコットのセリフをテキスト表示
     FR-2.6: MascotView Protocol の6メソッドを実装
+    FR-7.1〜7.5: エラー表示 UI（専用エラー画面 + 警告バー）
 """
 
 import queue
@@ -53,6 +54,10 @@ class TkinterMascotView:
         self._drag_start_x: int = 0
         self._drag_start_y: int = 0
 
+        # エラー表示 UI（show_error_screen / show_warning_bar で生成）
+        self._error_window: tk.Toplevel | None = None
+        self._warning_bar: tk.Frame | None = None
+
         # StringVar は root が生きている間のみ有効
         self.text_var = tk.StringVar(master=root)
         self.entry_var = tk.StringVar(master=root)
@@ -87,9 +92,10 @@ class TkinterMascotView:
         )
 
         # キャラクター名ラベル（上部）
+        self._name_var = tk.StringVar(master=self._root, value="影式")
         self._name_label = tk.Label(
             self._root,
-            text="影式",
+            textvariable=self._name_var,
             font=font_spec,
         )
         self._name_label.pack(anchor="nw", padx=8, pady=(8, 0))
@@ -208,3 +214,116 @@ class TkinterMascotView:
             handler: クリック時に呼ばれるコールバック。引数は (x, y) のスクリーン座標。
         """
         self._click_handler = handler
+
+    # ------------------------------------------------------------------
+    # エラー表示 UI（D-6 Section 5.4）
+    # ------------------------------------------------------------------
+
+    def set_character_name(self, name: str) -> None:
+        """キャラクター名ラベルを更新する.
+
+        Args:
+            name: 表示するキャラクター名。
+        """
+        self._name_var.set(name)
+
+    def show_error_screen(
+        self,
+        message: str,
+        on_open_log: Callable[[], None] | None = None,
+    ) -> None:
+        """専用エラー画面を表示する（Critical エラー用）.
+
+        D-6 Section 5.4.1: 400x300 の Toplevel ウィンドウにメッセージと
+        「ログを開く」「閉じる」ボタンを表示する。
+
+        Args:
+            message: 表示するエラーメッセージ。
+            on_open_log: 「ログを開く」ボタン押下時のコールバック。
+                None の場合はボタンを非表示にする。
+        """
+        error_win = tk.Toplevel(self._root)
+        error_win.title("影式 — エラー")
+        error_win.geometry("400x300")
+        error_win.resizable(False, False)
+
+        msg_label = tk.Label(
+            error_win,
+            text=message,
+            wraplength=360,
+            justify="left",
+            padx=20,
+            pady=20,
+        )
+        msg_label.pack(fill="both", expand=True)
+
+        btn_frame = tk.Frame(error_win)
+        btn_frame.pack(pady=(0, 16))
+
+        if on_open_log is not None:
+            log_btn = tk.Button(
+                btn_frame,
+                text="ログを開く",
+                command=on_open_log,
+            )
+            log_btn.pack(side="left", padx=(0, 8))
+
+        close_btn = tk.Button(
+            btn_frame,
+            text="閉じる",
+            command=error_win.destroy,
+        )
+        close_btn.pack(side="left")
+
+        self._error_window = error_win
+
+    def show_warning_bar(self, message: str) -> None:
+        """警告バーをメインウィンドウ上部に表示する（Warning エラー用）.
+
+        D-6 Section 5.4.2: 折りたたみ可能なバーをメインウィンドウ最上部に
+        表示する。クリックで詳細を展開/折りたたみ、×ボタンで閉じる。
+
+        Args:
+            message: 表示する警告メッセージ。
+        """
+        bar = tk.Frame(self._root, bg="#FFF3CD")
+
+        # 折りたたみ時は先頭行のみ表示
+        first_line = message.split("\n")[0]
+
+        label = tk.Label(
+            bar,
+            text=f"[!] {first_line}",
+            bg="#FFF3CD",
+            fg="#856404",
+            anchor="w",
+            padx=8,
+            cursor="hand2",
+        )
+        label.pack(side="left", fill="x", expand=True)
+
+        # クリックで展開/折りたたみをトグル
+        def _toggle_expand(_event: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            current = label.cget("text")
+            if current == f"[!] {first_line}":
+                label.configure(text=f"[!] {message}")
+            else:
+                label.configure(text=f"[!] {first_line}")
+
+        label.bind("<Button-1>", _toggle_expand)
+        bar._toggle_expand = _toggle_expand  # type: ignore[attr-defined]
+
+        close_btn = tk.Button(
+            bar,
+            text="×",
+            bg="#FFF3CD",
+            fg="#856404",
+            relief="flat",
+            command=bar.destroy,
+        )
+        close_btn.pack(side="right", padx=4)
+
+        # 最上部に配置（既存ウィジェットの上に）
+        bar.pack(fill="x", before=self._name_label)
+
+        self._warning_bar = bar
