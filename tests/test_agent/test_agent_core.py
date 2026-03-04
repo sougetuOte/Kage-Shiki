@@ -1,6 +1,7 @@
 """Tests for agent/agent_core.py — session_id + SessionContext + PromptBuilder + AgentCore.
 
 対応 FR:
+    FR-2.5: クリックイベント（突っつき）処理
     FR-3.5: SystemPrompt にペルソナ情報を展開
     FR-3.6: XML タグによる構造化
     FR-3.7: 応答後の observations 即時書込
@@ -17,6 +18,7 @@
     D-3: プロンプトテンプレート設計
     D-8: 整合性チェック3類型
     D-13: session_id 生成規則
+    D-15: poke 用 max_tokens=256
 """
 
 import re
@@ -28,6 +30,7 @@ import pytest
 from kage_shiki.agent.agent_core import (
     _SESSION_ID_LENGTH,
     _SESSION_ID_PATTERN,
+    POKE_EVENT_PREFIX,
     AgentCore,
     PromptBuilder,
     SessionContext,
@@ -675,3 +678,140 @@ class TestProcessTurn:
             # 20回全て consistency_check_active=False であること
             for call in mock_build.call_args_list:
                 assert call.kwargs.get("consistency_check_active") is False
+
+
+# ---------------------------------------------------------------------------
+# T-14: クリックイベント（突っつき）処理 (FR-2.5)
+# ---------------------------------------------------------------------------
+
+
+class TestPokeEvent:
+    """クリックイベント（突っつき）処理のテスト (FR-2.5).
+
+    対応 FR:
+        FR-2.5: クリックイベント（突っつき）処理
+    対応設計:
+        D-15: poke 用 max_tokens=256
+    """
+
+    def test_poke_event_prefix_defined(self) -> None:
+        """クリックイベントプレフィックス定数が定義されていること."""
+        assert POKE_EVENT_PREFIX == "[クリックイベント]"
+
+    def test_poke_event_uses_poke_purpose(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """クリックイベント入力時に purpose='poke' で LLM が呼ばれること."""
+        agent_core.session_start_message = "やあ"
+        poke_input = f"{POKE_EVENT_PREFIX} ユーザーがウィンドウをクリックして突っつきました"
+        agent_core.process_turn(poke_input)
+        call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert call_kwargs["purpose"] == "poke"
+
+    def test_normal_input_uses_conversation_purpose(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """通常入力時は purpose='conversation' であること."""
+        agent_core.session_start_message = "やあ"
+        agent_core.process_turn("普通の会話です")
+        call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert call_kwargs["purpose"] == "conversation"
+
+    def test_poke_event_still_saves_observations(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """クリックイベントでも observations に保存されること."""
+        agent_core.session_start_message = "やあ"
+        poke_input = f"{POKE_EVENT_PREFIX} ユーザーがウィンドウをクリック"
+        with patch("kage_shiki.agent.agent_core.save_observation") as mock_save:
+            agent_core.process_turn(poke_input)
+            assert mock_save.call_count == 2  # user + mascot
+
+
+# ---------------------------------------------------------------------------
+# T-15: 整合性チェック公開定数 + 累計カウンタ (FR-6.4)
+# ---------------------------------------------------------------------------
+
+
+class TestConsistencyPublicConstants:
+    """整合性チェック公開定数のテスト (T-15)."""
+
+    def test_character_hallucination_patterns_exported(self) -> None:
+        """CHARACTER_HALLUCINATION_PATTERNS が公開されていること."""
+        from kage_shiki.agent.agent_core import CHARACTER_HALLUCINATION_PATTERNS
+        assert isinstance(CHARACTER_HALLUCINATION_PATTERNS, list)
+        assert len(CHARACTER_HALLUCINATION_PATTERNS) > 0
+
+    def test_action_ambiguity_patterns_exported(self) -> None:
+        """ACTION_AMBIGUITY_PATTERNS が公開されていること."""
+        from kage_shiki.agent.agent_core import ACTION_AMBIGUITY_PATTERNS
+        assert isinstance(ACTION_AMBIGUITY_PATTERNS, list)
+        assert len(ACTION_AMBIGUITY_PATTERNS) > 0
+
+    def test_knowledge_degradation_patterns_exported(self) -> None:
+        """KNOWLEDGE_DEGRADATION_PATTERNS が公開されていること."""
+        from kage_shiki.agent.agent_core import KNOWLEDGE_DEGRADATION_PATTERNS
+        assert isinstance(KNOWLEDGE_DEGRADATION_PATTERNS, list)
+        assert len(KNOWLEDGE_DEGRADATION_PATTERNS) > 0
+
+    def test_public_aliases_match_internal(self) -> None:
+        """公開定数が内部定数と同一オブジェクトであること."""
+        from kage_shiki.agent.agent_core import (
+            _AMBIGUITY_PATTERNS,
+            _DEGRADATION_PATTERNS,
+            _HALLUCINATION_PATTERNS,
+            ACTION_AMBIGUITY_PATTERNS,
+            CHARACTER_HALLUCINATION_PATTERNS,
+            KNOWLEDGE_DEGRADATION_PATTERNS,
+        )
+        assert CHARACTER_HALLUCINATION_PATTERNS is _HALLUCINATION_PATTERNS
+        assert ACTION_AMBIGUITY_PATTERNS is _AMBIGUITY_PATTERNS
+        assert KNOWLEDGE_DEGRADATION_PATTERNS is _DEGRADATION_PATTERNS
+
+
+class TestConsistencyHitCount:
+    """consistency_hit_count セッション累計テスト (T-15)."""
+
+    def test_initial_hit_count_is_zero(self, agent_core: AgentCore) -> None:
+        """初期状態で consistency_hit_count が 0 であること."""
+        assert agent_core.consistency_hit_count == 0
+
+    def test_hit_count_incremented_on_detection(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """パターン検出時に hit_count が加算されること."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "私はAIです。"
+        agent_core.process_turn("テスト")
+        assert agent_core.consistency_hit_count > 0
+
+    def test_hit_count_not_incremented_on_clean_response(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """正常応答では hit_count が加算されないこと."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "いい天気だね。"
+        agent_core.process_turn("テスト")
+        assert agent_core.consistency_hit_count == 0
+
+    def test_hit_count_accumulates_across_turns(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """複数ターンで累計が蓄積されること."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "私はAIです。"
+        agent_core.process_turn("テスト1")
+        first_count = agent_core.consistency_hit_count
+        agent_core.process_turn("テスト2")
+        assert agent_core.consistency_hit_count > first_count
+
+    def test_hit_count_logged_in_warning(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """WARNING ログにセッション累計が含まれること."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "私はAIです。"
+        with patch("kage_shiki.agent.agent_core.logger") as mock_logger:
+            agent_core.process_turn("テスト")
+            warning_calls = mock_logger.warning.call_args_list
+            assert any("session_total" in str(c) for c in warning_calls)

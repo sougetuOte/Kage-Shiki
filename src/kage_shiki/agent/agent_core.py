@@ -369,6 +369,11 @@ _CONSISTENCY_RULES: dict[int, tuple[str, list[str]]] = {
     3: ("knowledge_degradation", _DEGRADATION_PATTERNS),
 }
 
+# 公開エイリアス（tasks.md 仕様名準拠、T-15）
+CHARACTER_HALLUCINATION_PATTERNS = _HALLUCINATION_PATTERNS
+ACTION_AMBIGUITY_PATTERNS = _AMBIGUITY_PATTERNS
+KNOWLEDGE_DEGRADATION_PATTERNS = _DEGRADATION_PATTERNS
+
 
 def check_consistency_rules(response: str) -> list[ConsistencyHit]:
     """ルールベース後処理パターンマッチング (D-8 Section 5.4).
@@ -398,6 +403,12 @@ def check_consistency_rules(response: str) -> list[ConsistencyHit]:
 
 
 # ---------------------------------------------------------------------------
+# T-14: クリックイベント（突っつき）定数 (FR-2.5)
+# ---------------------------------------------------------------------------
+
+POKE_EVENT_PREFIX = "[クリックイベント]"
+
+# ---------------------------------------------------------------------------
 # T-13: AgentCore（FR-6.1）
 # ---------------------------------------------------------------------------
 
@@ -421,6 +432,7 @@ class AgentCore:
     Attributes:
         session_context: セッション状態。
         session_start_message: セッション開始時の挨拶テキスト。
+        consistency_hit_count: セッション開始からの整合性チェックヒット累計数（T-15）。
     """
 
     def __init__(
@@ -437,6 +449,7 @@ class AgentCore:
 
         self.session_context = SessionContext()
         self.session_start_message = ""
+        self.consistency_hit_count = 0
 
         self._prompt_builder = PromptBuilder(
             persona_core=getattr(persona_system, "_persona_core_text", ""),
@@ -502,11 +515,12 @@ class AgentCore:
             cold_memories=cold_memories if cold_memories else None,
         )
 
-        # 5. LLM 呼び出し
+        # 5. LLM 呼び出し — クリックイベントなら purpose="poke" (FR-2.5)
+        purpose = "poke" if user_input.startswith(POKE_EVENT_PREFIX) else "conversation"
         response = self._llm_client.send_message_for_purpose(
             system=system_prompt,
             messages=messages,
-            purpose="conversation",
+            purpose=purpose,
         )
 
         # 6. observations 即時書込 (FR-3.7)
@@ -529,14 +543,16 @@ class AgentCore:
 
         # 7. 整合性チェック（D-8 ルールベース後処理）
         hits = check_consistency_rules(response)
+        self.consistency_hit_count += len(hits)
         for hit in hits:
             logger.warning(
                 "consistency_check: type=%d (%s), session_id=%s, "
-                "message_count=%d, pattern=%r",
+                "message_count=%d, session_total=%d, pattern=%r",
                 hit.type_id,
                 hit.type_name,
                 self.session_context.session_id,
                 self.session_context.message_count,
+                self.consistency_hit_count,
                 hit.pattern,
             )
 
