@@ -78,6 +78,9 @@ _HUMAN_BLOCK_SECTIONS: frozenset[str] = frozenset({
     "更新履歴",
 })
 
+# human_block.md の有効セクション名（公開エイリアス: human_block_updater から参照）
+HUMAN_BLOCK_SECTIONS: frozenset[str] = _HUMAN_BLOCK_SECTIONS
+
 # ---------------------------------------------------------------------------
 # personality_trends.md テンプレート（requirements.md Section 4.3.4 準拠）
 # ---------------------------------------------------------------------------
