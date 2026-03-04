@@ -917,8 +917,8 @@ flowchart TD
 - [ ] shutdown_callback 内で例外が発生してもクラッシュしないこと
 
 **成果物**:
-- `src/kage_shiki/memory/memory_worker.py`（シャットダウンハンドラー部分、または専用モジュール）
-- `tests/test_memory/test_memory_worker.py`（シャットダウンテスト）
+- `src/kage_shiki/core/shutdown_handler.py`
+- `tests/test_core/test_shutdown_handler.py`
 
 **インターフェース契約**:
 | 種別 | 定義 |

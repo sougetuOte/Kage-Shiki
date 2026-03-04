@@ -36,19 +36,22 @@
 
 ### Phase 1 進捗
 
-テスト: 449 passed / カバレッジ: 98%
+テスト: 546 passed / カバレッジ: 98%
 
 実装済みモジュール:
 - `core/config.py` — TOML 設定パーサー + バリデーション
 - `core/env.py` — 環境変数管理 + API キー検証
 - `core/errors.py` — エラーメッセージ定義（EM-001〜EM-011）
 - `core/logging_setup.py` — ログ設定（RotatingFileHandler）
+- `core/shutdown_handler.py` — シャットダウン2層防御（atexit + SetConsoleCtrlHandler）
 - `agent/llm_client.py` — LLM クライアント（purpose ベースモデルスロット）
-- `agent/agent_core.py` — AgentCore ReAct ループ + 整合性チェック
+- `agent/agent_core.py` — AgentCore ReAct ループ + 整合性チェック + クリック処理
+- `agent/trends_proposal.py` — personality_trends 承認フロー（トリガー + 承認判定）
+- `agent/human_block_updater.py` — human_block 自己編集（ガードレール付き）
 - `memory/db.py` — SQLite + FTS5 CRUD + リトライ
 - `memory/memory_worker.py` — 日次サマリー生成 + 欠損日補完
 - `persona/persona_system.py` — 3段階ペルソナロード + 凍結制御 + freeze_and_save
-- `persona/wizard.py` — ウィザードモード A/B + プレビュー + 凍結
+- `persona/wizard.py` — ウィザードモード A/B/C + プレビュー + 凍結 + 白紙育成
 - `gui/tkinter_view.py` — MascotView Protocol + 枠なしウィンドウ
 - `tray/system_tray.py` — pystray 統合 + メニュー + 通知
 

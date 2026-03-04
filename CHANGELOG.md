@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 1: 基盤（MVP）— BUILDING 進行中
 
+#### Wave 7 (2026-03-04)
+
+- **T-14**: クリックイベント（突っつき）処理（POKE_EVENT_PREFIX + purpose="poke" 切替）
+- **T-15**: 整合性チェック公開定数エイリアス + consistency_hit_count セッションカウンタ
+- **T-16**: personality_trends 承認フロー（T1/T2 トリガー + 提案パース + 承認/却下判定）
+- **T-17**: human_block 自己編集（マーカーパース + ガードレール5種 + 履歴フォーマット）
+- **T-19**: シャットダウン2層防御（ctypes SetConsoleCtrlHandler + atexit + 2重実行防止）
+- **T-23**: ウィザード方式C（白紙育成 + blank_freeze_threshold 凍結提案）
+- **audit**: full-review 10件修正（dict.get() WARNING ログ化、VALID_SECTIONS 統合、Phase 2 マーク追記 等）
+
 #### Wave 6 (2026-03-04)
 
 - **T-13**: AgentCore ReAct ループ（FTS5 検索 + プロンプト構築 + LLM 呼出 + observations 書込 + 整合性チェック）

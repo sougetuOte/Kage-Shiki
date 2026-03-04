@@ -280,6 +280,29 @@ CREATE INDEX idx_curiosity_status ON curiosity_targets (status, priority);
 - 一時情報はフィルタ（枝刈り）
 - 矛盾時は最新日付が勝つ（鮮度優先）
 
+**実装モジュール**: `src/kage_shiki/agent/human_block_updater.py`（T-17）
+
+**LLM応答内更新マーカー仕様**:
+
+LLM 応答に以下のマーカーを埋め込むことで human_block 更新を指示する。
+AgentCore は会話ターン完了後（非同期）にマーカーをパースし、`PersonaSystem.update_human_block()` を呼び出す（T-25 で統合）。
+
+```
+---human_block_update---
+セクション: <セクション名>
+内容: <追記テキスト>
+---update_end---
+```
+
+有効なセクション名（`VALID_SECTIONS`）: `基本情報`、`好み・興味`、`習慣・パターン`
+（`更新履歴` への直接書き込みは禁止。自動管理。）
+
+**ガードレール詳細**:
+- 推測キーワード検出（「おそらく」「たぶん」「きっと」等）→ 拒否
+- 一時キーワードが 2 つ以上（「今日」「さっき」「今」等）→ 拒否
+- `更新履歴` セクションへの直接書き込み → 拒否
+- 空コンテンツ → 拒否
+
 #### 4.3.4 personality_trends.md
 
 ```markdown
