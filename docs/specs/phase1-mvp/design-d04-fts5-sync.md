@@ -202,11 +202,15 @@ CREATE TABLE IF NOT EXISTS observations (
     embedding   BLOB
 );
 
--- 2. FTS5 仮想テーブル（外部コンテンツテーブル方式）
+-- 2. FTS5 仮想テーブル（外部コンテンツテーブル方式 + trigram トークナイザ）
+-- trigram: CJK（日本語等の非空白区切り言語）の部分一致検索に対応。
+-- デフォルトの unicode61 はスペース区切り単語ベースのため日本語では機能しない。
+-- 最低3文字のクエリが必要。
 CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
     content,
     content='observations',
-    content_rowid='id'
+    content_rowid='id',
+    tokenize='trigram'
 );
 
 -- 3. FTS5 同期トリガー（INSERT のみ）
