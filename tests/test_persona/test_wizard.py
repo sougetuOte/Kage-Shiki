@@ -1,13 +1,15 @@
-"""Tests for persona/wizard.py — WizardController (T-20, T-21, T-22).
+"""Tests for persona/wizard.py — WizardController (T-20, T-21, T-22, T-23).
 
 対応 FR:
     FR-5.1: ウィザード方式によるキャラクター生成（方式 A/B のバックエンドロジック部分）
     FR-5.2: AI おまかせ方式（連想拡張 + 候補生成 + 選択）
     FR-5.3: 既存イメージ方式（自由記述 + AI 整形補完）
+    FR-5.4: 方式 C（白紙育成）— 名前 + 一人称のみ入力 → 未凍結で開始
     FR-5.5: プレビュー会話（3-5往復）
     FR-5.6: 凍結処理
     FR-5.7: 連想拡張パイプライン
     FR-5.8: 生成メタデータの記録
+    FR-5.9: blank_freeze_threshold 会話後に AI が全体像を提案 → ユーザー承認で凍結
 
 対応設計:
     D-5: ウィザードフロー設計
@@ -703,3 +705,227 @@ class TestFreezePersona:
             style_text="## S1\nテスト",
             persona_dir=tmp_path,
         )
+
+
+# ---------------------------------------------------------------------------
+# T-23: 方式 C — 白紙育成 (FR-5.4)
+# ---------------------------------------------------------------------------
+
+
+class TestCreateBlankPersona:
+    """create_blank_persona のテスト (FR-5.4)."""
+
+    def test_create_blank_persona_basic(
+        self, controller: WizardController,
+    ) -> None:
+        """名前 + 一人称で最小 PersonaCore が生成されること."""
+        persona, _ = controller.create_blank_persona(
+            name="ミドリ", first_person="わたし",
+        )
+        assert isinstance(persona, PersonaCore)
+        assert persona.c1_name == "ミドリ"
+        assert persona.c2_first_person == "わたし"
+
+    def test_create_blank_persona_with_user_name(
+        self, controller: WizardController,
+    ) -> None:
+        """user_name 指定時に c3_second_person が設定されること."""
+        persona, _ = controller.create_blank_persona(
+            name="ミドリ", first_person="わたし", user_name="田中",
+        )
+        assert persona.c3_second_person == "田中"
+
+    def test_create_blank_persona_without_user_name(
+        self, controller: WizardController,
+    ) -> None:
+        """user_name 未指定時に c3_second_person が 'あなた' であること."""
+        persona, _ = controller.create_blank_persona(
+            name="ミドリ", first_person="わたし",
+        )
+        assert persona.c3_second_person == "あなた"
+
+    def test_create_blank_persona_metadata(
+        self, controller: WizardController,
+    ) -> None:
+        """generation_metadata に method='C' が記録されること."""
+        controller.create_blank_persona(name="ミドリ", first_person="わたし")
+        assert controller.generation_metadata["method"] == "C"
+
+    def test_create_blank_persona_style_template(
+        self, controller: WizardController,
+    ) -> None:
+        """返される style_samples が S1-S7 の空テンプレートであること."""
+        _, style = controller.create_blank_persona(
+            name="ミドリ", first_person="わたし",
+        )
+        for i in range(1, 8):
+            assert f"## S{i}" in style
+        assert "まだ定義されていません" in style
+
+
+# ---------------------------------------------------------------------------
+# T-23: 凍結提案トリガー (FR-5.9)
+# ---------------------------------------------------------------------------
+
+
+class TestShouldProposeFreeze:
+    """should_propose_freeze のテスト (FR-5.9)."""
+
+    def test_should_propose_freeze_at_threshold(
+        self, controller: WizardController, config: AppConfig,
+    ) -> None:
+        """threshold=20 で count=20 → True であること."""
+        assert config.wizard.blank_freeze_threshold == 20
+        assert controller.should_propose_freeze(20) is True
+
+    def test_should_propose_freeze_at_multiple(
+        self, controller: WizardController,
+    ) -> None:
+        """threshold=20 で count=40 → True であること."""
+        assert controller.should_propose_freeze(40) is True
+
+    def test_should_propose_freeze_below(
+        self, controller: WizardController,
+    ) -> None:
+        """threshold=20 で count=19 → False であること."""
+        assert controller.should_propose_freeze(19) is False
+
+    def test_should_propose_freeze_between(
+        self, controller: WizardController,
+    ) -> None:
+        """threshold=20 で count=25 → False であること."""
+        assert controller.should_propose_freeze(25) is False
+
+    def test_should_propose_freeze_zero_count(
+        self, controller: WizardController,
+    ) -> None:
+        """count=0 → False であること."""
+        assert controller.should_propose_freeze(0) is False
+
+    def test_should_propose_freeze_zero_threshold(
+        self, mock_llm: Mock,
+    ) -> None:
+        """threshold=0 で任意 count → False であること（無効化）."""
+        config = AppConfig()
+        # blank_freeze_threshold を 0 に設定したコントローラを作る
+        import dataclasses
+
+        wiz_cfg = dataclasses.replace(config.wizard, blank_freeze_threshold=0)
+        cfg_zero = dataclasses.replace(config, wizard=wiz_cfg)
+        ctrl = WizardController(mock_llm, cfg_zero)
+        assert ctrl.should_propose_freeze(20) is False
+        assert ctrl.should_propose_freeze(100) is False
+
+    def test_should_propose_freeze_negative_count(
+        self, controller: WizardController,
+    ) -> None:
+        """負数の会話数では凍結提案しないこと（防御的）."""
+        # 実用上 mascot_message_count が負になることはないが、防御的に False を返すこと
+        result = controller.should_propose_freeze(-20)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# T-23: 凍結提案生成 (FR-5.9)
+# ---------------------------------------------------------------------------
+
+_FREEZE_PROPOSAL_RESPONSE = json.dumps(
+    {
+        "c1_name": "ミドリ",
+        "c2_first_person": "わたし",
+        "c3_second_person": "あなた",
+        "c4_personality_core": "明るくて好奇心旺盛です。",
+        "c5_personality_axes": "積極性、好奇心",
+        "c6_speech_pattern": "「〜だよ」が多め",
+        "c7_catchphrase": "えへへ",
+        "c8_age_impression": "10代",
+        "c9_values": "誠実さ",
+        "c10_forbidden": "嘘をつくこと",
+        "c11_self_knowledge": "知識は標準的",
+    },
+    ensure_ascii=False,
+)
+
+
+class TestGenerateFreezeProposal:
+    """generate_freeze_proposal のテスト (FR-5.9)."""
+
+    def test_generate_freeze_proposal_success(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """LLM モック、正常系で PersonaCore が返ること."""
+        mock_llm.send_message_for_purpose.return_value = _FREEZE_PROPOSAL_RESPONSE
+        persona = controller.generate_freeze_proposal(
+            name="ミドリ",
+            observations_text="会話内容のまとめ...",
+        )
+        assert isinstance(persona, PersonaCore)
+        assert persona.c1_name == "ミドリ"
+
+    def test_generate_freeze_proposal_metadata(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """method='C_freeze' が generation_metadata に記録されること."""
+        mock_llm.send_message_for_purpose.return_value = _FREEZE_PROPOSAL_RESPONSE
+        controller.generate_freeze_proposal(
+            name="ミドリ",
+            observations_text="観察内容",
+        )
+        assert controller.generation_metadata["method"] == "C_freeze"
+        assert "observations_summary" in controller.generation_metadata
+
+    def test_generate_freeze_proposal_invalid_json(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """LLM 応答が不正 JSON → ValueError が発生すること."""
+        mock_llm.send_message_for_purpose.return_value = "これはJSONではない"
+        with pytest.raises(ValueError, match="JSON パース失敗"):
+            controller.generate_freeze_proposal(
+                name="ミドリ",
+                observations_text="観察内容",
+            )
+
+    def test_generate_freeze_proposal_with_user_name(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """user_name 指定時にプロンプトにユーザー名が含まれること。"""
+        mock_llm.send_message_for_purpose.return_value = _FREEZE_PROPOSAL_RESPONSE
+        controller.generate_freeze_proposal(
+            name="ミドリ",
+            observations_text="観察内容",
+            user_name="田中",
+        )
+        user_msg = mock_llm.send_message_for_purpose.call_args.kwargs["messages"][0]["content"]
+        assert "田中" in user_msg
+
+    def test_generate_freeze_proposal_without_user_name(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """user_name 未指定時にプロンプトにユーザー名情報が含まれないこと。"""
+        mock_llm.send_message_for_purpose.return_value = _FREEZE_PROPOSAL_RESPONSE
+        controller.generate_freeze_proposal(
+            name="ミドリ",
+            observations_text="観察内容",
+        )
+        user_msg = mock_llm.send_message_for_purpose.call_args.kwargs["messages"][0]["content"]
+        assert "ユーザーの名前は" not in user_msg
+
+
+# ---------------------------------------------------------------------------
+# T-23: 空スタイルテンプレート (FR-5.4)
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateBlankStyleTemplate:
+    """generate_blank_style_template のテスト (FR-5.4)."""
+
+    def test_generate_blank_style_template(self) -> None:
+        """S1-S7 全セクションが含まれること."""
+        result = WizardController.generate_blank_style_template()
+        for i in range(1, 8):
+            assert f"## S{i}" in result
+
+    def test_generate_blank_style_template_placeholder(self) -> None:
+        """各セクションに「まだ定義されていません」が含まれること."""
+        result = WizardController.generate_blank_style_template()
+        assert result.count("まだ定義されていません") == 7

@@ -1,13 +1,15 @@
-"""ウィザードコントローラ (T-20, T-21, T-22).
+"""ウィザードコントローラ (T-20, T-21, T-22, T-23).
 
 対応 FR:
     FR-5.1: ウィザード方式によるキャラクター生成
     FR-5.2: AI おまかせ方式（連想拡張 + 候補生成 + 選択）
     FR-5.3: 既存イメージ方式（自由記述 + AI 整形補完）
+    FR-5.4: 方式 C（白紙育成）— 名前 + 一人称のみ入力 → 未凍結で開始
     FR-5.5: プレビュー会話（3-5往復）
     FR-5.6: 凍結処理
     FR-5.7: 連想拡張パイプライン
     FR-5.8: 生成メタデータの記録
+    FR-5.9: blank_freeze_threshold 会話後に AI が全体像を提案 → ユーザー承認で凍結
 
 対応設計:
     D-5: ウィザードフロー設計
@@ -137,6 +139,45 @@ _W4_SYSTEM = (
     "## S7: 沈黙破り\n..."
 )
 
+# ---------------------------------------------------------------------------
+# W-5: 凍結提案用プロンプト (FR-5.9)
+# ---------------------------------------------------------------------------
+
+_W5_SYSTEM = (
+    "あなたはキャラクター設計の専門家です。"
+    "以下の会話履歴から、このキャラクターの人格を分析し、"
+    "C1-C11の人格パラメータとして整理してください。\n\n"
+    "応答は以下のJSON構造のみを出力してください:\n"
+    "{\n"
+    '  "c1_name": "名前",\n'
+    '  "c2_first_person": "一人称",\n'
+    '  "c3_second_person": "ユーザーの呼び方",\n'
+    '  "c4_personality_core": "人格核文（2-3文）",\n'
+    '  "c5_personality_axes": "性格軸（箇条書き3-5項目）",\n'
+    '  "c6_speech_pattern": "口調パターンの説明",\n'
+    '  "c7_catchphrase": "口癖（2-3個）",\n'
+    '  "c8_age_impression": "年齢感の説明",\n'
+    '  "c9_values": "価値観の説明",\n'
+    '  "c10_forbidden": "禁忌事項（2-3個）",\n'
+    '  "c11_self_knowledge": "知識の自己認識"\n'
+    "}\n\n"
+    "応答はJSONのみを出力してください。説明文は不要です。"
+)
+
+# ---------------------------------------------------------------------------
+# 空スタイルテンプレート定義 (FR-5.4)
+# ---------------------------------------------------------------------------
+
+_BLANK_STYLE_SECTIONS = [
+    "S1: 日常会話",
+    "S2: 喜び",
+    "S3: 怒り・不快",
+    "S4: 悲しみ・寂しさ",
+    "S5: 困惑・不知",
+    "S6: ユーモア",
+    "S7: 沈黙破り",
+]
+
 
 # ---------------------------------------------------------------------------
 # JSON 抽出ヘルパー
@@ -201,12 +242,13 @@ def _dict_to_persona_core(d: dict[str, str]) -> PersonaCore:
 
 
 class WizardController:
-    """ウィザードコントローラ (D-5, T-20/T-21/T-22).
+    """ウィザードコントローラ (D-5, T-20/T-21/T-22/T-23).
 
     方式 A: 連想拡張 → 候補生成 → スタイルサンプル生成 (T-20)
     方式 B: 自由記述 → AI 整形・補完 (T-21)
     共通: プレビュー会話 + 凍結処理 (T-22)
-    方式 C (W-6: 凍結提案) は T-23 で実装予定。
+    方式 C: 白紙育成 (FR-5.4) — 名前 + 一人称のみで開始し、
+            blank_freeze_threshold (FR-5.9) 会話後に AI が全体像を提案して凍結 (T-23)
 
     Attributes:
         generation_metadata: 生成メタデータ（FR-5.8）。
@@ -470,3 +512,141 @@ class WizardController:
         style_path.write_text(style_text, encoding="utf-8")
 
         logger.info("ペルソナ凍結完了: %s", persona.c1_name)
+
+    # -----------------------------------------------------------------------
+    # T-23: 方式 C — 白紙育成 (FR-5.4, FR-5.9)
+    # -----------------------------------------------------------------------
+
+    def create_blank_persona(
+        self,
+        name: str,
+        first_person: str,
+        user_name: str = "",
+    ) -> tuple[PersonaCore, str]:
+        """白紙育成用の最小 PersonaCore を生成する (FR-5.4).
+
+        名前と一人称のみで PersonaCore を作成し、残りのフィールドは空文字列とする。
+        凍結は行わず、会話を通じて育てていく方式 C の起点となる。
+
+        Args:
+            name: キャラクター名（C1）。
+            first_person: 一人称（C2）。
+            user_name: ユーザー名（任意）。省略時は「あなた」を C3 に設定。
+
+        Returns:
+            (PersonaCore, style_samples テキスト) のタプル。
+            style_samples は S1-S7 の空テンプレートテキスト。
+        """
+        second_person = user_name if user_name else "あなた"
+        personality_core = f"{name}です。よろしくね。"
+
+        persona = PersonaCore(
+            c1_name=name,
+            c2_first_person=first_person,
+            c3_second_person=second_person,
+            c4_personality_core=personality_core,
+            c5_personality_axes="",
+            c6_speech_pattern="",
+            c7_catchphrase="",
+            c8_age_impression="",
+            c9_values="",
+            c10_forbidden="",
+            c11_self_knowledge="",
+        )
+
+        style_samples = self.generate_blank_style_template()
+
+        self.generation_metadata = {
+            "generated_at": datetime.now().isoformat(),
+            "method": "C",
+        }
+
+        logger.info("白紙育成ペルソナ生成完了: %s", name)
+        return persona, style_samples
+
+    def should_propose_freeze(self, mascot_message_count: int) -> bool:
+        """凍結提案タイミングを判定する (FR-5.9).
+
+        mascot_message_count が blank_freeze_threshold の正の倍数である場合に
+        True を返す。threshold が 0 の場合は常に False（無効化）。
+
+        Args:
+            mascot_message_count: マスコットのメッセージ送信回数。
+
+        Returns:
+            凍結提案を行うべき場合 True。
+        """
+        threshold = self._config.wizard.blank_freeze_threshold
+        if threshold == 0:
+            return False
+        if mascot_message_count <= 0:
+            return False
+        return mascot_message_count % threshold == 0
+
+    def generate_freeze_proposal(
+        self,
+        name: str,
+        observations_text: str,
+        user_name: str = "",
+    ) -> PersonaCore:
+        """会話履歴から全体像を分析し PersonaCore 草案を生成する (FR-5.9).
+
+        W-5 プロンプトを使用して LLM に C1-C11 の草案を生成させる。
+
+        Args:
+            name: キャラクター名（ユーザー確認済みの名前）。
+            observations_text: 会話観察ログのテキスト。
+            user_name: ユーザー名（任意）。指定時は LLM プロンプトに追加。
+
+        Returns:
+            LLM が提案した PersonaCore。
+
+        Raises:
+            LLMError: API 呼び出し失敗。
+            ValueError: LLM 応答の JSON パース失敗。
+        """
+        user_parts = [
+            f"キャラクター名: {name}\n\n"
+            "以下の会話履歴からこのキャラクターの人格を分析してください:\n\n"
+            f"{observations_text}",
+        ]
+        if user_name:
+            user_parts.append(f"\nユーザーの名前は「{user_name}」です。")
+        user_msg = "\n".join(user_parts)
+
+        response = self._llm.send_message_for_purpose(
+            system=_W5_SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+            purpose="wizard_generate",
+        )
+
+        data = _extract_json(response)
+        if not isinstance(data, dict):
+            raise ValueError(f"凍結提案データの形式が不正です: {type(data)}")
+
+        persona = _dict_to_persona_core(data)
+
+        # FR-5.8: メタデータ記録
+        summary = observations_text[:100] if len(observations_text) > 100 else observations_text
+        self.generation_metadata = {
+            "generated_at": datetime.now().isoformat(),
+            "method": "C_freeze",
+            "observations_summary": summary,
+        }
+
+        logger.info("凍結提案生成完了: %s", persona.c1_name)
+        return persona
+
+    @staticmethod
+    def generate_blank_style_template() -> str:
+        """S1-S7 の空スタイルテンプレートを生成する (FR-5.4).
+
+        各セクションに「まだ定義されていません」プレースホルダーを設定する。
+
+        Returns:
+            S1-S7 の空テンプレートテキスト（Markdown 形式）。
+        """
+        sections = []
+        for section in _BLANK_STYLE_SECTIONS:
+            sections.append(f"## {section}\n（まだ定義されていません）")
+        return "\n\n".join(sections)
