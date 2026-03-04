@@ -27,12 +27,29 @@ Memory carries over between sessions, and the personality is frozen after initia
 
 ## Phase Roadmap
 
-| Phase | Contents |
-|-------|----------|
-| **Phase 1: Foundation (MVP)** | tkinter GUI + pystray tray, API connection, personality generation wizard, memory system, daily summaries |
-| **Phase 2: Autonomy** | Desire system, autonomous utterances, semantic search (sqlite-vec), forgetting curve |
-| **Phase 3: Intelligence** | Curiosity system, Theory of Mind, approval-gated personality trend updates |
-| **Phase 4: Maturity** | Consistency check improvements, monthly memory summarization |
+| Phase | Contents | Status |
+|-------|----------|--------|
+| **Phase 1: Foundation (MVP)** | tkinter GUI + pystray tray, API connection, personality generation wizard, memory system, daily summaries | **Building** |
+| **Phase 2: Autonomy** | Desire system, autonomous utterances, semantic search (sqlite-vec), forgetting curve | Not started |
+| **Phase 3: Intelligence** | Curiosity system, Theory of Mind, approval-gated personality trend updates | Not started |
+| **Phase 4: Maturity** | Consistency check improvements, monthly memory summarization | Not started |
+
+### Phase 1 Progress
+
+Tests: 404 passed / Coverage: 99%
+
+Implemented modules:
+- `core/config.py` — TOML config parser + validation
+- `core/env.py` — Environment variable management + API key verification
+- `core/errors.py` — Error message definitions (EM-001 to EM-011)
+- `core/logging_setup.py` — Log configuration (RotatingFileHandler)
+- `agent/llm_client.py` — LLM client (purpose-based model slots)
+- `agent/agent_core.py` — session_id generation + PromptBuilder
+- `memory/db.py` — SQLite + FTS5 CRUD + retry
+- `persona/persona_system.py` — 3-stage persona loading + freeze control
+- `persona/wizard.py` — Wizard mode A controller
+- `gui/tkinter_view.py` — MascotView Protocol + borderless window
+- `tray/system_tray.py` — pystray integration + menu + notifications
 
 ---
 

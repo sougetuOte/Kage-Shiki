@@ -27,12 +27,29 @@
 
 ## Phase ロードマップ
 
-| Phase | 内容 |
-|-------|------|
-| **Phase 1: 基盤（MVP）** | tkinter GUI + pystray 常駐、API 接続、人格生成ウィザード、記憶システム、日次サマリー |
-| **Phase 2: 自律性** | 欲求システム、自律発言、セマンティック検索（sqlite-vec）、忘却曲線 |
-| **Phase 3: 知性** | 好奇心システム、Theory of Mind、傾向メモ層の承認制更新 |
-| **Phase 4: 成熟** | 整合性チェック精度向上、月次記憶要約 |
+| Phase | 内容 | 状況 |
+|-------|------|------|
+| **Phase 1: 基盤（MVP）** | tkinter GUI + pystray 常駐、API 接続、人格生成ウィザード、記憶システム、日次サマリー | **BUILDING 中** |
+| **Phase 2: 自律性** | 欲求システム、自律発言、セマンティック検索（sqlite-vec）、忘却曲線 | 未着手 |
+| **Phase 3: 知性** | 好奇心システム、Theory of Mind、傾向メモ層の承認制更新 | 未着手 |
+| **Phase 4: 成熟** | 整合性チェック精度向上、月次記憶要約 | 未着手 |
+
+### Phase 1 進捗
+
+テスト: 404 passed / カバレッジ: 99%
+
+実装済みモジュール:
+- `core/config.py` — TOML 設定パーサー + バリデーション
+- `core/env.py` — 環境変数管理 + API キー検証
+- `core/errors.py` — エラーメッセージ定義（EM-001〜EM-011）
+- `core/logging_setup.py` — ログ設定（RotatingFileHandler）
+- `agent/llm_client.py` — LLM クライアント（purpose ベースモデルスロット）
+- `agent/agent_core.py` — session_id 生成 + PromptBuilder
+- `memory/db.py` — SQLite + FTS5 CRUD + リトライ
+- `persona/persona_system.py` — 3段階ペルソナロード + 凍結制御
+- `persona/wizard.py` — ウィザードモード A コントローラ
+- `gui/tkinter_view.py` — MascotView Protocol + 枠なしウィンドウ
+- `tray/system_tray.py` — pystray 統合 + メニュー + 通知
 
 ---
 
