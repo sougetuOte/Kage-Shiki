@@ -1,9 +1,12 @@
-"""PersonaSystem — persona_core.md パーサー + 凍結ガード (T-08).
+"""PersonaSystem — ペルソナファイル群の読み書き + 凍結ガード (T-08, T-09).
 
 対応 FR:
     FR-4.1: persona_core.md の読み込み（C1-C11）
+    FR-4.2: style_samples.md の読み込み（S1-S7 口調参照例）
     FR-4.3: ペルソナの凍結状態管理
     FR-4.4: 手動編集検出
+    FR-4.5: human_block.md の読み込み・セクション更新（AI 自己編集）
+    FR-4.6: personality_trends.md の読み込み・セクション追記（AI 提案 → 承認）
     FR-4.8: 3段階エラーハンドリング
 """
 
@@ -48,6 +51,66 @@ _FIELD_MAP: dict[int, str] = {
     10: "c10_forbidden",
     11: "c11_self_knowledge",
 }
+
+# ---------------------------------------------------------------------------
+# human_block.md テンプレート（requirements.md Section 4.3.3 準拠）
+# ---------------------------------------------------------------------------
+
+_HUMAN_BLOCK_TEMPLATE = """\
+# ユーザー情報
+
+## 基本情報
+
+（AI が会話中に検出した情報を追記）
+
+## 好み・興味
+
+## 習慣・パターン
+
+## 更新履歴
+
+"""
+
+_HUMAN_BLOCK_SECTIONS: frozenset[str] = frozenset({
+    "基本情報",
+    "好み・興味",
+    "習慣・パターン",
+    "更新履歴",
+})
+
+# ---------------------------------------------------------------------------
+# personality_trends.md テンプレート（requirements.md Section 4.3.4 準拠）
+# ---------------------------------------------------------------------------
+
+_TRENDS_TEMPLATE = """\
+# 傾向メモ
+
+## 関係性の変化
+
+（AI が提案 → ユーザー承認後に追記）
+
+## 感情の傾向
+
+## 新しい口癖候補（supplementary_styles）
+
+## 提案履歴
+
+"""
+
+_TRENDS_SECTIONS: frozenset[str] = frozenset({
+    "関係性の変化",
+    "感情の傾向",
+    "新しい口癖候補（supplementary_styles）",
+    "提案履歴",
+})
+
+# D-3: 省略判定で除外するセクション（このセクションのみの場合は「空」とみなす）
+_TRENDS_METADATA_ONLY_SECTION = "提案履歴"
+
+# テンプレートのプレースホルダテキスト（空判定時に除外）
+_TRENDS_PLACEHOLDER_TEXTS: frozenset[str] = frozenset({
+    "（AI が提案 → ユーザー承認後に追記）",
+})
 
 # C番号 → セクション見出しラベル（requirements.md Section 4.3.1 準拠）
 _SECTION_LABELS: dict[int, str] = {
@@ -133,6 +196,7 @@ class PersonaSystem:
 
     def __init__(self) -> None:
         self._file_hash: str | None = None
+        self._persona_frozen: bool = False
 
     def load_persona_core(self, path: Path) -> PersonaCore | None:
         """persona_core.md を読み込んで PersonaCore を返す.
@@ -179,6 +243,11 @@ class PersonaSystem:
                     f"必須フィールド C{c_num}（{label}）が欠損しています",
                 )
 
+        # 凍結状態を記録（T-09: style_samples 凍結ガードで参照）
+        self._persona_frozen = (
+            metadata.get(_FREEZE_KEY) == _FREEZE_VALUE_FROZEN
+        )
+
         logger.info("persona_core.md を読み込みました: %s (C1=%s)", path, core.c1_name)
         return core
 
@@ -224,6 +293,173 @@ class PersonaSystem:
         current_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         return current_hash != self._file_hash
 
+    # ------------------------------------------------------------------
+    # FR-4.2: style_samples.md
+    # ------------------------------------------------------------------
+
+    def load_style_samples(self, path: Path) -> str:
+        """style_samples.md を全文読み込みする (FR-4.2).
+
+        Args:
+            path: style_samples.md のファイルパス。
+
+        Returns:
+            ファイル全文。ファイル不在時または読取不能時は空文字列。
+        """
+        if not path.exists():
+            return ""
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning("style_samples.md の読み込みに失敗: %s", path)
+            return ""
+
+    def save_style_samples(self, path: Path, content: str) -> None:
+        """style_samples.md を保存する (FR-4.2).
+
+        凍結ガード: ペルソナが凍結状態の場合は書き込みを拒否する。
+
+        Args:
+            path: 保存先ファイルパス。
+            content: 保存するテキスト。
+
+        Raises:
+            PersonaFrozenError: 凍結状態で書き込みが試みられた場合。
+        """
+        if self._persona_frozen:
+            raise PersonaFrozenError(
+                "ペルソナは凍結されています。style_samples の書き込みはできません。",
+            )
+        path.write_text(content, encoding="utf-8")
+        logger.info("style_samples.md を保存しました: %s", path)
+
+    # ------------------------------------------------------------------
+    # FR-4.5: human_block.md
+    # ------------------------------------------------------------------
+
+    def load_human_block(self, path: Path) -> str:
+        """human_block.md を読み込む (FR-4.5).
+
+        ファイルが存在しない場合はテンプレートを自動生成して保存する。
+
+        Args:
+            path: human_block.md のファイルパス。
+
+        Returns:
+            ファイル全文。
+        """
+        if not path.exists():
+            path.write_text(_HUMAN_BLOCK_TEMPLATE, encoding="utf-8")
+            logger.info("human_block.md テンプレートを生成しました: %s", path)
+        return path.read_text(encoding="utf-8")
+
+    def update_human_block(
+        self, path: Path, section: str, content: str,
+    ) -> None:
+        """human_block.md の指定セクションにコンテンツを追記する (FR-4.5).
+
+        Args:
+            path: human_block.md のファイルパス。
+            section: 追記先セクション名（## の後の文字列）。
+            content: 追記するテキスト。
+
+        Raises:
+            ValueError: 無効なセクション名が指定された場合。
+        """
+        file_content = path.read_text(encoding="utf-8")
+        new_content = self._append_to_section(
+            file_content, section, content, _HUMAN_BLOCK_SECTIONS,
+        )
+        path.write_text(new_content, encoding="utf-8")
+        logger.info("human_block.md セクション '%s' を更新しました", section)
+
+    # ------------------------------------------------------------------
+    # FR-4.6: personality_trends.md
+    # ------------------------------------------------------------------
+
+    def load_personality_trends(self, path: Path) -> str:
+        """personality_trends.md を読み込む (FR-4.6).
+
+        ファイルが存在しない場合はテンプレートを自動生成して保存する。
+
+        Args:
+            path: personality_trends.md のファイルパス。
+
+        Returns:
+            ファイル全文。
+        """
+        if not path.exists():
+            path.write_text(_TRENDS_TEMPLATE, encoding="utf-8")
+            logger.info(
+                "personality_trends.md テンプレートを生成しました: %s", path,
+            )
+        return path.read_text(encoding="utf-8")
+
+    def append_personality_trends(
+        self, path: Path, section: str, entry: str,
+    ) -> None:
+        """personality_trends.md の指定セクションにエントリを追記する (FR-4.6).
+
+        Args:
+            path: personality_trends.md のファイルパス。
+            section: 追記先セクション名（## の後の文字列）。
+            entry: 追記するテキスト。
+
+        Raises:
+            ValueError: 無効なセクション名が指定された場合。
+        """
+        file_content = path.read_text(encoding="utf-8")
+        new_content = self._append_to_section(
+            file_content, section, entry, _TRENDS_SECTIONS,
+        )
+        path.write_text(new_content, encoding="utf-8")
+        logger.info(
+            "personality_trends.md セクション '%s' にエントリを追記しました",
+            section,
+        )
+
+    def is_trends_empty(self, content: str) -> bool:
+        """personality_trends の省略判定 (D-3 Section 5.4).
+
+        「提案履歴」以外のセクションにコンテンツが存在するか否かで判定する。
+        テンプレートのプレースホルダテキストはコンテンツとして扱わない。
+
+        Args:
+            content: personality_trends.md の全文。
+
+        Returns:
+            実質的にコンテンツがない場合 True。
+        """
+        if not content.strip():
+            return True
+
+        section_pattern = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+        matches = list(section_pattern.finditer(content))
+
+        for i, match in enumerate(matches):
+            section_name = match.group(1)
+
+            # D-3: 提案履歴セクションは省略判定から除外
+            if section_name == _TRENDS_METADATA_ONLY_SECTION:
+                continue
+
+            # セクション本文の範囲を特定
+            body_start = match.end()
+            body_end = (
+                matches[i + 1].start() if i + 1 < len(matches) else len(content)
+            )
+            body = content[body_start:body_end].strip()
+
+            # プレースホルダを除いた実質コンテンツが存在すれば非空
+            if body and body not in _TRENDS_PLACEHOLDER_TEXTS:
+                return False
+
+        return True
+
+    # ------------------------------------------------------------------
+    # 内部ヘルパー（パース・描画）
+    # ------------------------------------------------------------------
+
     def _parse_metadata(self, content: str) -> dict[str, str]:
         """メタデータセクションをパースする.
 
@@ -247,9 +483,9 @@ class PersonaSystem:
         # テーブル行をパース
         metadata: dict[str, str] = {}
         rows_found = False
-        for line in meta_text.split("\n"):
-            line = line.strip()
-            match = _METADATA_TABLE_ROW.match(line)
+        for raw_line in meta_text.split("\n"):
+            stripped = raw_line.strip()
+            match = _METADATA_TABLE_ROW.match(stripped)
             if match:
                 key = match.group(1).strip()
                 value = match.group(2).strip()
@@ -353,3 +589,56 @@ class PersonaSystem:
             lines.append("")
 
         return "\n".join(lines)
+
+    def _append_to_section(
+        self,
+        content: str,
+        section: str,
+        entry: str,
+        valid_sections: frozenset[str],
+    ) -> str:
+        """指定セクションの末尾にエントリを追加する.
+
+        Args:
+            content: ファイル全文。
+            section: 対象セクション名。
+            entry: 追記するテキスト。
+            valid_sections: 有効なセクション名の集合。
+
+        Returns:
+            更新後のファイル全文。
+
+        Raises:
+            ValueError: 無効なセクション名が指定された場合。
+        """
+        if section not in valid_sections:
+            raise ValueError(
+                f"セクション '{section}' は有効なセクション名ではありません",
+            )
+
+        header_pattern = re.compile(
+            rf"^##\s+{re.escape(section)}\s*$", re.MULTILINE,
+        )
+        header_match = header_pattern.search(content)
+        if header_match is None:
+            raise ValueError(f"セクション '{section}' が見つかりません")
+
+        after_header = header_match.end()
+
+        # 次の ## セクションを探す
+        next_match = re.search(r"^##\s+", content[after_header:], re.MULTILINE)
+        insert_pos = (
+            after_header + next_match.start() if next_match else len(content)
+        )
+
+        # セクション本文を取得して末尾に追記
+        existing_body = content[after_header:insert_pos].rstrip()
+        remaining = content[insert_pos:]
+        before = content[:after_header]
+
+        if existing_body:
+            new_body = existing_body + "\n\n" + entry + "\n\n"
+        else:
+            new_body = "\n\n" + entry + "\n\n"
+
+        return before + new_body + remaining
