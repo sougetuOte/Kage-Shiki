@@ -15,13 +15,13 @@ from unittest.mock import MagicMock, patch
 class TestMascotViewProtocol:
     """MascotView Protocol 定義のテスト."""
 
-    def test_protocol_importable(self):
+    def test_protocol_importable(self) -> None:
         """MascotView Protocol がインポート可能であること."""
         from kage_shiki.gui.mascot_view import MascotView
 
         assert MascotView is not None
 
-    def test_protocol_has_required_methods(self):
+    def test_protocol_has_required_methods(self) -> None:
         """MascotView Protocol が6つの必須メソッドを持つこと."""
         from kage_shiki.gui.mascot_view import MascotView
 
@@ -34,7 +34,7 @@ class TestMascotViewProtocol:
         assert hasattr(MascotView, "schedule")
         assert hasattr(MascotView, "on_click")
 
-    def test_protocol_is_runtime_checkable(self):
+    def test_protocol_is_runtime_checkable(self) -> None:
         """MascotView Protocol が runtime_checkable であること."""
         from kage_shiki.gui.mascot_view import MascotView
 
@@ -66,20 +66,20 @@ class TestMascotViewProtocol:
 class TestTkinterMascotViewInit:
     """TkinterMascotView 初期化テスト."""
 
-    def test_importable(self):
+    def test_importable(self) -> None:
         """TkinterMascotView がインポート可能であること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
         assert TkinterMascotView is not None
 
-    def test_instantiation(self, tk_root, input_queue, gui_config):
+    def test_instantiation(self, tk_root, input_queue, gui_config) -> None:
         """TkinterMascotView が正常にインスタンス化できること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
         view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
         assert view is not None
 
-    def test_implements_mascot_view_protocol(self, tk_root, input_queue, gui_config):
+    def test_implements_mascot_view_protocol(self, tk_root, input_queue, gui_config) -> None:
         """TkinterMascotView が MascotView Protocol に準拠すること (FR-2.6)."""
         from kage_shiki.gui.mascot_view import MascotView
         from kage_shiki.gui.tkinter_view import TkinterMascotView
@@ -87,7 +87,7 @@ class TestTkinterMascotViewInit:
         view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
         assert isinstance(view, MascotView)
 
-    def test_overrideredirect_applied(self, tk_root, input_queue, gui_config):
+    def test_overrideredirect_applied(self, tk_root, input_queue, gui_config) -> None:
         """overrideredirect(True) が適用されてタイトルバーなしになること (FR-2.1)."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -99,7 +99,7 @@ class TestTkinterMascotViewInit:
 class TestTkinterMascotViewDisplay:
     """TkinterMascotView の表示機能テスト."""
 
-    def test_display_text_updates_label(self, tk_root, input_queue, gui_config):
+    def test_display_text_updates_label(self, tk_root, input_queue, gui_config) -> None:
         """display_text() でラベルのテキストが更新されること (FR-2.4)."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -108,7 +108,7 @@ class TestTkinterMascotViewDisplay:
 
         assert view.text_var.get() == "こんにちは"
 
-    def test_display_text_with_empty_string(self, tk_root, input_queue, gui_config):
+    def test_display_text_with_empty_string(self, tk_root, input_queue, gui_config) -> None:
         """display_text() に空文字を渡してもエラーにならないこと."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -117,7 +117,7 @@ class TestTkinterMascotViewDisplay:
 
         assert view.text_var.get() == ""
 
-    def test_display_text_overwrites_previous(self, tk_root, input_queue, gui_config):
+    def test_display_text_overwrites_previous(self, tk_root, input_queue, gui_config) -> None:
         """display_text() の連続呼び出しで最新テキストに上書きされること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -131,7 +131,7 @@ class TestTkinterMascotViewDisplay:
 class TestTkinterMascotViewShowHide:
     """TkinterMascotView の表示/非表示テスト."""
 
-    def test_show_makes_window_visible(self, tk_root, input_queue, gui_config):
+    def test_show_makes_window_visible(self, tk_root, input_queue, gui_config) -> None:
         """show() でウィンドウが表示状態になること (FR-2.1)."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -143,7 +143,7 @@ class TestTkinterMascotViewShowHide:
         # winfo_viewable() は実際の表示状態、state() は管理状態を返す
         assert tk_root.state() != "withdrawn"
 
-    def test_hide_makes_window_invisible(self, tk_root, input_queue, gui_config):
+    def test_hide_makes_window_invisible(self, tk_root, input_queue, gui_config) -> None:
         """hide() でウィンドウが非表示状態になること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -156,7 +156,7 @@ class TestTkinterMascotViewShowHide:
 class TestTkinterMascotViewSchedule:
     """TkinterMascotView の schedule() テスト."""
 
-    def test_schedule_calls_root_after(self, tk_root, input_queue, gui_config):
+    def test_schedule_calls_root_after(self, tk_root, input_queue, gui_config) -> None:
         """schedule() が root.after() を呼び出すこと."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -167,7 +167,7 @@ class TestTkinterMascotViewSchedule:
             view.schedule(100, callback)
             mock_after.assert_called_once_with(100, callback)
 
-    def test_schedule_with_zero_delay(self, tk_root, input_queue, gui_config):
+    def test_schedule_with_zero_delay(self, tk_root, input_queue, gui_config) -> None:
         """schedule() にディレイ0を渡しても正常動作すること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -182,7 +182,7 @@ class TestTkinterMascotViewSchedule:
 class TestTkinterMascotViewOnClick:
     """TkinterMascotView の on_click() テスト."""
 
-    def test_on_click_registers_handler(self, tk_root, input_queue, gui_config):
+    def test_on_click_registers_handler(self, tk_root, input_queue, gui_config) -> None:
         """on_click() でクリックハンドラーが登録されること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -194,7 +194,7 @@ class TestTkinterMascotViewOnClick:
         # ハンドラーが内部に保存されていること
         assert view._click_handler is handler
 
-    def test_on_click_replaces_previous_handler(self, tk_root, input_queue, gui_config):
+    def test_on_click_replaces_previous_handler(self, tk_root, input_queue, gui_config) -> None:
         """on_click() の再呼び出しで前のハンドラーが置き換わること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -211,7 +211,7 @@ class TestTkinterMascotViewOnClick:
 class TestTkinterMascotViewInput:
     """TkinterMascotView の入力送信テスト."""
 
-    def test_submit_enqueues_text(self, tk_root, input_queue, gui_config):
+    def test_submit_enqueues_text(self, tk_root, input_queue, gui_config) -> None:
         """送信ボタン押下でテキストが input_queue に enqueue されること (FR-2.3)."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -225,7 +225,7 @@ class TestTkinterMascotViewInput:
         assert not input_queue.empty()
         assert input_queue.get_nowait() == "テストメッセージ"
 
-    def test_submit_clears_entry(self, tk_root, input_queue, gui_config):
+    def test_submit_clears_entry(self, tk_root, input_queue, gui_config) -> None:
         """送信後に入力欄がクリアされること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -236,7 +236,9 @@ class TestTkinterMascotViewInput:
 
         assert view.entry_var.get() == ""
 
-    def test_submit_with_empty_text_does_not_enqueue(self, tk_root, input_queue, gui_config):
+    def test_submit_with_empty_text_does_not_enqueue(
+        self, tk_root, input_queue, gui_config,
+    ) -> None:
         """空文字の送信では enqueue しないこと."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
@@ -251,7 +253,7 @@ class TestTkinterMascotViewInput:
 class TestTkinterMascotViewSetBodyState:
     """TkinterMascotView の set_body_state() テスト."""
 
-    def test_set_body_state_does_not_raise(self, tk_root, input_queue, gui_config):
+    def test_set_body_state_does_not_raise(self, tk_root, input_queue, gui_config) -> None:
         """set_body_state() が例外を出さないこと（Phase 1 は no-op）."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 

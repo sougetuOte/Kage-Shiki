@@ -1,8 +1,8 @@
 {
   "feature": "phase-1-mvp",
   "description": "影式 Phase 1: 基盤 (MVP) — 人格を持ち記憶を引き継ぐ常駐テキストデスクトップマスコット",
-  "phase": "PLANNING",
-  "subphase": "design",
+  "phase": "AUDITING",
+  "subphase": "review",
   "status": {
     "requirements": "approved",
     "design": "approved",

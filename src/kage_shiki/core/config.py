@@ -26,8 +26,61 @@ _OPACITY_MAX = 1.0
 # get_max_tokens の固定値（D-15）
 _MAX_TOKENS_WIZARD_GENERATE = 2048
 _MAX_TOKENS_WIZARD_PREVIEW = 1024
+_MAX_TOKENS_WIZARD_ASSOCIATION = 512
 _MAX_TOKENS_MEMORY_WORKER = 800
+_MAX_TOKENS_MEMORY_SUMMARY = 800
+_MAX_TOKENS_HUMAN_BLOCK_UPDATE = 256
 _MAX_TOKENS_POKE = 256
+
+# 用途別 max_tokens マップ（conversation 以外の固定値）
+_MAX_TOKENS_MAP: dict[str, int] = {
+    "wizard_generate": _MAX_TOKENS_WIZARD_GENERATE,
+    "wizard_preview": _MAX_TOKENS_WIZARD_PREVIEW,
+    "wizard_association": _MAX_TOKENS_WIZARD_ASSOCIATION,
+    "memory_worker": _MAX_TOKENS_MEMORY_WORKER,
+    "memory_summary": _MAX_TOKENS_MEMORY_SUMMARY,
+    "human_block_update": _MAX_TOKENS_HUMAN_BLOCK_UPDATE,
+    "poke": _MAX_TOKENS_POKE,
+}
+
+# 用途別モデルスロットマップ
+_PURPOSE_MODEL_SLOTS: dict[str, str] = {
+    "conversation": "conversation",
+    "poke": "conversation",
+    "wizard_preview": "conversation",
+    "wizard_generate": "wizard",
+    "wizard_association": "wizard",
+    "memory_worker": "memory_worker",
+    "memory_summary": "memory_worker",
+    "human_block_update": "utility",
+}
+
+# ---------------------------------------------------------------------------
+# Purpose 管理 (D-15) — SSOT
+# ---------------------------------------------------------------------------
+
+VALID_PURPOSES: frozenset[str] = frozenset({
+    "conversation",
+    "wizard_generate",
+    "wizard_preview",
+    "wizard_association",
+    "memory_worker",
+    "memory_summary",
+    "human_block_update",
+    "poke",
+})
+
+# 用途別 temperature オーバーライド（None = config.conversation.temperature を使用）
+_PURPOSE_TEMPERATURES: dict[str, float | None] = {
+    "conversation": None,
+    "wizard_generate": 0.9,
+    "wizard_preview": None,
+    "wizard_association": 0.9,
+    "memory_worker": 0.3,
+    "memory_summary": 0.3,
+    "human_block_update": 0.3,
+    "poke": None,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -715,13 +768,7 @@ def get_max_tokens(config: AppConfig, purpose: str) -> int:
 
     Args:
         config: アプリケーション設定。
-        purpose: トークン数を取得する用途識別子。
-            以下のいずれかを指定する:
-            - "conversation": 通常会話（config.conversation.max_tokens を使用）
-            - "wizard_generate": ウィザード生成（固定 2048）
-            - "wizard_preview": ウィザードプレビュー（固定 1024）
-            - "memory_worker": 記憶ワーカー（固定 800）
-            - "poke": 一言発話（固定 256）
+        purpose: VALID_PURPOSES に含まれる用途識別子。
 
     Returns:
         指定された用途に対応する max_tokens 値。
@@ -729,15 +776,51 @@ def get_max_tokens(config: AppConfig, purpose: str) -> int:
     Raises:
         ValueError: 未知の purpose が指定された場合。
     """
+    if purpose not in VALID_PURPOSES:
+        raise ValueError(f"Unknown purpose: {purpose!r}")
+
     if purpose == "conversation":
         return config.conversation.max_tokens
-    if purpose == "wizard_generate":
-        return _MAX_TOKENS_WIZARD_GENERATE
-    if purpose == "wizard_preview":
-        return _MAX_TOKENS_WIZARD_PREVIEW
-    if purpose == "memory_worker":
-        return _MAX_TOKENS_MEMORY_WORKER
-    if purpose == "poke":
-        return _MAX_TOKENS_POKE
+    return _MAX_TOKENS_MAP[purpose]
 
-    raise ValueError(f"Unknown purpose: {purpose!r}")
+
+def get_temperature(config: AppConfig, purpose: str) -> float:
+    """用途別の temperature を返す（D-15）。
+
+    Args:
+        config: アプリケーション設定。
+        purpose: VALID_PURPOSES に含まれる用途識別子。
+
+    Returns:
+        サンプリング温度。
+
+    Raises:
+        ValueError: 未知の purpose が指定された場合。
+    """
+    if purpose not in VALID_PURPOSES:
+        raise ValueError(f"Unknown purpose: {purpose!r}")
+
+    override = _PURPOSE_TEMPERATURES[purpose]
+    if override is not None:
+        return override
+    return config.conversation.temperature
+
+
+def get_model(config: AppConfig, purpose: str) -> str:
+    """用途別のモデル ID を返す（D-15）。
+
+    Args:
+        config: アプリケーション設定。
+        purpose: VALID_PURPOSES に含まれる用途識別子。
+
+    Returns:
+        モデル ID 文字列。
+
+    Raises:
+        ValueError: 未知の purpose が指定された場合。
+    """
+    if purpose not in VALID_PURPOSES:
+        raise ValueError(f"Unknown purpose: {purpose!r}")
+
+    slot = _PURPOSE_MODEL_SLOTS[purpose]
+    return getattr(config.models, slot)
