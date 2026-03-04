@@ -276,7 +276,7 @@ tests/
     └── tray/    ──→ core/, gui/
 
 禁止:
-  core/ → 他のいかなるモジュールも import 禁止
+  core/ → core 外のいかなるパッケージも import 禁止（core 内部の相互参照は許可）
   memory/ → agent/ の import 禁止（逆方向）
   gui/ → agent/, memory/, persona/ の直接 import 禁止
          （GUI はキューのみで通信。AgentCore の参照を持たない）

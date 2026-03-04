@@ -99,12 +99,14 @@ max_tokens = 512       # ユーザー調整可能な項目はここだけ
 # コード内定義（擬似コード。実装コードではない）
 # agent/llm_client.py の定数定義のイメージ
 MAX_TOKENS_DEFAULTS = {
-    "conversation": 512,    # config.toml の値を優先
+    "conversation": 1024,        # config.toml の値を優先
     "wizard_generate": 2048,
-    "wizard_preview": 512,
-    "summary": 800,
+    "wizard_preview": 1024,
+    "wizard_association": 512,
+    "memory_worker": 800,
+    "memory_summary": 800,
     "human_block_update": 256,
-    "association": 400,
+    "poke": 256,
 }
 ```
 
@@ -159,12 +161,13 @@ MAX_TOKENS_DEFAULTS = {
 | 用途 | 設定場所 | デフォルト値 | 根拠 |
 |------|---------|------------|------|
 | 通常会話（conversation） | config.toml `[conversation].max_tokens` | **1024** | 通常の対話応答（50〜500 tokens）に余裕を持たせる。ユーザー調整可能 |
-| クリック反応（poke） | コード定数 | **256** | 「突っつかれた」への短い反応。長文は不要 |
 | 人格生成 — 全パラメータ（wizard_generate） | コード定数 | **2048** | C1-C11 + S1-S7 を一括生成。1500〜2000 tokens 必要。W-1〜W-4, W-6 に適用（方式 B の整形補完を含む） |
-| 人格生成 — プレビュー会話（wizard_preview） | コード定数 | **512** | プレビューは通常会話と同等の長さで十分 |
+| 人格生成 — プレビュー会話（wizard_preview） | コード定数 | **1024** | プレビューは通常会話（conversation）と同じ上限を適用。ウィザード中の確認用途として十分 |
 | 連想拡張（wizard_association） | コード定数 | **512** | association_count 個（デフォルト5）の連想リストを生成 |
+| 記憶ワーカー（memory_worker） | コード定数 | **800** | MemoryWorker が memory_summary 以外の用途（欠損補完・分類等）で使用する汎用呼び出し枠。memory_summary と同値だが用途が異なるため別定義 |
 | 日次サマリー（memory_summary） | コード定数 | **800** | 5〜8文の日記形式。300〜600 tokens で収まるが余裕を持って 800 |
 | human_block 更新（human_block_update） | コード定数 | **256** | ユーザー属性情報の抽出・整形。短いJSON様テキストを想定 |
+| クリック反応（poke） | コード定数 | **256** | 「突っつかれた」への短い反応。長文は不要 |
 
 ### 5.2 config.toml への追加
 
@@ -178,29 +181,35 @@ max_tokens = 1024       # 通常会話の応答最大トークン数
                         # 長すぎる場合は 512 に下げてください
 ```
 
-### 5.3 AppConfig での定義（擬似コード）
+### 5.3 config.py での定義（擬似コード）
 
 ```python
-# core/config.py の AppConfig dataclass のイメージ（実装コードではない）
+# core/config.py のイメージ（実装コードではない）
 
-# 定数定義（LLM 呼び出し用途別 max_tokens デフォルト値）
-# 用途: 用途名 → デフォルト max_tokens
-#   conversation: config.toml の [conversation].max_tokens を参照（デフォルト 1024）
-#   poke: 256（固定、設定不要）
-#   wizard_generate: 2048（固定、設定不要）
-#   wizard_preview: 512（固定、設定不要）
-#   wizard_association: 512（固定、設定不要）
-#   memory_summary: 800（固定、設定不要）
-#   human_block_update: 256（固定、設定不要）
+# 有効な purpose の一覧（SSOT）
+VALID_PURPOSES = frozenset({
+    "conversation", "wizard_generate", "wizard_preview", "wizard_association",
+    "memory_worker", "memory_summary", "human_block_update", "poke",
+})
 
-# AppConfig.conversation セクション
-#   temperature: float = 0.7
-#   max_tokens: int = 1024
+# 用途別 max_tokens マップ（conversation 以外の固定値）
+_MAX_TOKENS_MAP = {
+    "wizard_generate": 2048,
+    "wizard_preview": 1024,      # conversation と同等
+    "wizard_association": 512,
+    "memory_worker": 800,        # memory_summary と同値だが用途が異なるため別定義
+    "memory_summary": 800,
+    "human_block_update": 256,
+    "poke": 256,
+}
 
-# AppConfig に get_max_tokens(purpose: str) -> int メソッドを持つ
-#   purpose が "conversation" の場合: self.conversation.max_tokens を返す
-#   それ以外: 上記定数テーブルを参照して返す
-#   未知の purpose: デフォルト値（1024）を返してwarningログ
+# スタンドアロン関数として実装（AppConfig のメソッドではない）
+# def get_max_tokens(config: AppConfig, purpose: str) -> int:
+#   purpose が VALID_PURPOSES に含まれない場合: ValueError を送出
+#   purpose が "conversation" の場合: config.conversation.max_tokens を返す
+#   それ以外: _MAX_TOKENS_MAP[purpose] を返す
+
+# 同様に get_temperature(), get_model() もスタンドアロン関数として実装
 ```
 
 ### 5.4 llm_client.py での使用パターン（擬似コード）

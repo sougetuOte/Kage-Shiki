@@ -157,14 +157,16 @@ Critical の懸念（プライバシー）に対しては、DEBUG ログに LLM 
 | モジュール | ロガー名 |
 |-----------|---------|
 | core/config.py | `kage_shiki.core.config` |
-| agent/agent_core.py | `kage_shiki.agent.core` |
-| agent/llm_client.py | `kage_shiki.agent.llm` |
+| core/env.py | `kage_shiki.core.env` |
+| core/logging_setup.py | `kage_shiki.core.logging_setup` |
+| agent/agent_core.py | `kage_shiki.agent.agent_core` |
+| agent/llm_client.py | `kage_shiki.agent.llm_client` |
 | memory/db.py | `kage_shiki.memory.db` |
-| memory/memory_worker.py | `kage_shiki.memory.worker` |
-| persona/persona_system.py | `kage_shiki.persona.system` |
+| memory/memory_worker.py | `kage_shiki.memory.memory_worker` |
+| persona/persona_system.py | `kage_shiki.persona.persona_system` |
 | persona/wizard.py | `kage_shiki.persona.wizard` |
-| gui/tkinter_view.py | `kage_shiki.gui.tkinter` |
-| tray/system_tray.py | `kage_shiki.tray` |
+| gui/tkinter_view.py | `kage_shiki.gui.tkinter_view` |
+| tray/system_tray.py | `kage_shiki.tray.system_tray` |
 
 ### 5.2 ログフォーマット
 
@@ -177,7 +179,7 @@ Critical の懸念（プライバシー）に対しては、DEBUG ログに LLM 
 例:
 ```
 [14:32:07] INFO   kage_shiki.core.config  config.toml を読み込みました
-[14:32:08] WARNING kage_shiki.agent.llm  APIタイムアウト（リトライ 1/3）
+[14:32:08] WARNING kage_shiki.agent.llm_client  APIタイムアウト（リトライ 1/3）
 ```
 
 **ファイル（DEBUG 以上）**:
@@ -190,7 +192,7 @@ YYYY-MM-DD HH:MM:SS,mmm LEVEL     kage_shiki.module  メッセージ
 ```
 2026-03-15 14:32:07,123 INFO      kage_shiki.core.config  config.toml を読み込みました
 2026-03-15 14:32:08,456 DEBUG     kage_shiki.memory.db  FTS5検索: クエリ="天気" 件数=3 時間=0.012s
-2026-03-15 14:32:09,789 WARNING   kage_shiki.agent.llm  APIタイムアウト（リトライ 1/3）
+2026-03-15 14:32:09,789 WARNING   kage_shiki.agent.llm_client  APIタイムアウト（リトライ 1/3）
 ```
 
 ### 5.3 RotatingFileHandler パラメータ
