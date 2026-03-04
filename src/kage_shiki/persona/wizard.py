@@ -1,8 +1,11 @@
-"""ウィザードモード A コントローラ (T-20).
+"""ウィザードコントローラ (T-20, T-21, T-22).
 
 対応 FR:
     FR-5.1: ウィザード方式によるキャラクター生成
     FR-5.2: AI おまかせ方式（連想拡張 + 候補生成 + 選択）
+    FR-5.3: 既存イメージ方式（自由記述 + AI 整形補完）
+    FR-5.5: プレビュー会話（3-5往復）
+    FR-5.6: 凍結処理
     FR-5.7: 連想拡張パイプライン
     FR-5.8: 生成メタデータの記録
 
@@ -15,11 +18,12 @@ import json
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from kage_shiki.agent.llm_client import LLMClient
 from kage_shiki.core.config import AppConfig
-from kage_shiki.persona.persona_system import PersonaCore
+from kage_shiki.persona.persona_system import PersonaCore, PersonaSystem
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +82,37 @@ _W2_SYSTEM = (
     '    "c11_self_knowledge": "知識の自己認識"\n'
     "  }\n"
     "]}\n\n"
+    "応答はJSONのみを出力してください。説明文は不要です。"
+)
+
+# ---------------------------------------------------------------------------
+# W-3: 自由記述整形プロンプト (FR-5.3)
+# ---------------------------------------------------------------------------
+
+_W3_SYSTEM = (
+    "あなたはキャラクター設計の専門家です。"
+    "ユーザーの自由記述からデスクトップマスコットのキャラクター設定を"
+    "整形・補完してください。\n\n"
+    "ユーザーが明示しなかったフィールドは、"
+    "記述の雰囲気に合わせてAIが補完してください。\n\n"
+    "応答は以下のJSON構造のみを出力してください:\n"
+    "{\n"
+    '  "persona": {\n'
+    '    "c1_name": "名前",\n'
+    '    "c2_first_person": "一人称",\n'
+    '    "c3_second_person": "ユーザーの呼び方",\n'
+    '    "c4_personality_core": "人格核文（2-3文）",\n'
+    '    "c5_personality_axes": "性格軸（箇条書き3-5項目）",\n'
+    '    "c6_speech_pattern": "口調パターンの説明",\n'
+    '    "c7_catchphrase": "口癖（2-3個）",\n'
+    '    "c8_age_impression": "年齢感の説明",\n'
+    '    "c9_values": "価値観の説明",\n'
+    '    "c10_forbidden": "禁忌事項（2-3個）",\n'
+    '    "c11_self_knowledge": "知識の自己認識"\n'
+    "  },\n"
+    '  "style_samples": "## S1: 日常会話\\n1. ...（S1-S7 の口調サンプル）",\n'
+    '  "ai_filled": ["AIが補完したフィールド名のリスト"]\n'
+    "}\n\n"
     "応答はJSONのみを出力してください。説明文は不要です。"
 )
 
@@ -166,10 +201,12 @@ def _dict_to_persona_core(d: dict[str, str]) -> PersonaCore:
 
 
 class WizardController:
-    """ウィザードモード A コントローラ (D-5, T-20).
+    """ウィザードコントローラ (D-5, T-20/T-21/T-22).
 
-    連想拡張 → 候補生成 → スタイルサンプル生成の LLM パイプラインを管理する。
-    方式 B (W-3: 整形・補完) は T-21、方式 C (W-6: 凍結提案) は T-23 で実装予定。
+    方式 A: 連想拡張 → 候補生成 → スタイルサンプル生成 (T-20)
+    方式 B: 自由記述 → AI 整形・補完 (T-21)
+    共通: プレビュー会話 + 凍結処理 (T-22)
+    方式 C (W-6: 凍結提案) は T-23 で実装予定。
 
     Attributes:
         generation_metadata: 生成メタデータ（FR-5.8）。
@@ -308,3 +345,128 @@ class WizardController:
 
         logger.info("スタイルサンプル生成完了")
         return response.strip()
+
+    def reshape_free_description(
+        self,
+        text: str,
+        user_name: str = "",
+    ) -> tuple[PersonaCore, str, list[str]]:
+        """自由記述の整形・補完パイプライン (W-3, FR-5.3).
+
+        ユーザーの自由記述テキストを AI が C1-C11 + S1-S7 に整形し、
+        不足フィールドを補完する。
+
+        Args:
+            text: ユーザーの自由記述テキスト。
+            user_name: ユーザー名（任意）。指定時は C3 に反映。
+
+        Returns:
+            (PersonaCore, style_samples テキスト, AI 補完フィールド名リスト)。
+
+        Raises:
+            LLMError: API 呼び出し失敗。
+            ValueError: 応答の JSON パース失敗。
+        """
+        user_parts = [
+            "以下の自由記述からキャラクター設定を整形・補完してください:\n\n"
+            f"{text}",
+        ]
+        if user_name:
+            user_parts.append(
+                f"\nユーザーの名前は「{user_name}」です。"
+                "c3_second_person にはこの名前を適切な呼び方で設定してください。",
+            )
+
+        response = self._llm.send_message_for_purpose(
+            system=_W3_SYSTEM,
+            messages=[{"role": "user", "content": "\n".join(user_parts)}],
+            purpose="wizard_generate",
+        )
+
+        data = _extract_json(response)
+        if not isinstance(data, dict) or "persona" not in data:
+            raise ValueError("LLM 応答に 'persona' キーが含まれていません")
+        if "style_samples" not in data:
+            raise ValueError("LLM 応答に 'style_samples' キーが含まれていません")
+        persona = _dict_to_persona_core(data["persona"])
+        style_samples = data["style_samples"]
+        ai_filled: list[str] = data.get("ai_filled", [])
+
+        # FR-5.8: メタデータ記録
+        self.generation_metadata = {
+            "generated_at": datetime.now().isoformat(),
+            "method": "B",
+            "free_description": text,
+        }
+
+        logger.info("自由記述整形完了: %s", persona.c1_name)
+        return persona, style_samples, ai_filled
+
+    def preview_conversation_turn(
+        self,
+        persona: PersonaCore,
+        style_text: str,
+        turns: list[dict],
+        user_input: str,
+    ) -> str:
+        """プレビュー会話の1ターン生成 (FR-5.5).
+
+        生成した人格で会話プレビューを行う。
+
+        Args:
+            persona: プレビュー対象の PersonaCore。
+            style_text: S1-S7 スタイルサンプルテキスト。
+            turns: これまでの会話ターン。
+            user_input: ユーザーの最新入力。
+
+        Returns:
+            キャラクターの応答テキスト。
+
+        Raises:
+            LLMError: API 呼び出し失敗。
+        """
+        system_prompt = (
+            f"あなたは「{persona.c1_name}」というキャラクターです。\n"
+            f"一人称: {persona.c2_first_person}\n"
+            f"人格核文: {persona.c4_personality_core}\n"
+            f"性格軸: {persona.c5_personality_axes}\n"
+            f"口調パターン: {persona.c6_speech_pattern}\n"
+            f"口癖: {persona.c7_catchphrase}\n\n"
+            f"口調サンプル:\n{style_text}\n\n"
+            "上記の人格設定に従って、ユーザーとの会話に応答してください。"
+        )
+
+        messages = list(turns) + [{"role": "user", "content": user_input}]
+
+        return self._llm.send_message_for_purpose(
+            system=system_prompt,
+            messages=messages,
+            purpose="wizard_preview",
+        )
+
+    def freeze_persona(
+        self,
+        persona_system: PersonaSystem,
+        persona: PersonaCore,
+        style_text: str,
+        persona_dir: Path,
+    ) -> None:
+        """ペルソナ凍結処理 (FR-5.6).
+
+        PersonaCore と style_samples を保存し、凍結状態に設定する。
+
+        Args:
+            persona_system: PersonaSystem インスタンス。
+            persona: 凍結対象の PersonaCore。
+            style_text: S1-S7 スタイルサンプルテキスト。
+            persona_dir: ペルソナファイルの保存先ディレクトリ。
+        """
+        # persona_core.md を凍結メタデータ付きで保存
+        persona_path = persona_dir / "persona_core.md"
+        persona_system.freeze_and_save(persona_path, persona)
+
+        # style_samples.md 保存
+        style_path = persona_dir / "style_samples.md"
+        style_path.write_text(style_text, encoding="utf-8")
+
+        logger.info("ペルソナ凍結完了: %s", persona.c1_name)

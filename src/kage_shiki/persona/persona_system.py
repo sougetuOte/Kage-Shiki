@@ -13,7 +13,7 @@
 import hashlib
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -272,6 +272,26 @@ class PersonaSystem:
         path.write_text(content, encoding="utf-8")
         self._file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         logger.info("persona_core.md を保存しました: %s", path)
+
+    def freeze_and_save(self, path: Path, core: PersonaCore) -> None:
+        """凍結メタデータを付与して persona_core.md を保存する (FR-5.6).
+
+        ウィザード完了時の初期凍結用。既存メタデータを保持しつつ
+        凍結状態を frozen に設定して保存する。
+
+        Args:
+            path: 保存先ファイルパス。
+            core: 凍結する PersonaCore データ。
+        """
+        frozen_core = replace(
+            core,
+            metadata={**core.metadata, _FREEZE_KEY: _FREEZE_VALUE_FROZEN},
+        )
+        content = self._render_persona_core(frozen_core)
+        path.write_text(content, encoding="utf-8")
+        self._file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        self._persona_frozen = True
+        logger.info("persona_core.md を凍結保存しました: %s", path)
 
     def detect_manual_edit(self, path: Path) -> bool:
         """ファイルのハッシュを比較して手動編集を検出する (FR-4.4).

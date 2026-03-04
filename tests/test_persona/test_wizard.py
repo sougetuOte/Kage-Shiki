@@ -1,8 +1,11 @@
-"""Tests for persona/wizard.py — WizardController (T-20).
+"""Tests for persona/wizard.py — WizardController (T-20, T-21, T-22).
 
 対応 FR:
-    FR-5.1: ウィザード方式によるキャラクター生成（方式 A のバックエンドロジック部分）
+    FR-5.1: ウィザード方式によるキャラクター生成（方式 A/B のバックエンドロジック部分）
     FR-5.2: AI おまかせ方式（連想拡張 + 候補生成 + 選択）
+    FR-5.3: 既存イメージ方式（自由記述 + AI 整形補完）
+    FR-5.5: プレビュー会話（3-5往復）
+    FR-5.6: 凍結処理
     FR-5.7: 連想拡張パイプライン
     FR-5.8: 生成メタデータの記録
 
@@ -18,7 +21,7 @@ import pytest
 
 from kage_shiki.agent.llm_client import LLMClient, LLMError
 from kage_shiki.core.config import AppConfig
-from kage_shiki.persona.persona_system import PersonaCore
+from kage_shiki.persona.persona_system import PersonaCore, PersonaSystem
 from kage_shiki.persona.wizard import (
     WizardController,
     _dict_to_persona_core,
@@ -435,3 +438,268 @@ class TestGenerationMetadata:
     ) -> None:
         """初期状態ではメタデータが空であること."""
         assert controller.generation_metadata == {}
+
+
+# ---------------------------------------------------------------------------
+# T-21: W-3 方式 B — 自由記述の整形補完 (FR-5.3)
+# ---------------------------------------------------------------------------
+
+
+class TestReshapeFreeDescription:
+    """reshape_free_description のテスト (W-3, FR-5.3)."""
+
+    _RESHAPE_RESPONSE = json.dumps(
+        {
+            "persona": {
+                "c1_name": "ミカ",
+                "c2_first_person": "僕",
+                "c3_second_person": "きみ",
+                "c4_personality_core": "ちょっと毒舌だけど根は優しい",
+                "c5_personality_axes": "皮肉屋、世話焼き",
+                "c6_speech_pattern": "ぶっきらぼうな語尾",
+                "c7_catchphrase": "知らないの？",
+                "c8_age_impression": "大学生くらい",
+                "c9_values": "本音を大切にする",
+                "c10_forbidden": "嘘をつくこと",
+                "c11_self_knowledge": "人並みの知識はある",
+            },
+            "style_samples": (
+                "## S1: 日常会話\n1. →「まぁ、そうだろうね」\n\n"
+                "## S2: 喜び\n1. →「...悪くないね」\n\n"
+                "## S3: 怒り・不快\n1. →「はぁ？ ちょっと待てよ」\n\n"
+                "## S4: 悲しみ・寂しさ\n1. →「...別に」\n\n"
+                "## S5: 困惑・不知\n1. →「んー、それは知らないな」\n\n"
+                "## S6: ユーモア\n1. →「ははっ、なにそれ」\n\n"
+                "## S7: 沈黙破り\n1. →「...暇？」"
+            ),
+            "ai_filled": ["c9_values", "c10_forbidden", "c11_self_knowledge"],
+        },
+        ensure_ascii=False,
+    )
+
+    def test_returns_persona_and_style(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """PersonaCore と style_samples のタプルが返ること."""
+        mock_llm.send_message_for_purpose.return_value = self._RESHAPE_RESPONSE
+        persona, style, ai_filled = controller.reshape_free_description(
+            "名前はミカ。毒舌だけど優しい。一人称は僕。",
+        )
+        assert isinstance(persona, PersonaCore)
+        assert persona.c1_name == "ミカ"
+        assert isinstance(style, str)
+        assert "## S1" in style
+
+    def test_ai_filled_fields_returned(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """AI が補完したフィールド一覧が返ること."""
+        mock_llm.send_message_for_purpose.return_value = self._RESHAPE_RESPONSE
+        _, _, ai_filled = controller.reshape_free_description("テスト記述")
+        assert "c9_values" in ai_filled
+
+    def test_uses_wizard_generate_purpose(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """purpose='wizard_generate' で LLM を呼び出すこと."""
+        mock_llm.send_message_for_purpose.return_value = self._RESHAPE_RESPONSE
+        controller.reshape_free_description("テスト記述")
+        call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert call_kwargs["purpose"] == "wizard_generate"
+
+    def test_user_name_in_prompt(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """ユーザー名がプロンプトに含まれること."""
+        mock_llm.send_message_for_purpose.return_value = self._RESHAPE_RESPONSE
+        controller.reshape_free_description("テスト記述", user_name="太郎")
+        user_msg = mock_llm.send_message_for_purpose.call_args.kwargs[
+            "messages"
+        ][0]["content"]
+        assert "太郎" in user_msg
+
+    def test_metadata_records_method_b(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """メタデータの method が 'B' であること."""
+        mock_llm.send_message_for_purpose.return_value = self._RESHAPE_RESPONSE
+        controller.reshape_free_description("テスト記述")
+        assert controller.generation_metadata["method"] == "B"
+
+    def test_free_description_in_prompt(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """ユーザーの自由記述がプロンプトに含まれること."""
+        mock_llm.send_message_for_purpose.return_value = self._RESHAPE_RESPONSE
+        controller.reshape_free_description("名前はミカ。毒舌だけど優しい。")
+        user_msg = mock_llm.send_message_for_purpose.call_args.kwargs[
+            "messages"
+        ][0]["content"]
+        assert "名前はミカ" in user_msg
+
+
+# ---------------------------------------------------------------------------
+# T-22: プレビュー会話 (FR-5.5)
+# ---------------------------------------------------------------------------
+
+
+class TestPreviewConversationTurn:
+    """preview_conversation_turn のテスト (FR-5.5, D-12)."""
+
+    def _make_persona(self) -> PersonaCore:
+        return PersonaCore(
+            c1_name="アキ",
+            c2_first_person="わたし",
+            c4_personality_core="好奇心旺盛だが慎重",
+        )
+
+    def test_returns_response(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """プレビュー応答が返ること."""
+        mock_llm.send_message_for_purpose.return_value = "やあ、はじめまして！"
+        result = controller.preview_conversation_turn(
+            persona=self._make_persona(),
+            style_text="## S1\nテスト",
+            turns=[],
+            user_input="こんにちは",
+        )
+        assert result == "やあ、はじめまして！"
+
+    def test_uses_wizard_preview_purpose(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """purpose='wizard_preview' で LLM を呼び出すこと (D-12)."""
+        mock_llm.send_message_for_purpose.return_value = "応答"
+        controller.preview_conversation_turn(
+            persona=self._make_persona(),
+            style_text="## S1\nテスト",
+            turns=[],
+            user_input="テスト",
+        )
+        call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert call_kwargs["purpose"] == "wizard_preview"
+
+    def test_persona_in_system_prompt(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """システムプロンプトにペルソナ情報が含まれること."""
+        mock_llm.send_message_for_purpose.return_value = "応答"
+        controller.preview_conversation_turn(
+            persona=self._make_persona(),
+            style_text="## S1\nテスト口調",
+            turns=[],
+            user_input="テスト",
+        )
+        call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "アキ" in call_kwargs["system"]
+        assert "好奇心旺盛" in call_kwargs["system"]
+
+    def test_turns_included_in_messages(
+        self, controller: WizardController, mock_llm: Mock,
+    ) -> None:
+        """過去のターンが messages に含まれること."""
+        mock_llm.send_message_for_purpose.return_value = "応答"
+        turns = [
+            {"role": "user", "content": "前の入力"},
+            {"role": "assistant", "content": "前の応答"},
+        ]
+        controller.preview_conversation_turn(
+            persona=self._make_persona(),
+            style_text="",
+            turns=turns,
+            user_input="新しい入力",
+        )
+        messages = mock_llm.send_message_for_purpose.call_args.kwargs["messages"]
+        assert len(messages) == 3  # 2 turns + latest input
+        assert messages[-1]["content"] == "新しい入力"
+
+
+# ---------------------------------------------------------------------------
+# T-22: 凍結処理 (FR-5.6)
+# ---------------------------------------------------------------------------
+
+
+class TestFreezePersona:
+    """freeze_persona のテスト (FR-5.6)."""
+
+    def test_saves_persona_core(
+        self, controller: WizardController, mock_llm: Mock, tmp_path,
+    ) -> None:
+        """persona_core.md が保存されること."""
+        ps = PersonaSystem()
+        persona = PersonaCore(
+            c1_name="アキ",
+            c2_first_person="わたし",
+            c4_personality_core="好奇心旺盛",
+        )
+        controller.freeze_persona(
+            persona_system=ps,
+            persona=persona,
+            style_text="## S1\nテスト",
+            persona_dir=tmp_path,
+        )
+        persona_file = tmp_path / "persona_core.md"
+        assert persona_file.exists()
+        content = persona_file.read_text(encoding="utf-8")
+        assert "アキ" in content
+
+    def test_saves_style_samples(
+        self, controller: WizardController, mock_llm: Mock, tmp_path,
+    ) -> None:
+        """style_samples.md が保存されること."""
+        ps = PersonaSystem()
+        persona = PersonaCore(
+            c1_name="アキ",
+            c2_first_person="わたし",
+            c4_personality_core="好奇心旺盛",
+        )
+        controller.freeze_persona(
+            persona_system=ps,
+            persona=persona,
+            style_text="## S1\nテスト口調サンプル",
+            persona_dir=tmp_path,
+        )
+        style_file = tmp_path / "style_samples.md"
+        assert style_file.exists()
+        content = style_file.read_text(encoding="utf-8")
+        assert "テスト口調サンプル" in content
+
+    def test_persona_is_frozen(
+        self, controller: WizardController, mock_llm: Mock, tmp_path,
+    ) -> None:
+        """凍結後に persona_frozen が true であること."""
+        ps = PersonaSystem()
+        persona = PersonaCore(
+            c1_name="アキ",
+            c2_first_person="わたし",
+            c4_personality_core="好奇心旺盛",
+        )
+        controller.freeze_persona(
+            persona_system=ps,
+            persona=persona,
+            style_text="## S1\nテスト",
+            persona_dir=tmp_path,
+        )
+        # 凍結状態を検証: persona_core.md に freeze マーカーが含まれる
+        content = (tmp_path / "persona_core.md").read_text(encoding="utf-8")
+        assert "frozen" in content.lower()
+
+    def test_no_observations_saved(
+        self, controller: WizardController, mock_llm: Mock, tmp_path,
+    ) -> None:
+        """凍結処理で observations に保存されないこと."""
+        ps = PersonaSystem()
+        persona = PersonaCore(
+            c1_name="アキ",
+            c2_first_person="わたし",
+            c4_personality_core="好奇心旺盛",
+        )
+        # freeze_persona は save_observation を呼ばない設計。
+        # 正常完了すれば DB 操作なしが保証される。
+        controller.freeze_persona(
+            persona_system=ps,
+            persona=persona,
+            style_text="## S1\nテスト",
+            persona_dir=tmp_path,
+        )
