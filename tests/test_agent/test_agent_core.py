@@ -1,13 +1,17 @@
-"""Tests for agent/agent_core.py — session_id + SessionContext + PromptBuilder.
+"""Tests for agent/agent_core.py — session_id + SessionContext + PromptBuilder + AgentCore.
 
 対応 FR:
     FR-3.5: SystemPrompt にペルソナ情報を展開
     FR-3.6: XML タグによる構造化
+    FR-3.7: 応答後の observations 即時書込
     FR-3.11: プロンプトインジェクション対策
     FR-3.12: session_id のハイブリッド形式（YYYYMMDD_HHMM_xxxxxxxx）
+    FR-6.1: ReAct ループ本体
     FR-6.2: コンテキスト注入優先順位
     FR-6.3: 簡易自己問答指示
+    FR-6.4: 整合性チェック間隔
     FR-6.5: 括弧書き心情描写の禁止
+    FR-6.6: 後処理（observations 書込、human_block/trends 判断）
 
 対応設計:
     D-3: プロンプトテンプレート設計
@@ -17,14 +21,22 @@
 
 import re
 from datetime import datetime
+from unittest.mock import Mock, patch
+
+import pytest
 
 from kage_shiki.agent.agent_core import (
     _SESSION_ID_LENGTH,
     _SESSION_ID_PATTERN,
+    AgentCore,
     PromptBuilder,
     SessionContext,
+    check_consistency_rules,
     generate_session_id,
 )
+from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.core.config import AppConfig
+from kage_shiki.persona.persona_system import PersonaSystem
 
 # ---------------------------------------------------------------------------
 # FR-3.12: session_id 生成
@@ -397,3 +409,269 @@ class TestPromptBuilderMessages:
         mem_pos = content.index("<retrieved_memories>")
         input_pos = content.index("質問です")
         assert mem_pos < input_pos
+
+
+# ---------------------------------------------------------------------------
+# T-13: ConsistencyHit + check_consistency_rules (D-8)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckConsistencyRules:
+    """ルールベース後処理のテスト (D-8).
+
+    対応 FR:
+        FR-6.4: 整合性チェック3類型
+    """
+
+    def test_detects_character_hallucination(self) -> None:
+        """「私はAIです」でタイプ1ヒットが検出されること."""
+        hits = check_consistency_rules("実は私はAIです。何でも聞いてね。")
+        assert any(h.type_id == 1 for h in hits)
+        assert any(h.type_name == "character_hallucination" for h in hits)
+
+    def test_detects_action_ambiguity(self) -> None:
+        """「承知しました」でタイプ2ヒットが検出されること."""
+        hits = check_consistency_rules("承知しました。説明いたします。")
+        assert any(h.type_id == 2 for h in hits)
+
+    def test_detects_knowledge_degradation(self) -> None:
+        """「答えられません」でタイプ3ヒットが検出されること."""
+        hits = check_consistency_rules("その質問には答えられません。")
+        assert any(h.type_id == 3 for h in hits)
+
+    def test_no_hit_on_normal_response(self) -> None:
+        """正常な応答でヒットが検出されないこと."""
+        hits = check_consistency_rules("今日はいい天気だね。散歩でもしない？")
+        assert hits == []
+
+    def test_multiple_hits(self) -> None:
+        """複数パターンが同時検出されること."""
+        text = "私はAIです。承知しました。答えられません。"
+        hits = check_consistency_rules(text)
+        type_ids = {h.type_id for h in hits}
+        assert type_ids == {1, 2, 3}
+
+    def test_hit_contains_matched_pattern(self) -> None:
+        """ヒットにマッチしたパターン文字列が含まれること."""
+        hits = check_consistency_rules("ChatGPTみたいだね")
+        assert len(hits) >= 1
+        assert any("ChatGPT" in h.pattern for h in hits)
+
+
+# ---------------------------------------------------------------------------
+# T-13: AgentCore (FR-6.1, FR-3.7, FR-6.6)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def mock_llm() -> Mock:
+    """LLMClient のモック."""
+    m = Mock(spec=LLMClient)
+    m.send_message_for_purpose.return_value = "テスト応答だよ。"
+    return m
+
+
+@pytest.fixture()
+def mock_db_conn() -> Mock:
+    """DB接続のモック."""
+    return Mock()
+
+
+@pytest.fixture()
+def persona_system() -> PersonaSystem:
+    """PersonaSystem インスタンス."""
+    ps = PersonaSystem()
+    ps._persona_core_text = "# テストキャラ\n## C1: テスト名\nテスト"
+    ps._style_samples_text = "## S1\nテスト口調"
+    ps._human_block_text = ""
+    ps._personality_trends_text = ""
+    return ps
+
+
+@pytest.fixture()
+def config() -> AppConfig:
+    """デフォルト AppConfig."""
+    return AppConfig()
+
+
+@pytest.fixture()
+def agent_core(
+    mock_llm: Mock,
+    mock_db_conn: Mock,
+    persona_system: PersonaSystem,
+    config: AppConfig,
+) -> AgentCore:
+    """AgentCore インスタンス."""
+    return AgentCore(
+        config=config,
+        db_conn=mock_db_conn,
+        llm_client=mock_llm,
+        persona_system=persona_system,
+    )
+
+
+class TestAgentCoreInit:
+    """AgentCore 初期化テスト."""
+
+    def test_session_context_created(self, agent_core: AgentCore) -> None:
+        """初期化時に SessionContext が生成されること."""
+        assert agent_core.session_context is not None
+        assert agent_core.session_context.session_id != ""
+        assert agent_core.session_context.message_count == 0
+
+    def test_session_start_message_empty_initially(
+        self, agent_core: AgentCore,
+    ) -> None:
+        """初期化時にセッション開始メッセージが空であること."""
+        assert agent_core.session_start_message == ""
+
+
+class TestGenerateSessionStartMessage:
+    """セッション開始メッセージ生成テスト."""
+
+    def test_generates_greeting(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """LLM を呼び出してセッション開始メッセージを生成すること."""
+        mock_llm.send_message_for_purpose.return_value = "おはよう！今日もよろしくね。"
+        result = agent_core.generate_session_start_message()
+        assert result == "おはよう！今日もよろしくね。"
+        assert agent_core.session_start_message == result
+
+    def test_uses_conversation_purpose(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """purpose='conversation' で LLM を呼び出すこと."""
+        agent_core.generate_session_start_message()
+        call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert call_kwargs["purpose"] == "conversation"
+
+
+class TestProcessTurn:
+    """process_turn のテスト (ReAct ループ単一ターン)."""
+
+    def test_returns_llm_response(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """ユーザー入力に対して LLM 応答が返ること."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "そうだね、元気だよ。"
+        result = agent_core.process_turn("元気？")
+        assert result == "そうだね、元気だよ。"
+
+    def test_writes_user_input_to_observations(
+        self, agent_core: AgentCore, mock_llm: Mock, mock_db_conn: Mock,
+    ) -> None:
+        """ユーザー入力が observations に書き込まれること (FR-3.7)."""
+        agent_core.session_start_message = "やあ"
+        with patch("kage_shiki.agent.agent_core.save_observation") as mock_save:
+            agent_core.process_turn("テスト入力")
+            calls = [
+                c for c in mock_save.call_args_list
+                if c.kwargs.get("speaker") == "user"
+                or (len(c.args) > 2 and c.args[2] == "user")
+            ]
+            assert len(calls) >= 1
+
+    def test_writes_mascot_response_to_observations(
+        self, agent_core: AgentCore, mock_llm: Mock, mock_db_conn: Mock,
+    ) -> None:
+        """マスコット応答が observations に書き込まれること (FR-3.7)."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "応答テスト"
+        with patch("kage_shiki.agent.agent_core.save_observation") as mock_save:
+            agent_core.process_turn("入力")
+            calls = [
+                c for c in mock_save.call_args_list
+                if c.kwargs.get("speaker") == "mascot"
+                or (len(c.args) > 2 and c.args[2] == "mascot")
+            ]
+            assert len(calls) >= 1
+
+    def test_increments_message_count(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """message_count が正しくインクリメントされること."""
+        agent_core.session_start_message = "やあ"
+        assert agent_core.session_context.message_count == 0
+        agent_core.process_turn("1回目")
+        assert agent_core.session_context.message_count == 1
+        agent_core.process_turn("2回目")
+        assert agent_core.session_context.message_count == 2
+
+    def test_consistency_check_active_at_interval(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """consistency_interval 間隔で consistency_check_active が True になること."""
+        agent_core.session_start_message = "やあ"
+        interval = agent_core._config.memory.consistency_interval
+        for i in range(interval - 1):
+            agent_core.process_turn(f"入力{i}")
+        # interval回目で active になること
+        with patch.object(
+            agent_core._prompt_builder, "build_system_prompt",
+            wraps=agent_core._prompt_builder.build_system_prompt,
+        ) as mock_build:
+            agent_core.process_turn(f"入力{interval}")
+            mock_build.assert_called_once()
+            call_kwargs = mock_build.call_args.kwargs
+            assert call_kwargs["consistency_check_active"] is True
+
+    def test_fts5_results_injected_into_prompt(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """FTS5 検索結果がプロンプトに注入されること."""
+        agent_core.session_start_message = "やあ"
+        cold = [
+            {"content": "昨日公園で遊んだ", "speaker": "user", "created_at": 1709510400.0},
+        ]
+        with patch("kage_shiki.agent.agent_core.search_observations_fts", return_value=cold):
+            agent_core.process_turn("昨日のことだけど")
+            call_kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+            messages = call_kwargs["messages"]
+            last_user = messages[-1]["content"]
+            assert "<retrieved_memories>" in last_user
+
+    def test_turns_appended_to_session_context(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """会話ターンが SessionContext に追加されること."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "応答1"
+        agent_core.process_turn("入力1")
+        assert len(agent_core.session_context.turns) == 2  # user + assistant
+        assert agent_core.session_context.turns[0]["role"] == "user"
+        assert agent_core.session_context.turns[1]["role"] == "assistant"
+
+    def test_consistency_rules_logged_on_hit(
+        self, agent_core: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """ルールベース後処理でパターンマッチ時に WARNING ログが記録されること."""
+        agent_core.session_start_message = "やあ"
+        mock_llm.send_message_for_purpose.return_value = "私はAIです。何でも聞いてね。"
+        with patch("kage_shiki.agent.agent_core.logger") as mock_logger:
+            agent_core.process_turn("あなたは誰？")
+            warning_calls = mock_logger.warning.call_args_list
+            assert any("consistency_check" in str(c) for c in warning_calls)
+
+    def test_consistency_interval_zero_disables_check(
+        self, mock_llm: Mock, mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+    ) -> None:
+        """consistency_interval=0 でチェックが無効化されること."""
+        config = AppConfig()
+        config.memory.consistency_interval = 0
+        core = AgentCore(
+            config=config, db_conn=mock_db_conn,
+            llm_client=mock_llm, persona_system=persona_system,
+        )
+        core.session_start_message = "やあ"
+        with patch.object(
+            core._prompt_builder, "build_system_prompt",
+            wraps=core._prompt_builder.build_system_prompt,
+        ) as mock_build:
+            for i in range(20):
+                core.process_turn(f"入力{i}")
+            # 20回全て consistency_check_active=False であること
+            for call in mock_build.call_args_list:
+                assert call.kwargs.get("consistency_check_active") is False
