@@ -58,16 +58,27 @@ PLANNING 承認状態:
 
 ## TDDサイクル（t-wada style）
 
+**重要**: 各ステップで `.claude/rules/building-checklist.md` のルールを適用すること。
+
 ### Step 1: Spec & Task Update
 - コードを書く前に `docs/specs/` の更新案を提示
 
 ### Step 2: Red (Test First)
 - 失敗するテストを先に書く
 - テストは「実行可能な仕様書」
+- **[R-4]** タスクの FR 番号をテスト docstring に転記し、各 FR に最低 1 テスト対応を確認
+- **[R-5]** 異常系・エラーパス・境界値のテストも Red で書く
 
 ### Step 3: Green (Minimal Implementation)
 - テストを通す最小限のコードを実装
 - 美しさより速さを優先
+- **[R-2]** 3 分岐以上の有限値セットは dict ディスパッチ（if-chain 禁止）
+- **[R-3]** 定数を定義したら同サイクル内で使用（未参照定数を残さない）
+- **[R-6]** else/default のデフォルト値は正当な理由がなければ `raise ValueError`
+
+### Step 3.5: Post-Green Verification（Green 直後）
+- **[R-1]** 対応 FR/設計仕様を**再読**し、フィールド名・定数値・文言の文字単位一致を照合
+- **[R-5]** `pytest --cov` で未カバー行を確認し、テスト必要な行を追加
 
 ### Step 4: Refactor
 - Green になってから設計を改善

@@ -77,7 +77,23 @@
   <!-- TODO(Phase1): ruff 設定（pyproject.toml）の詳細は設定確定後に更新 -->
 - **Docstrings**: モジュール・クラス・関数レベルで Google スタイルの docstring を記述する。
 
-## 7. Technology Trend Awareness (トレンド適応)
+## 7. Building Defect Prevention (実装不具合防止)
+
+Phase 1 監査で発見された不具合パターン分析に基づく防止ルール。
+ルール本体は `.claude/rules/building-checklist.md` に定義（自動ロード対象）。
+
+| ルール | 防止する不具合パターン | 適用タイミング |
+|--------|----------------------|---------------|
+| R-1: FR 突合チェック | 仕様-実装ドリフト | Green 直後 |
+| R-2: dict ディスパッチ | 列挙の網羅漏れ | Green（実装時） |
+| R-3: 定数→使用の即時接続 | SSOT 違反 | Red-Green サイクル内 |
+| R-4: FR チェックリスト駆動テスト | FR 実装漏れ | Red（テスト作成時） |
+| R-5: カバレッジ確認 | テストの構造的盲点 | Green 直後 |
+| R-6: else の正当性確認 | 暗黙のフォールバック | Green（実装時） |
+
+根拠分析: `docs/memos/audit-report-wave3.md`, `docs/memos/audit-report-full-source.md`
+
+## 8. Technology Trend Awareness (トレンド適応)
 
 - ライブラリの Deprecated 状況を定期的に確認する。
 - 長期保守性を最優先し、枯れた技術と最新技術のバランスをとる。
