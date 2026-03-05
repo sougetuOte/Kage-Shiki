@@ -20,8 +20,11 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 
+from kage_shiki.agent.human_block_updater import parse_human_block_updates, validate_update
 from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.trends_proposal import TrendsProposalManager
 from kage_shiki.core.config import AppConfig
 from kage_shiki.memory.db import save_observation, search_observations_fts
 from kage_shiki.persona.persona_system import PersonaSystem
@@ -441,6 +444,9 @@ class AgentCore:
         db_conn: sqlite3.Connection,
         llm_client: LLMClient,
         persona_system: PersonaSystem,
+        prompt_builder: PromptBuilder,
+        *,
+        data_dir: Path | None = None,
     ) -> None:
         self._config = config
         self._db_conn = db_conn
@@ -451,14 +457,17 @@ class AgentCore:
         self.session_start_message = ""
         self.consistency_hit_count = 0
 
-        self._prompt_builder = PromptBuilder(
-            persona_core=getattr(persona_system, "_persona_core_text", ""),
-            style_samples=getattr(persona_system, "_style_samples_text", ""),
-            human_block=getattr(persona_system, "_human_block_text", ""),
-            personality_trends=getattr(
-                persona_system, "_personality_trends_text", "",
-            ),
+        self._prompt_builder = prompt_builder
+
+        # W-T25: ファイルパス（human_block / trends 更新用）
+        self._data_dir = data_dir
+        self._human_block_path = data_dir / "human_block.md" if data_dir else None
+        self._trends_path = (
+            data_dir / "personality_trends.md" if data_dir else None
         )
+
+        # W-T25: TrendsProposalManager（セッション開始時にトリガー評価）
+        self._trends_manager: TrendsProposalManager | None = None
 
     def generate_session_start_message(self) -> str:
         """セッション開始メッセージを LLM で生成する.
@@ -512,7 +521,7 @@ class AgentCore:
             session_start_message=self.session_start_message,
             turns=self.session_context.turns,
             latest_input=user_input,
-            cold_memories=cold_memories if cold_memories else None,
+            cold_memories=cold_memories,
         )
 
         # 5. LLM 呼び出し — クリックイベントなら purpose="poke" (FR-2.5)
@@ -564,4 +573,66 @@ class AgentCore:
             {"role": "assistant", "content": response},
         )
 
+        # 9. human_block 更新マーカーのパースと適用 (T-17)
+        self._apply_human_block_updates(response)
+
+        # 10. personality_trends 承認フロー (T-16)
+        self._handle_trends_approval(response, user_input)
+
         return response
+
+    def _apply_human_block_updates(self, response: str) -> None:
+        """LLM 応答から human_block 更新マーカーを抽出し適用する (T-17)."""
+        if self._human_block_path is None:
+            return
+        updates = parse_human_block_updates(response)
+        for update in updates:
+            valid, reason = validate_update(update)
+            if not valid:
+                logger.info("human_block 更新をスキップ: %s", reason)
+                continue
+            try:
+                self._persona_system.update_human_block(
+                    self._human_block_path,
+                    update.section,
+                    update.content,
+                )
+                logger.info(
+                    "human_block 更新: section=%s", update.section,
+                )
+            except Exception:
+                logger.error(
+                    "human_block 更新失敗: path=%s, section=%s",
+                    self._human_block_path, update.section,
+                    exc_info=True,
+                )
+
+    def _handle_trends_approval(self, response: str, user_input: str) -> None:
+        """personality_trends 承認フローを処理する (T-16)."""
+        if self._trends_manager is None or self._trends_path is None:
+            return
+
+        self._trends_manager.parse_proposal_from_response(
+            response, self.session_context.message_count,
+        )
+
+        result = self._trends_manager.judge_approval(
+            user_input, self.session_context.message_count,
+        )
+
+        if result == "approved":
+            proposal = self._trends_manager.get_approved_proposal()
+            if proposal is not None:
+                entry = self._trends_manager.format_entry_for_trends(proposal)
+                try:
+                    self._persona_system.append_personality_trends(
+                        self._trends_path,
+                        proposal.section,
+                        entry,
+                    )
+                    logger.info(
+                        "personality_trends 追記: section=%s",
+                        proposal.section,
+                    )
+                except Exception:
+                    logger.error("personality_trends 追記失敗", exc_info=True)

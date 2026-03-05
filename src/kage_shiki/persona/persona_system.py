@@ -181,6 +181,23 @@ class PersonaCore:
     c11_self_knowledge: str = ""
     metadata: dict[str, str] = field(default_factory=dict)
 
+    def to_markdown(self) -> str:
+        """C1-C11 フィールドを Markdown テキストとして再構成する.
+
+        _SECTION_LABELS を参照し、requirements.md Section 4.3.1 準拠の
+        日本語ラベルを使用する。空フィールドのセクションは出力しない。
+
+        Returns:
+            Markdown 形式のテキスト。各セクションは空行で区切られる。
+        """
+        lines: list[str] = []
+        for num, attr_name in _FIELD_MAP.items():
+            value = getattr(self, attr_name, "")
+            if value:
+                label = _SECTION_LABELS[num]
+                lines.append(f"## C{num}: {label}\n\n{value}")
+        return "\n\n".join(lines)
+
 
 # ---------------------------------------------------------------------------
 # PersonaSystem

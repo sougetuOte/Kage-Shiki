@@ -627,7 +627,7 @@ class WizardController:
         persona = _dict_to_persona_core(data)
 
         # FR-5.8: メタデータ記録
-        summary = observations_text[:100] if len(observations_text) > 100 else observations_text
+        summary = observations_text[:100]
         self.generation_metadata = {
             "generated_at": datetime.now().isoformat(),
             "method": "C_freeze",

@@ -362,6 +362,29 @@ def get_missing_summary_dates(conn: sqlite3.Connection) -> list[str]:
 
 
 @_retry_on_lock
+def get_recent_day_summaries(
+    conn: sqlite3.Connection,
+    days: int,
+) -> list[dict[str, str]]:
+    """直近 N 日分の day_summary を取得する (FR-3.6).
+
+    Args:
+        conn: DB コネクション。
+        days: 取得する日数。
+
+    Returns:
+        [{"date": "YYYY-MM-DD", "summary": "..."}] 形式のリスト。
+        古い日付が先。
+    """
+    rows = conn.execute(
+        "SELECT date, summary FROM day_summary "
+        "ORDER BY date DESC LIMIT ?",
+        (days,),
+    ).fetchall()
+    return [{"date": r[0], "summary": r[1]} for r in reversed(rows)]
+
+
+@_retry_on_lock
 def save_day_summary(
     conn: sqlite3.Connection,
     date_str: str,

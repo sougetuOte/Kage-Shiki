@@ -292,7 +292,7 @@ class TrendsProposalManager:
         end_idx = response.find(_PROPOSAL_END)
 
         if start_idx == -1 or end_idx == -1 or start_idx >= end_idx:
-            logger.warning("proposal delimiter not found in response")
+            logger.debug("proposal delimiter not found in response")
             return None
 
         inner = response[start_idx + len(_PROPOSAL_START):end_idx].strip()
@@ -314,13 +314,12 @@ class TrendsProposalManager:
             elif stripped.startswith("内容:") or stripped.startswith("内容："):
                 content = re.split(r"[:：]", stripped, maxsplit=1)[-1].strip()
 
-        if section in _TRIGGER_TYPE_MAP:
-            trigger_type = _TRIGGER_TYPE_MAP[section]
-        else:
-            logger.warning(
-                "未知のセクション '%s' — トリガータイプを 'T1' にフォールバック", section,
+        if section not in _TRIGGER_TYPE_MAP:
+            logger.error(
+                "未知のセクション '%s' — 提案を破棄", section,
             )
-            trigger_type = "T1"
+            return
+        trigger_type = _TRIGGER_TYPE_MAP[section]
 
         proposal = TrendsProposal(
             trigger_type=trigger_type,

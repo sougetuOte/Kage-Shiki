@@ -25,6 +25,7 @@
 | D-13 | session_id 生成規則 | `design-d13-session-id.md` | FR-3.12 | 提案（承認待ち） |
 | D-14 | personality_trends 承認フロー | `design-d14-personality-trends-approval.md` | FR-4.6 | 提案（承認待ち） |
 | D-15 | max_tokens デフォルト値 | `design-d15-max-tokens.md` | Anthropic API | 提案（承認待ち） |
+| D-16 | 起動シーケンス統合 | `design-d16-startup-sequence.md` | FR-1.1〜1.6, FR-2.1, FR-2.7, FR-3.5〜3.12, FR-4.4, FR-4.7 | Approved |
 
 ## 依存関係
 
