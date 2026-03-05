@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 1: 基盤（MVP）— BUILDING 進行中
 
+#### Wave 8 (2026-03-05)
+
+- **T-25**: 起動シーケンス統合（main.py 13ステップ + バックグラウンドループ + 応答ポーリング + シャットダウンCB）
+- **fix(C-01)**: AgentCore の PromptBuilder 外部注入化（getattr プライベート属性アクセス廃止）
+- **fix(W-T25)**: process_turn に human_block 更新 + trends 承認フロー統合
+- **feat**: `get_recent_day_summaries()` Warm Memory ロード関数 + `PersonaCore.to_markdown()` 日本語ラベル付き出力
+- **feat**: TrendsProposalManager 起動時初期化 + トリガー評価接続
+- **fix**: LLMClient コンストラクタ呼び出し修正（api_key 引数除去 — D-10 環境変数準拠）
+- **audit**: full-review 12件修正（shutdown CB 例外捕捉、到達不能フォールバック除去、テスト allowlist 等）
+- **docs**: D-16 設計仕様書 + design-index 追加
+
 #### Wave 7 (2026-03-04)
 
 - **T-14**: クリックイベント（突っつき）処理（POKE_EVENT_PREFIX + purpose="poke" 切替）

@@ -36,9 +36,10 @@ Memory carries over between sessions, and the personality is frozen after initia
 
 ### Phase 1 Progress
 
-Tests: 546 passed / Coverage: 98%
+Tests: 580 passed / Coverage: 97%
 
 Implemented modules:
+- `main.py` — **Startup sequence integration** (13 steps + thread management + shutdown CB)
 - `core/config.py` — TOML config parser + validation
 - `core/env.py` — Environment variable management + API key verification
 - `core/errors.py` — Error message definitions (EM-001 to EM-011)
@@ -48,7 +49,7 @@ Implemented modules:
 - `agent/agent_core.py` — AgentCore ReAct loop + consistency check + click handling
 - `agent/trends_proposal.py` — personality_trends approval flow (triggers + judgment)
 - `agent/human_block_updater.py` — human_block self-editing (with guardrails)
-- `memory/db.py` — SQLite + FTS5 CRUD + retry
+- `memory/db.py` — SQLite + FTS5 CRUD + retry + Warm Memory loading
 - `memory/memory_worker.py` — Daily summary generation + missing date backfill
 - `persona/persona_system.py` — 3-stage persona loading + freeze control + freeze_and_save
 - `persona/wizard.py` — Wizard mode A/B/C + preview + freeze + blank cultivation

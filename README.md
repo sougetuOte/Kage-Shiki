@@ -36,9 +36,10 @@
 
 ### Phase 1 進捗
 
-テスト: 546 passed / カバレッジ: 98%
+テスト: 580 passed / カバレッジ: 97%
 
 実装済みモジュール:
+- `main.py` — **起動シーケンス統合**（13ステップ + スレッド管理 + シャットダウンCB）
 - `core/config.py` — TOML 設定パーサー + バリデーション
 - `core/env.py` — 環境変数管理 + API キー検証
 - `core/errors.py` — エラーメッセージ定義（EM-001〜EM-011）
@@ -48,7 +49,7 @@
 - `agent/agent_core.py` — AgentCore ReAct ループ + 整合性チェック + クリック処理
 - `agent/trends_proposal.py` — personality_trends 承認フロー（トリガー + 承認判定）
 - `agent/human_block_updater.py` — human_block 自己編集（ガードレール付き）
-- `memory/db.py` — SQLite + FTS5 CRUD + リトライ
+- `memory/db.py` — SQLite + FTS5 CRUD + リトライ + Warm Memory ロード
 - `memory/memory_worker.py` — 日次サマリー生成 + 欠損日補完
 - `persona/persona_system.py` — 3段階ペルソナロード + 凍結制御 + freeze_and_save
 - `persona/wizard.py` — ウィザードモード A/B/C + プレビュー + 凍結 + 白紙育成
