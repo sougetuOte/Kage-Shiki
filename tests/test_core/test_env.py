@@ -4,6 +4,7 @@
 対応設計: D-10 — python-dotenv 採用
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -26,10 +27,7 @@ class TestLoadDotenvFile:
 
         load_dotenv_file(env_path=env_file)
 
-        import os
         assert os.environ.get("ANTHROPIC_API_KEY") == "sk-ant-from-dotenv"
-        # cleanup
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     def test_does_not_override_existing_env(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
@@ -43,7 +41,6 @@ class TestLoadDotenvFile:
 
         load_dotenv_file(env_path=env_file)
 
-        import os
         assert os.environ.get("ANTHROPIC_API_KEY") == "sk-ant-existing"
 
     def test_missing_env_file_does_not_crash(self, tmp_path: Path) -> None:
@@ -131,9 +128,7 @@ class TestDefaultEnvPath:
 
         load_dotenv_file()  # 引数なし（デフォルトパス使用）
 
-        import os
         assert os.environ.get("ANTHROPIC_API_KEY") == "sk-ant-default-path-test"
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     def test_ensure_api_key_uses_default_path(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,

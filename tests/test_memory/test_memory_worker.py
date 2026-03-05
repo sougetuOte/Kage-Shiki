@@ -176,7 +176,6 @@ class TestGenerateDailySummarySync:
         ) as mock_logger:
             result = worker.generate_daily_summary_sync("2026-03-03")
             assert result is None
-            mock_logger.warning.assert_called()
             assert any(
                 "EM-009" in str(c) for c in mock_logger.warning.call_args_list
             )

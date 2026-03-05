@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from kage_shiki.persona.persona_system import (
+    _SECTION_LABELS,
+    PersonaCore,
     PersonaFrozenError,
     PersonaLoadError,
     PersonaSystem,
@@ -348,6 +350,83 @@ class TestPersonaSystemManualEditDetection:
 
         monkeypatch.setattr(Path, "read_text", raise_oserror)
         assert system.detect_manual_edit(path) is False
+
+
+class TestPersonaCoreToMarkdown:
+    """PersonaCore.to_markdown() の動作検証 (T-25, D-16 Section 5.3)."""
+
+    def test_all_fields_produce_labeled_sections(self) -> None:
+        """全フィールド PersonaCore で to_markdown() が日本語ラベル付き Markdown を返すこと."""
+        core = PersonaCore(
+            c1_name="アリス",
+            c2_first_person="わたし",
+            c3_second_person="あなた",
+            c4_personality_core="好奇心旺盛で誰にでも優しい",
+            c5_personality_axes="好奇心: 高い",
+            c6_speech_pattern="です・ます調",
+            c7_catchphrase="なるほど〜",
+            c8_age_impression="高校生くらい",
+            c9_values="誠実であること",
+            c10_forbidden="暴言禁止",
+            c11_self_knowledge="自分がAIと知っている",
+        )
+        result = core.to_markdown()
+
+        assert "## C1: 名前" in result
+        assert "アリス" in result
+        assert "## C4: 人格核文" in result
+        assert "好奇心旺盛で誰にでも優しい" in result
+        assert "## C11: 知識の自己認識" in result
+        assert "自分がAIと知っている" in result
+
+    def test_only_c1_populated_returns_c1_only(self) -> None:
+        """c1_name のみの PersonaCore で C1 セクションだけが含まれること."""
+        core = PersonaCore(c1_name="テストくん")
+        result = core.to_markdown()
+
+        assert "## C1: 名前" in result
+        assert "テストくん" in result
+        # 他のセクションは含まれない
+        assert "## C2:" not in result
+        assert "## C4:" not in result
+
+    def test_empty_fields_excluded(self) -> None:
+        """空フィールドのセクションが出力に含まれないこと."""
+        core = PersonaCore(
+            c1_name="名前あり",
+            c4_personality_core="人格あり",
+            # c2, c3, c5-c11 は空（デフォルト ""）
+        )
+        result = core.to_markdown()
+
+        assert "## C1:" in result
+        assert "## C4:" in result
+        assert "## C2:" not in result
+        assert "## C3:" not in result
+        assert "## C5:" not in result
+
+    def test_section_labels_are_japanese(self) -> None:
+        """_SECTION_LABELS の日本語ラベルが使われていること."""
+        core = PersonaCore(
+            c1_name="テスト",
+            c9_values="価値観テキスト",
+        )
+        result = core.to_markdown()
+
+        # _SECTION_LABELS の値が使われている
+        assert f"## C1: {_SECTION_LABELS[1]}" in result
+        assert f"## C9: {_SECTION_LABELS[9]}" in result
+
+    def test_sections_separated_by_blank_lines(self) -> None:
+        """複数セクションが空行で区切られていること."""
+        core = PersonaCore(
+            c1_name="名前",
+            c4_personality_core="人格",
+        )
+        result = core.to_markdown()
+
+        # "\n\n" で join されているため2つのセクション間に空行がある
+        assert "\n\n" in result
 
 
 class TestPersonaSystemParseSections:

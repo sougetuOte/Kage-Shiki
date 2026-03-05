@@ -24,6 +24,7 @@ from kage_shiki.memory.db import (
     _retry_on_lock,
     get_day_observations,
     get_missing_summary_dates,
+    get_recent_day_summaries,
     initialize_db,
     save_day_summary,
     save_observation,
@@ -459,9 +460,15 @@ def _get_trigger_names(conn: sqlite3.Connection) -> set[str]:
     return {row[0] for row in rows}
 
 
+_ALLOWED_TABLES = frozenset({"observations", "day_summary", "curiosity_targets"})
+
+
 def _get_column_info(conn: sqlite3.Connection, table_name: str) -> list[dict]:
     """テーブルのカラム情報を取得する."""
-    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    if table_name not in _ALLOWED_TABLES:
+        msg = f"許可されていないテーブル名: {table_name}"
+        raise ValueError(msg)
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()  # noqa: S608
     return [
         {
             "name": row[1],
@@ -741,6 +748,66 @@ class TestSaveDaySummary:
         save_day_summary(db_conn, "2026-03-01", "初回")
         with pytest.raises(sqlite3.IntegrityError):
             save_day_summary(db_conn, "2026-03-01", "重複")
+
+
+# ---------------------------------------------------------------------------
+# get_recent_day_summaries — 直近 N 日分のサマリー取得 (T-25, FR-3.6)
+# ---------------------------------------------------------------------------
+
+
+class TestGetRecentDaySummaries:
+    """get_recent_day_summaries 関数のテスト (FR-3.6)."""
+
+    def test_empty_table_returns_empty_list(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """空の day_summary テーブルで空リストが返ること."""
+        result = get_recent_day_summaries(db_conn, days=5)
+        assert result == []
+
+    def test_returns_latest_n_days(self, db_conn: sqlite3.Connection) -> None:
+        """3件のサマリーを INSERT して days=2 で最新2件が返ること."""
+        save_day_summary(db_conn, "2026-03-01", "3月1日のサマリー")
+        save_day_summary(db_conn, "2026-03-02", "3月2日のサマリー")
+        save_day_summary(db_conn, "2026-03-03", "3月3日のサマリー")
+
+        result = get_recent_day_summaries(db_conn, days=2)
+        assert len(result) == 2
+        # 最新2件は 2026-03-02 と 2026-03-03
+        dates = [r["date"] for r in result]
+        assert "2026-03-02" in dates
+        assert "2026-03-03" in dates
+        assert "2026-03-01" not in dates
+
+    def test_result_is_ascending_by_date(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """結果が日付昇順（古い日付が先）であること."""
+        save_day_summary(db_conn, "2026-03-03", "3日")
+        save_day_summary(db_conn, "2026-03-01", "1日")
+        save_day_summary(db_conn, "2026-03-02", "2日")
+
+        result = get_recent_day_summaries(db_conn, days=3)
+        assert len(result) == 3
+        assert result[0]["date"] == "2026-03-01"
+        assert result[1]["date"] == "2026-03-02"
+        assert result[2]["date"] == "2026-03-03"
+
+    def test_days_zero_returns_empty_list(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """days=0 で空リストが返ること."""
+        save_day_summary(db_conn, "2026-03-01", "サマリー")
+        result = get_recent_day_summaries(db_conn, days=0)
+        assert result == []
+
+    def test_result_dict_structure(self, db_conn: sqlite3.Connection) -> None:
+        """結果の各要素が date と summary キーを持つ dict であること."""
+        save_day_summary(db_conn, "2026-03-01", "今日は晴れでした。")
+        result = get_recent_day_summaries(db_conn, days=1)
+        assert len(result) == 1
+        assert result[0]["date"] == "2026-03-01"
+        assert result[0]["summary"] == "今日は晴れでした。"
 
 
 # ---------------------------------------------------------------------------

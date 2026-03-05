@@ -23,6 +23,7 @@
 
 import re
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -498,11 +499,23 @@ def config() -> AppConfig:
 
 
 @pytest.fixture()
+def default_prompt_builder() -> PromptBuilder:
+    """テスト用デフォルト PromptBuilder."""
+    return PromptBuilder(
+        persona_core="# テストキャラ\n## C1: テスト名\nテスト",
+        style_samples="## S1\nテスト口調",
+        human_block="",
+        personality_trends="",
+    )
+
+
+@pytest.fixture()
 def agent_core(
     mock_llm: Mock,
     mock_db_conn: Mock,
     persona_system: PersonaSystem,
     config: AppConfig,
+    default_prompt_builder: PromptBuilder,
 ) -> AgentCore:
     """AgentCore インスタンス."""
     return AgentCore(
@@ -510,6 +523,7 @@ def agent_core(
         db_conn=mock_db_conn,
         llm_client=mock_llm,
         persona_system=persona_system,
+        prompt_builder=default_prompt_builder,
     )
 
 
@@ -660,6 +674,7 @@ class TestProcessTurn:
     def test_consistency_interval_zero_disables_check(
         self, mock_llm: Mock, mock_db_conn: Mock,
         persona_system: PersonaSystem,
+        default_prompt_builder: PromptBuilder,
     ) -> None:
         """consistency_interval=0 でチェックが無効化されること."""
         config = AppConfig()
@@ -667,6 +682,7 @@ class TestProcessTurn:
         core = AgentCore(
             config=config, db_conn=mock_db_conn,
             llm_client=mock_llm, persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
         )
         core.session_start_message = "やあ"
         with patch.object(
@@ -815,3 +831,285 @@ class TestConsistencyHitCount:
             agent_core.process_turn("テスト")
             warning_calls = mock_logger.warning.call_args_list
             assert any("session_total" in str(c) for c in warning_calls)
+
+
+# ---------------------------------------------------------------------------
+# T-25: C-01 解決 — PromptBuilder 外部注入 + W-T25 後処理 (FR-6.6)
+# ---------------------------------------------------------------------------
+
+
+class TestAgentCorePromptBuilderInjection:
+    """PromptBuilder 外部注入 (C-01) のテスト."""
+
+    def test_prompt_builder_injected(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+    ) -> None:
+        """外部注入した PromptBuilder が使われること."""
+        custom_builder = PromptBuilder(
+            persona_core="custom persona",
+            style_samples="custom style",
+            human_block="custom human",
+        )
+        core = AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=custom_builder,
+        )
+        assert core._prompt_builder is custom_builder
+
+    def test_data_dir_none_by_default(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+    ) -> None:
+        """data_dir 未指定時は None になること."""
+        core = AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
+        )
+        assert core._data_dir is None
+        assert core._human_block_path is None
+        assert core._trends_path is None
+
+    def test_data_dir_sets_paths(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path,
+    ) -> None:
+        """data_dir 指定時にパスが設定されること."""
+        core = AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
+            data_dir=tmp_path,
+        )
+        assert core._data_dir == tmp_path
+        assert core._human_block_path == tmp_path / "human_block.md"
+        assert core._trends_path == tmp_path / "personality_trends.md"
+
+    def test_trends_manager_none_by_default(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+    ) -> None:
+        """_trends_manager 初期値が None であること."""
+        core = AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
+        )
+        assert core._trends_manager is None
+
+
+class TestApplyHumanBlockUpdates:
+    """_apply_human_block_updates のテスト (T-17, W-T25)."""
+
+    def _make_core(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path | None = None,
+    ) -> AgentCore:
+        return AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
+            data_dir=tmp_path,
+        )
+
+    def test_apply_human_block_updates_with_valid_marker(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path,
+    ) -> None:
+        """更新マーカー入り応答で update_human_block が呼ばれること."""
+        core = self._make_core(
+            mock_llm, mock_db_conn, persona_system, config,
+            default_prompt_builder, tmp_path,
+        )
+        persona_system.update_human_block = Mock()
+
+        valid_response = (
+            "通常の会話テキスト。\n"
+            "---human_block_update---\n"
+            "セクション: 基本情報\n"
+            "内容: 好きな食べ物はラーメン\n"
+            "---update_end---"
+        )
+        core._apply_human_block_updates(valid_response)
+
+        persona_system.update_human_block.assert_called_once()
+        call_args = persona_system.update_human_block.call_args
+        assert call_args.args[1] == "基本情報" or call_args.kwargs.get("section") == "基本情報"
+
+    def test_apply_human_block_updates_skips_invalid(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path,
+    ) -> None:
+        """不正な更新がスキップされログに記録されること."""
+        core = self._make_core(
+            mock_llm, mock_db_conn, persona_system, config,
+            default_prompt_builder, tmp_path,
+        )
+        persona_system.update_human_block = Mock()
+
+        # 推測マーカー入り（ガードレール: 推測禁止）
+        invalid_response = (
+            "---human_block_update---\n"
+            "セクション: 基本情報\n"
+            "内容: おそらくラーメンが好きかもしれない\n"
+            "---update_end---"
+        )
+        with patch("kage_shiki.agent.agent_core.logger") as mock_logger:
+            core._apply_human_block_updates(invalid_response)
+            mock_logger.info.assert_called_once()
+
+        persona_system.update_human_block.assert_not_called()
+
+    def test_apply_human_block_updates_no_data_dir(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+    ) -> None:
+        """data_dir=None の場合何もしないこと."""
+        core = self._make_core(
+            mock_llm, mock_db_conn, persona_system, config,
+            default_prompt_builder, None,
+        )
+        persona_system.update_human_block = Mock()
+
+        response_with_marker = (
+            "---human_block_update---\n"
+            "セクション: 基本情報\n"
+            "内容: 何か情報\n"
+            "---update_end---"
+        )
+        core._apply_human_block_updates(response_with_marker)
+
+        persona_system.update_human_block.assert_not_called()
+
+
+class TestHandleTrendsApproval:
+    """_handle_trends_approval のテスト (T-16, W-T25)."""
+
+    def _make_core_with_manager(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path,
+    ) -> AgentCore:
+        from kage_shiki.agent.trends_proposal import TrendsProposalManager
+        core = AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
+            data_dir=tmp_path,
+        )
+        core._trends_manager = TrendsProposalManager()
+        return core
+
+    def test_handle_trends_approval_approved(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path,
+    ) -> None:
+        """承認時に append_personality_trends が呼ばれること."""
+        core = self._make_core_with_manager(
+            mock_llm, mock_db_conn, persona_system, config,
+            default_prompt_builder, tmp_path,
+        )
+        persona_system.append_personality_trends = Mock()
+
+        mock_manager = Mock()
+        mock_manager.parse_proposal_from_response.return_value = None
+        mock_manager.judge_approval.return_value = "approved"
+        from kage_shiki.agent.trends_proposal import TrendsProposal
+        mock_proposal = TrendsProposal(
+            trigger_type="T1",
+            section="関係性の変化",
+            content="最近仲良くなってきた",
+            proposed_at_turn=1,
+        )
+        mock_manager.get_approved_proposal.return_value = mock_proposal
+        mock_manager.format_entry_for_trends.return_value = (
+            "### [2026-03-05] 関係性の変化\n\n最近仲良くなってきた"
+        )
+        core._trends_manager = mock_manager
+
+        core._handle_trends_approval("承認", core.session_context.message_count)
+
+        persona_system.append_personality_trends.assert_called_once()
+
+    def test_handle_trends_approval_no_manager(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        tmp_path: Path,
+    ) -> None:
+        """_trends_manager=None の場合何もしないこと."""
+        core = AgentCore(
+            config=config,
+            db_conn=mock_db_conn,
+            llm_client=mock_llm,
+            persona_system=persona_system,
+            prompt_builder=default_prompt_builder,
+            data_dir=tmp_path,
+        )
+        persona_system.append_personality_trends = Mock()
+
+        # _trends_manager は None のまま
+        core._handle_trends_approval("承認", 0)
+
+        persona_system.append_personality_trends.assert_not_called()
