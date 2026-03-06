@@ -1266,3 +1266,10 @@ flowchart TD
 | T-24 | FR-7.1〜7.5, D-6 | Yes | M | Must |
 | T-25 | 全 FR | Yes | L | Must |
 | T-26 | 全 FR, NFR-10 | Yes | M | Must |
+
+---
+
+## Phase 2 据え置き項目
+
+Phase 1 で対応を見送った項目は [`docs/memos/phase2-backlog.md`](../../memos/phase2-backlog.md) に一元管理。
+Phase 2 の `/planning` 開始時に必ず参照すること。
