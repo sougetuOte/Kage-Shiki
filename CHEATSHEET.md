@@ -134,6 +134,8 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `/adr-create` | ADR作成支援 |
 | `/security-review` | セキュリティレビュー |
 | `/impact-analysis` | 変更の影響分析 |
+| `/wave-plan` | 次Waveのタスク選定・実行順序策定 |
+| `/retro` | Wave/Phase完了時の振り返り（KPT） |
 
 ## 状態管理
 
@@ -168,6 +170,60 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 1. Decomposition: 議題を Atom に分解
 2. Debate: 各 Atom で 3 Agents 議論
 3. Synthesis: 統合結論 → 実装
+```
+
+## 日常ワークフロー
+
+### 一日の開始
+
+```
+/quick-load            # 前回の状態を確認
+                       # （数日ぶりなら /full-load）
+```
+
+### Wave 開始
+
+```
+/wave-plan             # 次Waveのタスク選定・順序決定
+  [承認]
+/building              # BUILDINGフェーズ切替
+```
+
+### 作業中（TDD サイクル）
+
+```
+Red → Green → Refactor → 報告 → (次のサイクル)
+  - building-checklist の R-1〜R-6 を適用
+  - spec-sync の S-1〜S-4 を適用
+```
+
+### Wave 終了
+
+```
+/full-review           # 並列監査 + 全修正
+/ship                  # 論理グループ分けコミット
+/retro wave            # 振り返り（KPT + アクション抽出）
+/quick-save            # セッション状態保存
+```
+
+### Phase 終了
+
+```
+/retro phase           # Phase 全体の振り返り
+/full-save             # git commit + push + daily
+```
+
+### 一日の終了
+
+```
+/quick-save            # 残量に余裕があれば /full-save
+```
+
+### 割り込み・中断
+
+```
+/quick-save            # 即座に状態保存（3-4% で済む）
+  exit
 ```
 
 ## クイックリファレンス

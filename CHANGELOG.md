@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 1: 基盤（MVP）— BUILDING 進行中
 
+#### .claude/ 改善 + docs/internal/ 拡充 (2026-03-06)
+
+- **chore(.claude)**: agents 改善（委任条件・役割境界・モデル指定）、rules 改善（AUDITING 実態合わせ・Subagent 委任原則）、settings.json python allow 統一
+- **feat(.claude)**: `/retro`（KPT 振り返り）、`/wave-plan`（Wave 計画策定）コマンド新規追加
+- **docs(internal)**: 02_DEVELOPMENT_FLOW 拡張（Wave 開発・Advanced Workflows・Quality Rules Integration）
+- **docs(internal)**: 08_SESSION_MANAGEMENT 新規作成（セーブ/ロード仕様・コンテキスト残量管理）
+- **docs(internal)**: 09_SUBAGENT_STRATEGY 新規作成（エージェント一覧・委任判断・並列パターン・モデル選択）
+- **docs(internal)**: 05_MCP_INTEGRATION Phase 1 未導入の明記
+- **docs**: CHEATSHEET 日常ワークフローセクション追加
+
 #### Wave 8 (2026-03-05)
 
 - **T-25**: 起動シーケンス統合（main.py 13ステップ + バックグラウンドループ + 応答ポーリング + シャットダウンCB）
