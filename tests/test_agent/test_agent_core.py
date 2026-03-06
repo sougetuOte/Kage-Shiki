@@ -625,9 +625,10 @@ class TestProcessTurn:
         for i in range(interval - 1):
             agent_core.process_turn(f"入力{i}")
         # interval回目で active になること
+        # Phase 2a 以降は build_with_truncation() 経由で build_system_prompt() が呼ばれる
         with patch.object(
-            agent_core._prompt_builder, "build_system_prompt",
-            wraps=agent_core._prompt_builder.build_system_prompt,
+            agent_core._prompt_builder, "build_with_truncation",
+            wraps=agent_core._prompt_builder.build_with_truncation,
         ) as mock_build:
             agent_core.process_turn(f"入力{interval}")
             mock_build.assert_called_once()

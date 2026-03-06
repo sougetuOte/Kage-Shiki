@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.core.config import AppConfig
 from kage_shiki.persona.persona_system import PersonaCore, PersonaSystem
 
@@ -254,8 +254,8 @@ class WizardController:
         generation_metadata: 生成メタデータ（FR-5.8）。
     """
 
-    def __init__(self, llm: LLMClient, config: AppConfig) -> None:
-        self._llm = llm
+    def __init__(self, llm: LLMProtocol, config: AppConfig) -> None:
+        self._llm: LLMProtocol = llm
         self._config = config
         self.generation_metadata: dict[str, Any] = {}
 

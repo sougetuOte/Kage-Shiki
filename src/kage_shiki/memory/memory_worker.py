@@ -9,7 +9,7 @@
 import logging
 import sqlite3
 
-from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.memory.db import (
     get_day_observations,
     get_missing_summary_dates,
@@ -56,10 +56,10 @@ class MemoryWorker:
     def __init__(
         self,
         db_conn: sqlite3.Connection,
-        llm_client: LLMClient,
+        llm_client: LLMProtocol,
     ) -> None:
         self._db_conn = db_conn
-        self._llm = llm_client
+        self._llm: LLMProtocol = llm_client
 
     def generate_daily_summary(self, date_str: str) -> str | None:
         """指定日の日次サマリーを生成する (FR-3.8).

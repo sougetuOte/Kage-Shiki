@@ -23,8 +23,13 @@ from datetime import datetime
 from pathlib import Path
 
 from kage_shiki.agent.human_block_updater import parse_human_block_updates, validate_update
-from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.agent.trends_proposal import TrendsProposalManager
+from kage_shiki.agent.truncation import (
+    _STYLE_SAMPLES_TRUNCATION_CHARS,
+    estimate_tokens,
+    get_effective_token_limit,
+)
 from kage_shiki.core.config import AppConfig
 from kage_shiki.memory.db import save_observation, search_observations_fts
 from kage_shiki.persona.persona_system import PersonaSystem
@@ -313,6 +318,134 @@ class PromptBuilder:
 
         return messages
 
+    def build_with_truncation(
+        self,
+        session_start_message: str,
+        turns: list[dict[str, str]],
+        latest_input: str,
+        cold_memories: list[dict] | None,
+        model: str,
+        max_tokens_for_output: int,
+        consistency_check_active: bool = False,
+        *,
+        _override_token_limit: int | None = None,
+    ) -> tuple[str, list[dict[str, str]]]:
+        """コンテキストウィンドウ超過時に削減しつつプロンプトを構築する (D-18, FR-8.7).
+
+        削減優先順位（D-18 Section 1）:
+            1. Cold Memory（build_messages() の cold_memories 引数）
+            2. Warm Memory（day_summaries フィールド）
+            3. Session Context（build_messages() の turns 引数）
+            4. Hot Memory（personality_trends → human_block → style_samples 順）
+               persona_core は絶対に削除しない。
+
+        PromptBuilder インスタンスのフィールドは変更しない（不変保証、D-18 Section 5.7）。
+
+        Args:
+            session_start_message: セッション開始時の挨拶テキスト。
+            turns: 過去の会話ターン（role/content の dict リスト）。
+            latest_input: 最新のユーザー入力テキスト。
+            cold_memories: FTS5 検索結果（None で Cold Memory なし）。
+            model: モデル ID（コンテキストウィンドウ上限の決定に使用）。
+            max_tokens_for_output: 出力に割り当てる max_tokens。
+            consistency_check_active: 整合性チェック指示を含めるかどうか。
+            _override_token_limit: テスト用トークン上限オーバーライド（非公開）。
+
+        Returns:
+            (system_prompt, messages) のタプル。
+        """
+        # Phase 0: トークン上限の計算
+        if _override_token_limit is not None:
+            token_limit = _override_token_limit
+        else:
+            token_limit = get_effective_token_limit(model, max_tokens_for_output)
+
+        # 削減用コピー（PromptBuilder フィールドは変更しない）
+        cold_list: list[dict] | None = list(cold_memories) if cold_memories is not None else None
+        warm_list: list[dict[str, str]] = list(self.day_summaries)
+        turn_list: list[dict[str, str]] = list(turns)
+
+        # Hot Memory 削減用コピー（persona_core には触れない）
+        personality_trends_work = self.personality_trends
+        human_block_work = self.human_block
+        style_samples_work = self.style_samples
+
+        def _estimate_current() -> int:
+            """現在の削減候補を使ってトークン数を見積もる."""
+            tmp = PromptBuilder(
+                persona_core=self.persona_core,
+                style_samples=style_samples_work,
+                human_block=human_block_work,
+                personality_trends=personality_trends_work,
+                day_summaries=warm_list,
+            )
+            sys = tmp.build_system_prompt(consistency_check_active=consistency_check_active)
+            msgs = tmp.build_messages(
+                session_start_message=session_start_message,
+                turns=turn_list,
+                latest_input=latest_input,
+                cold_memories=cold_list if cold_list else None,
+            )
+            return estimate_tokens(sys) + estimate_tokens(str(msgs))
+
+        def _build_final() -> tuple[str, list[dict[str, str]]]:
+            """現在の削減状態で最終プロンプトを構築する."""
+            final = PromptBuilder(
+                persona_core=self.persona_core,
+                style_samples=style_samples_work,
+                human_block=human_block_work,
+                personality_trends=personality_trends_work,
+                day_summaries=warm_list,
+            )
+            return (
+                final.build_system_prompt(consistency_check_active=consistency_check_active),
+                final.build_messages(
+                    session_start_message=session_start_message,
+                    turns=turn_list,
+                    latest_input=latest_input,
+                    cold_memories=cold_list,
+                ),
+            )
+
+        # Phase 1: 上限チェック（削減不要ならそのまま返す）
+        if _estimate_current() <= token_limit:
+            return _build_final()
+
+        # Phase 2: Cold Memory の削減（末尾=最古から1件ずつ削除）
+        if cold_list is not None:
+            while len(cold_list) > 0 and _estimate_current() > token_limit:
+                cold_list = cold_list[:-1]
+            if len(cold_list) == 0:
+                cold_list = None
+
+        if _estimate_current() <= token_limit:
+            return _build_final()
+
+        # Phase 3: Warm Memory（day_summaries）の削減（末尾=最古から1件ずつ削除）
+        while len(warm_list) > 0 and _estimate_current() > token_limit:
+            warm_list = warm_list[:-1]
+
+        if _estimate_current() <= token_limit:
+            return _build_final()
+
+        # Phase 4: Session Context の削減（先頭=最古ターンペアから2要素ずつ削除、最低2要素残す）
+        while len(turn_list) > 2 and _estimate_current() > token_limit:
+            turn_list = turn_list[2:]
+
+        if _estimate_current() <= token_limit:
+            return _build_final()
+
+        # Phase 5: Hot Memory の削減（極限時のみ、persona_core は絶対に削除しない）
+        if _estimate_current() > token_limit:
+            personality_trends_work = ""
+        if _estimate_current() > token_limit:
+            human_block_work = ""
+        if _estimate_current() > token_limit:
+            style_samples_work = style_samples_work[:_STYLE_SAMPLES_TRUNCATION_CHARS]
+
+        # Phase 6: 最終プロンプト構築（削減後の値で再構築）
+        return _build_final()
+
 
 # ---------------------------------------------------------------------------
 # T-13: 整合性チェック（D-8）
@@ -448,7 +581,7 @@ class AgentCore:
         self,
         config: AppConfig,
         db_conn: sqlite3.Connection,
-        llm_client: LLMClient,
+        llm_client: LLMProtocol,
         persona_system: PersonaSystem,
         prompt_builder: PromptBuilder,
         *,
@@ -457,7 +590,7 @@ class AgentCore:
     ) -> None:
         self._config = config
         self._db_conn = db_conn
-        self._llm_client = llm_client
+        self._llm_client: LLMProtocol = llm_client
         self._persona_system = persona_system
 
         self.session_context = SessionContext()
@@ -523,19 +656,20 @@ class AgentCore:
             logger.warning("FTS5 検索失敗（Cold Memory スキップ）", exc_info=True)
             cold_memories = None
 
-        # 4. SystemPrompt + Messages 構築
-        system_prompt = self._prompt_builder.build_system_prompt(
-            consistency_check_active=consistency_check_active,
-        )
-        messages = self._prompt_builder.build_messages(
+        # 4. SystemPrompt + Messages 構築（トランケートあり、D-18 FR-8.7）
+        purpose = "poke" if user_input.startswith(POKE_EVENT_PREFIX) else "conversation"
+        from kage_shiki.core.config import get_max_tokens, get_model
+        system_prompt, messages = self._prompt_builder.build_with_truncation(
             session_start_message=self.session_start_message,
             turns=self.session_context.turns,
             latest_input=user_input,
             cold_memories=cold_memories,
+            model=get_model(self._config, purpose),
+            max_tokens_for_output=get_max_tokens(self._config, purpose),
+            consistency_check_active=consistency_check_active,
         )
 
         # 5. LLM 呼び出し — クリックイベントなら purpose="poke" (FR-2.5)
-        purpose = "poke" if user_input.startswith(POKE_EVENT_PREFIX) else "conversation"
         response = self._llm_client.send_message_for_purpose(
             system=system_prompt,
             messages=messages,

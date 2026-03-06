@@ -1,7 +1,7 @@
 """LLMClient のテスト (T-07).
 
-対応 FR: FR-6.7, FR-7.1, FR-7.2
-対応設計: D-15（用途別 max_tokens）
+対応 FR: FR-6.7, FR-7.1, FR-7.2, FR-8.6
+対応設計: D-15（用途別 max_tokens）, D-17（LLMProtocol 抽出）
 """
 
 from unittest.mock import MagicMock, patch
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import anthropic
 import pytest
 
-from kage_shiki.agent.llm_client import AuthenticationError, LLMClient, LLMError
+from kage_shiki.agent.llm_client import AuthenticationError, LLMClient, LLMError, LLMProtocol
 from kage_shiki.core.config import ApiConfig, AppConfig, ConversationConfig
 
 
@@ -330,3 +330,87 @@ class TestLLMClientSendForPurpose:
                 messages=[{"role": "user", "content": "test"}],
                 purpose="nonexistent",
             )
+
+
+class TestLLMProtocol:
+    """FR-8.6: LLMProtocol の Protocol 互換性テスト (D-17).
+
+    対応 FR: FR-8.6
+    対応設計: D-17（LLMProtocol 抽出）
+
+    テストケース:
+        FR-8.6-1: LLMProtocol が typing.Protocol として定義されている
+        FR-8.6-2: isinstance(LLMClient(config), LLMProtocol) が True
+        FR-8.6-3: LLMProtocol を実装したモッククラスが isinstance で True
+        FR-8.6-4: LLMClient.chat() が send_message() に正しく委譲する
+        FR-8.6-5: Protocol を満たさないクラスの isinstance が False になる（異常系）
+    """
+
+    def test_llm_protocol_is_protocol(self) -> None:
+        """FR-8.6-1: LLMProtocol が typing.Protocol として定義されていること."""
+        from typing import Protocol
+        assert issubclass(LLMProtocol, Protocol)
+
+    def test_llm_client_satisfies_protocol(self, client: LLMClient) -> None:
+        """FR-8.6-2: LLMClient インスタンスが LLMProtocol を満足すること."""
+        assert isinstance(client, LLMProtocol)
+
+    def test_mock_client_satisfies_protocol(self) -> None:
+        """FR-8.6-3: chat() のみを実装したモッククラスが LLMProtocol を満足すること."""
+        class MockLLMClient:
+            """テスト用 LLMProtocol 実装（D-17 Section 6.2 のモック設計に準拠）."""
+
+            def __init__(self, response: str = "テスト応答") -> None:
+                self._response = response
+                self.calls: list[dict] = []
+
+            def chat(
+                self,
+                messages: list[dict],
+                *,
+                system: str,
+                model: str,
+                max_tokens: int,
+                temperature: float,
+            ) -> str:
+                self.calls.append({
+                    "messages": messages,
+                    "system": system,
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                })
+                return self._response
+
+        mock_client = MockLLMClient()
+        assert isinstance(mock_client, LLMProtocol)
+
+    def test_chat_delegates_to_send_message(self, client: LLMClient) -> None:
+        """FR-8.6-4: LLMClient.chat() が send_message() に正しく委譲すること."""
+        with patch.object(
+            client._client.messages, "create",
+            return_value=_make_mock_response("chat委譲テスト"),
+        ) as mock_create:
+            result = client.chat(
+                messages=[{"role": "user", "content": "テスト"}],
+                system="システムプロンプト",
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                temperature=0.7,
+            )
+        assert result == "chat委譲テスト"
+        kwargs = mock_create.call_args.kwargs
+        assert kwargs["system"] == "システムプロンプト"
+        assert kwargs["model"] == "claude-haiku-4-5-20251001"
+        assert kwargs["max_tokens"] == 512
+        assert kwargs["temperature"] == 0.7
+
+    def test_class_without_chat_does_not_satisfy_protocol(self) -> None:
+        """FR-8.6-5: chat() を実装していないクラスは LLMProtocol を満足しないこと（異常系）."""
+        class NoChatClass:
+            """chat() メソッドを持たないクラス."""
+            def send_message(self, messages: list[dict], *, system: str, model: str, max_tokens: int, temperature: float) -> str:
+                return "no chat"
+
+        instance = NoChatClass()
+        assert not isinstance(instance, LLMProtocol)

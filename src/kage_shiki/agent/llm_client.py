@@ -1,10 +1,11 @@
-"""LLM クライアント — Anthropic SDK ラッパー (T-07).
+"""LLM クライアント — Anthropic SDK ラッパー (T-07, T-28).
 
 対応 FR:
     FR-6.7: Anthropic API 経由で LLM を呼び出す
     FR-7.1: API 接続失敗時のリトライ（指数バックオフ）
     FR-7.2: 認証エラー（401/403）の検出と案内
-対応設計: D-15（用途別 max_tokens）
+    FR-8.6: LLMProtocol 抽出（抽象インターフェース定義）
+対応設計: D-15（用途別 max_tokens）, D-17（LLMProtocol 抽出）
 
 ログポリシー (D-2 Section 5.5):
     - LLM レスポンス本文はログに含めない
@@ -13,6 +14,7 @@
 
 import logging
 import time
+from typing import Protocol, runtime_checkable
 
 import anthropic
 
@@ -37,6 +39,54 @@ class LLMError(Exception):
 
 class AuthenticationError(LLMError):
     """API 認証エラー（401/403）."""
+
+
+# ---------------------------------------------------------------------------
+# LLMProtocol — 抽象インターフェース（D-17, FR-8.6）
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class LLMProtocol(Protocol):
+    """LLM クライアントの抽象インターフェース.
+
+    任意の LLM バックエンド（Anthropic API、LocalLLM 等）がこの Protocol を
+    実装することで、AgentCore・MemoryWorker・WizardController は
+    具体的な実装に依存しない。
+
+    Phase 2a では LLMClient（既存の Anthropic 実装）のみが実装する。
+    Phase 3 以降で LocalLLM 等の第2実装を追加する際に活用する。
+
+    Methods:
+        chat: LLM に対話リクエストを送信し、応答テキストを返す。
+    """
+
+    def chat(
+        self,
+        messages: list[dict],
+        *,
+        system: str,
+        model: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        """LLM に対話リクエストを送信し、応答テキストを返す.
+
+        Args:
+            messages: Anthropic Messages API 形式の会話配列。
+                各要素は {"role": "user"|"assistant", "content": str} の形式。
+            system: システムプロンプト。
+            model: モデル ID（例: "claude-haiku-4-5-20251001"）。
+            max_tokens: 最大出力トークン数。
+            temperature: サンプリング温度（0.0〜2.0）。
+
+        Returns:
+            LLM の応答テキスト。
+
+        Raises:
+            実装依存のエラー。AuthenticationError、LLMError 等。
+        """
+        ...
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +179,38 @@ class LLMClient:
         raise LLMError(
             f"リトライ上限 ({api_config.max_retries}回) に到達: {last_error}",
         ) from last_error
+
+    def chat(
+        self,
+        messages: list[dict],
+        *,
+        system: str,
+        model: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        """LLMProtocol を満足するための chat() メソッド.
+
+        内部で send_message() に委譲する。
+        LLMProtocol の実装として機能する（Phase 3 での差し替え口）。
+
+        Args:
+            messages: Anthropic Messages API 形式の会話配列。
+            system: システムプロンプト。
+            model: モデル ID。
+            max_tokens: 最大出力トークン数。
+            temperature: サンプリング温度。
+
+        Returns:
+            LLM の応答テキスト。
+        """
+        return self.send_message(
+            system=system,
+            messages=messages,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
 
     def send_message_for_purpose(
         self,
