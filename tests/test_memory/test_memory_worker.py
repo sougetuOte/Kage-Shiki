@@ -6,6 +6,7 @@
     FR-7.5: サマリー生成失敗時のログ記録（EM-009）
 """
 
+import sqlite3
 from unittest.mock import Mock, patch
 
 import pytest
@@ -33,7 +34,7 @@ def mock_llm() -> Mock:
 @pytest.fixture()
 def mock_db_conn() -> Mock:
     """DB 接続のモック."""
-    return Mock()
+    return Mock(spec=sqlite3.Connection)
 
 
 @pytest.fixture()

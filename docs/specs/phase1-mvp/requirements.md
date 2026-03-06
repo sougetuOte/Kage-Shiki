@@ -568,7 +568,7 @@ erDiagram
 |----|---------|------|------|
 | NFR-1 | プラットフォーム | Windows 11 で動作する | Windows 11 Pro/Home 22H2+ |
 | NFR-2 | 言語 | Python 3.12+ で動作する | 3.12, 3.13 対応 |
-| NFR-3 | 依存 | 外部依存を最小化する | tkinter(標準), pystray, anthropic, python-dotenv |
+| NFR-3 | 依存 | 外部依存を最小化する | tkinter(標準), pystray, Pillow, anthropic, python-dotenv |
 | NFR-4 | メモリ | 常駐時のメモリ使用量を抑える | 目標: < 100MB |
 | NFR-5 | 起動時間 | 起動からウィンドウ表示まで | 目標: 10秒以内（サマリー補完除く） |
 | NFR-6 | 応答時間 | ユーザー入力から応答表示まで | Haiku: 1-3秒（ネットワーク依存） |

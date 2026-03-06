@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 1: 基盤（MVP）— BUILDING 進行中
 
+#### Wave 9 (2026-03-06)
+
+- **T-26**: 結合テスト + E2E 検証（統合テスト 69 件追加、合計 649 tests / 97% coverage）
+- **test**: test_e2e.py（基本対話・記憶システム・シャットダウンサマリー・欠損補完・Warm Memory・整合性チェック）
+- **test**: test_wizard_e2e.py（方式 A/B/C 全パイプライン・凍結サイクル検証）
+- **test**: test_config_reflection.py（config.toml 読み書き・用途別パラメータ解決・AgentCore 連携）
+- **test**: test_error_handling.py（EM-001〜011 定義整合・ペルソナエラー・AgentCore エラー耐性）
+- **fix(audit)**: AgentCore コンストラクタに trends_manager 引数追加（カプセル化修正）
+- **fix(audit)**: cold_top_k を FTS5 検索に反映（config 設定値が未使用だった問題）
+- **fix(audit)**: trends_proposal R-6 違反修正（未知種別のデフォルトフォールバック → 破棄）
+- **fix(audit)**: load_human_block に OSError ハンドリング追加
+- **fix(audit)**: db.py 正規表現・config.py マジックナンバー・shutdown_handler 型アノテーション
+- **docs**: NFR-3 に Pillow 追記（仕様同期 S-1）
+
 #### .claude/ 改善 + docs/internal/ 拡充 (2026-03-06)
 
 - **chore(.claude)**: agents 改善（委任条件・役割境界・モデル指定）、rules 改善（AUDITING 実態合わせ・Subagent 委任原則）、settings.json python allow 統一
