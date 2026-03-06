@@ -24,6 +24,7 @@ Phase 0: Grounding → Level 1: AoT → Level 2: Debate → Level 3: Reflection 
 ### Phase 0: Grounding + 複雑度判定
 
 1. 議題から重要キーワードを抽出し、WebSearch を 1-2 回実行する
+   - `--no-web` 指定時またはオフライン環境では WebSearch をスキップする
    - 検索精度は完璧を求めない。失敗時は警告して続行する
 2. 複雑度を判定しレベルを選択する:
 

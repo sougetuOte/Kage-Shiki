@@ -49,6 +49,8 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 - チェックリストに基づく網羅的確認
 - 重要度分類: Critical / Warning / Info
 - 3 Agents Model 適用、根拠明示
+- `/full-review` で監査→修正→検証を一気通貫で実施可能
+- `audit-fix-policy.md` に従い、対応可能な Issue は全て修正する
 
 ### コード品質チェック
 

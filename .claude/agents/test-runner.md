@@ -4,7 +4,7 @@ description: >
   テスト実行・分析の専門 Subagent。
   テストスイートの実行、失敗分析、カバレッジ確認を担当。
   Use proactively when running tests, analyzing test failures, or checking coverage.
-model: haiku
+model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
 
