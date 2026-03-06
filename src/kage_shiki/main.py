@@ -129,7 +129,9 @@ def _start_response_polling(
 
     def _poll() -> None:
         if shutdown_event.is_set():
+            logger.debug("shutdown_event 検出 — root.quit() 呼び出し")
             root.quit()
+            root.destroy()
             return
 
         try:
@@ -168,24 +170,30 @@ def _make_shutdown_callback(
         シャットダウンコールバック関数。
     """
 
+    _done = threading.Event()
+
     def _shutdown() -> None:
+        if _done.is_set():
+            return
+        _done.set()
+
         logger.info("シャットダウンシーケンス開始")
 
-        # 1. 当日の日次サマリー生成
+        # 1. まず GUI を閉じる（ユーザーを待たせない）
+        shutdown_event.set()
+
+        # 2. 当日の日次サマリー生成
         try:
             today = datetime.now().strftime("%Y-%m-%d")
             memory_worker.generate_daily_summary_sync(today)
         except Exception:
             logger.error("日次サマリー生成失敗（シャットダウン続行）", exc_info=True)
 
-        # 2. DB コネクションのクローズ
+        # 3. DB コネクションのクローズ
         try:
             db.close()
         except Exception:
             logger.error("DB クローズ失敗", exc_info=True)
-
-        # 3. メインスレッドに GUI 終了を通知
-        shutdown_event.set()
 
         logger.info("シャットダウン完了")
 

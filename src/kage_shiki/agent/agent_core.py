@@ -415,11 +415,17 @@ POKE_EVENT_PREFIX = "[クリックイベント]"
 # T-13: AgentCore（FR-6.1）
 # ---------------------------------------------------------------------------
 
-_SESSION_START_INSTRUCTION = (
-    "セッションが開始されました。"
-    "キャラクターとしてユーザーに自然な挨拶をしてください。"
-    "短く、キャラクターらしい一言で構いません。"
-)
+def _make_session_start_instruction() -> str:
+    """現在時刻を含むセッション開始指示を生成する."""
+    now = datetime.now()
+    time_str = now.strftime("%Y年%m月%d日 %H時%M分")
+    weekdays = ["月", "火", "水", "木", "金", "土", "日"]
+    weekday = weekdays[now.weekday()]
+    return (
+        f"セッションが開始されました。現在は{time_str}（{weekday}曜日）です。"
+        "キャラクターとして、時間帯や曜日に合った自然な挨拶をしてください。"
+        "短く、キャラクターらしい一言で構いません。"
+    )
 
 
 class AgentCore:
@@ -477,7 +483,7 @@ class AgentCore:
             生成された挨拶テキスト。
         """
         system_prompt = self._prompt_builder.build_system_prompt()
-        messages = [{"role": "user", "content": _SESSION_START_INSTRUCTION}]
+        messages = [{"role": "user", "content": _make_session_start_instruction()}]
         response = self._llm_client.send_message_for_purpose(
             system=system_prompt,
             messages=messages,

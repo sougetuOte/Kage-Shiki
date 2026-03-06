@@ -91,8 +91,9 @@ class SystemTray:
         self._view.hide()
 
     def action_quit(self) -> None:
-        """シャットダウンシーケンスを開始する."""
+        """シャットダウンシーケンスを開始し、トレイアイコンを停止する."""
         self._shutdown_callback()
+        self.stop()
 
     def create_icon_image(self) -> Image.Image:
         """簡易なトレイアイコン画像を PIL で生成する.

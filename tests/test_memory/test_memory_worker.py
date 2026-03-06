@@ -34,7 +34,10 @@ def mock_llm() -> Mock:
 @pytest.fixture()
 def mock_db_conn() -> Mock:
     """DB 接続のモック."""
-    return Mock(spec=sqlite3.Connection)
+    conn = Mock(spec=sqlite3.Connection)
+    # 既存サマリーチェック: デフォルトは「未生成」（None）
+    conn.execute.return_value.fetchone.return_value = None
+    return conn
 
 
 @pytest.fixture()

@@ -100,15 +100,27 @@ class TkinterMascotView:
         )
         self._name_label.pack(anchor="nw", padx=8, pady=(8, 0))
 
-        # セリフ表示エリア（中央）
-        self._text_label = tk.Label(
-            self._root,
-            textvariable=self.text_var,
+        # セリフ表示エリア（中央 — スクロール付き Text ウィジェット）
+        text_frame = tk.Frame(self._root)
+        text_frame.pack(fill="both", expand=True, padx=8, pady=8)
+
+        self._text_widget = tk.Text(
+            text_frame,
             font=font_spec,
-            wraplength=config.window_width - 20,
-            justify="left",
+            wrap="word",
+            state="disabled",
+            relief="flat",
+            bg=self._root.cget("bg"),
+            cursor="arrow",
+            height=8,
         )
-        self._text_label.pack(fill="both", expand=True, padx=8, pady=8)
+        scrollbar = tk.Scrollbar(
+            text_frame, command=self._text_widget.yview,
+        )
+        self._text_widget.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side="right", fill="y")
+        self._text_widget.pack(side="left", fill="both", expand=True)
 
         # 入力エリアのフレーム（下部）
         input_frame = tk.Frame(self._root)
@@ -188,6 +200,11 @@ class TkinterMascotView:
             text: 表示するテキスト。空文字も許容する。
         """
         self.text_var.set(text)
+        self._text_widget.configure(state="normal")
+        self._text_widget.delete("1.0", "end")
+        self._text_widget.insert("1.0", text)
+        self._text_widget.configure(state="disabled")
+        self._text_widget.see("end")
 
     def set_body_state(self, state: str) -> None:
         """ボディ表示状態を設定する（Phase 1 は no-op）.

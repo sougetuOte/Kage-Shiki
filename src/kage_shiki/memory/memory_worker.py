@@ -74,6 +74,14 @@ class MemoryWorker:
             LLMError: API 呼び出し失敗。
             sqlite3.IntegrityError: 同一日のサマリーが既に存在する場合。
         """
+        # 既にサマリーが存在する場合はスキップ（UNIQUE 制約違反防止）
+        existing = self._db_conn.execute(
+            "SELECT 1 FROM day_summary WHERE date = ?", (date_str,),
+        ).fetchone()
+        if existing:
+            logger.info("サマリー既存: %s（生成スキップ）", date_str)
+            return None
+
         observations = get_day_observations(self._db_conn, date_str)
         if not observations:
             logger.info("observations なし: %s（サマリー生成スキップ）", date_str)

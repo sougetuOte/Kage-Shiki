@@ -127,7 +127,7 @@ class Database:
         """
         if self._conn is not None:
             self.close()
-        conn = sqlite3.connect(self._db_path)
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         _configure_pragmas(conn)
         self._conn = conn
