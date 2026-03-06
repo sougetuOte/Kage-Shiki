@@ -248,15 +248,15 @@ class TestConfigToAgentCoreIntegration:
         mock_llm_client.send_message_for_purpose.return_value = "応答"
         agent.generate_session_start_message()
 
-        # consistency_check_active を監視
+        # consistency_check_active を監視（T-29: build_with_truncation 経由）
         build_calls = []
-        original_build = prompt_builder.build_system_prompt
+        original_build_trunc = prompt_builder.build_with_truncation
 
-        def capture_build(**kwargs):
+        def capture_build_trunc(*args, **kwargs):
             build_calls.append(kwargs.get("consistency_check_active", False))
-            return original_build(**kwargs)
+            return original_build_trunc(*args, **kwargs)
 
-        prompt_builder.build_system_prompt = capture_build
+        prompt_builder.build_with_truncation = capture_build_trunc
 
         for i in range(4):
             agent.process_turn(f"入力{i}")

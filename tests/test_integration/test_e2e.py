@@ -179,16 +179,16 @@ class TestBasicDialogueFlow:
         mock_llm_client.send_message_for_purpose.return_value = "応答"
         agent.generate_session_start_message()
 
-        # 3ターン目で整合性チェックが有効になることを確認
+        # 3ターン目で整合性チェックが有効になることを確認（T-29: build_with_truncation 経由）
         calls_with_consistency = []
 
-        original_build = prompt_builder.build_system_prompt
+        original_build_trunc = prompt_builder.build_with_truncation
 
-        def capture_build(**kwargs):
+        def capture_build_trunc(*args, **kwargs):
             calls_with_consistency.append(kwargs.get("consistency_check_active", False))
-            return original_build(**kwargs)
+            return original_build_trunc(*args, **kwargs)
 
-        prompt_builder.build_system_prompt = capture_build
+        prompt_builder.build_with_truncation = capture_build_trunc
 
         for i in range(6):
             agent.process_turn(f"入力{i}")
