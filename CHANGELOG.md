@@ -4,7 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Phase 1: 基盤（MVP）— BUILDING 進行中
+### Phase 1: 基盤（MVP）— 完了
+
+#### ホットフィックス + 教訓反映 (2026-03-06)
+
+- **fix(runtime)**: `__main__.py` 追加（`python -m kage_shiki` 起動対応）
+- **fix(runtime)**: SQLite `check_same_thread=False`（スレッド間DB共有）
+- **fix(runtime)**: tkinter スクロール付き Text ウィジェットに変更
+- **fix(runtime)**: シャットダウン二重実行防止 + GUI 先行終了 + `root.destroy()`
+- **fix(runtime)**: pystray Icon 終了時 stop 追加
+- **fix(runtime)**: `day_summary` 既存チェック（UNIQUE 制約違反防止）
+- **fix(runtime)**: セッション開始メッセージに現在時刻注入
+- **test**: `test_memory_worker.py` 既存サマリーチェックのテスト追加
+- **chore(.claude)**: `building-checklist.md` に R-7〜R-10 追加（スレッド安全性・永続状態・シャットダウン経路・GUI目視確認）
+- **chore(.claude)**: `phase-rules.md` に Phase 完了判定（実動作スモークテスト必須化）追加
+- **docs**: `phase2-backlog.md` に統合テスト強化タスク B-7〜B-11 追加
 
 #### Wave 9 (2026-03-06)
 

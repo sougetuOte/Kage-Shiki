@@ -54,7 +54,7 @@ docs/memos/middle-draft/   # 設計中間文書
 | `phase-rules.md` | フェーズ別ガードレール（PLANNING/BUILDING/AUDITING） |
 | `security-commands.md` | コマンド安全基準（Allow/Deny List） |
 | `decision-making.md` | 意思決定プロトコル |
-| `building-checklist.md` | BUILDING 品質チェックリスト（R-1〜R-6） |
+| `building-checklist.md` | BUILDING 品質チェックリスト（R-1〜R-10） |
 | `spec-sync.md` | 仕様・実装同期ルール（S-1〜S-4） |
 | `audit-fix-policy.md` | 監査修正ポリシー（A-1〜A-4） |
 
@@ -193,7 +193,7 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 ```
 Red → Green → Refactor → 報告 → (次のサイクル)
-  - building-checklist の R-1〜R-6 を適用
+  - building-checklist の R-1〜R-10 を適用
   - spec-sync の S-1〜S-4 を適用
 ```
 
