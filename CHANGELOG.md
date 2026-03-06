@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Phase 2a: 基盤強化 — PLANNING 完了
+
+#### PLANNING 完了 (2026-03-06)
+
+- **docs(specs)**: Phase 2a 要件定義書 `requirements.md` 作成・承認（FR-8.1〜8.11、NFR-11〜12）
+- **docs(specs)**: 設計書 D-17〜D-20 作成・承認（LLMProtocol / トランケート / ウィザードGUI / 統合テスト）
+- **docs(specs)**: タスク分解 `tasks.md` 作成・承認（T-27〜T-32、6タスク、Wave 1〜3）
+- **chore(.claude)**: `building-checklist.md` に R-11（Green直後3点ミニチェック）追加
+- **chore(.claude)**: `spec-sync.md` に NFR チェック追加（Phase 1 Retro Try-2）
+- **chore(.claude)**: `wave-plan.md` にタスク数上限追加
+
 ### Phase 1: 基盤（MVP）— 完了
 
 #### ホットフィックス + 教訓反映 (2026-03-06)

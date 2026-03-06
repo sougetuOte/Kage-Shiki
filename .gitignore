@@ -40,3 +40,6 @@ docs/daily/
 
 # Reference materials
 _reference/
+
+# User Config
+config.toml
