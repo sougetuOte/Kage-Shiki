@@ -1,0 +1,17 @@
+{
+  "feature": "phase-2-autonomy",
+  "description": "影式 Phase 2: 自律性 — 欲求システム・自律発言・AgenticSearch・セマンティック検索",
+  "phase": "PLANNING",
+  "subphase": "design",
+  "status": {
+    "requirements": "approved",
+    "design": "in_progress",
+    "tasks": "not_started"
+  },
+  "approvals": {
+    "requirements": "2026-03-06"
+  },
+  "scope": [],
+  "created_at": "2026-03-06",
+  "updated_at": "2026-03-06"
+}
