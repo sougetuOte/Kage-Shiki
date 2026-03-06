@@ -8,7 +8,10 @@
 
 ## 1. MCP Servers (サーバー一覧)
 
-### A. Serena (Coding Agent Toolkit) — Optional
+> **Phase 1 MVP**: MCP サーバーは未導入。Claude Code 標準ツール（Bash, Glob, Grep, Read, Edit, Write）で運用している。
+> 以下のサーバーは Phase 2 以降での導入を検討する。
+
+### A. Serena (Coding Agent Toolkit) — Phase 2 以降で検討
 
 - **Repository**: `oraios/serena`
 - **Role**: **"The Hands" (手)**
@@ -19,7 +22,7 @@
   - CLAUDE.md に「Serena を優先使用する」旨を明記しないと、Claude Code は grep に流れる傾向がある。
   - 導入する場合は、CLAUDE.md のツール使用ルールに明示的に記載すること。
 
-### B. Heimdall (Long-Term Memory) — Optional
+### B. Heimdall (Long-Term Memory) — Phase 2 以降で検討
 
 - **Repository**: `lcbcFoo/heimdall-mcp-server`
 - **Role**: **"The Brain" (脳)**
@@ -29,7 +32,7 @@
   - **Knowledge Retrieval**: 過去の意思決定や、類似の実装パターンを探す際は、Heimdall の検索機能を使用する。
 
 
-### C. Database Visualization — Optional
+### C. Database Visualization — Phase 2 以降で検討
 
 - **Tools**: `SingleStore MCP`, `ChartDB` (Self-hosted)
 - **Role**: **"The Eyes" (目)**
