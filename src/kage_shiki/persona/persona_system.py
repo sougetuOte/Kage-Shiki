@@ -391,7 +391,11 @@ class PersonaSystem:
         if not path.exists():
             path.write_text(_HUMAN_BLOCK_TEMPLATE, encoding="utf-8")
             logger.info("human_block.md テンプレートを生成しました: %s", path)
-        return path.read_text(encoding="utf-8")
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning("human_block.md の読み込みに失敗: %s", path, exc_info=True)
+            return _HUMAN_BLOCK_TEMPLATE
 
     def update_human_block(
         self, path: Path, section: str, content: str,

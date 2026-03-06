@@ -346,15 +346,6 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Step 10: SessionContext 初期化 (FR-3.12)
     # ------------------------------------------------------------------
-    agent_core = AgentCore(
-        config=config,
-        db_conn=db_conn,
-        llm_client=llm_client,
-        persona_system=persona_system,
-        prompt_builder=prompt_builder,
-        data_dir=data_dir,
-    )
-
     # Step 10.5: TrendsProposalManager 初期化 + トリガー評価 (D-14)
     trends_manager = TrendsProposalManager()
     trigger_addition = trends_manager.evaluate_triggers(
@@ -362,7 +353,16 @@ def main() -> None:
     )
     if trigger_addition:
         trends_manager.prompt_addition = trigger_addition
-    agent_core._trends_manager = trends_manager
+
+    agent_core = AgentCore(
+        config=config,
+        db_conn=db_conn,
+        llm_client=llm_client,
+        persona_system=persona_system,
+        prompt_builder=prompt_builder,
+        data_dir=data_dir,
+        trends_manager=trends_manager,
+    )
 
     # ------------------------------------------------------------------
     # Step 11: シャットダウンCB + GUI + トレイ (FR-2.1, FR-2.7)

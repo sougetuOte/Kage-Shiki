@@ -159,7 +159,7 @@ class Database:
 
 
 # ハイフンは負の数値（例: "-2000"）を許容するためリテラルとして含める
-_PRAGMA_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
+_PRAGMA_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _configure_pragmas(conn: sqlite3.Connection) -> None:

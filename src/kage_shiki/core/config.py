@@ -22,6 +22,7 @@ _TEMPERATURE_MIN = 0.0
 _TEMPERATURE_MAX = 2.0
 _OPACITY_MIN = 0.0
 _OPACITY_MAX = 1.0
+_DEFAULT_LOG_MAX_BYTES = 5 * 1024 * 1024  # 5MB
 
 # get_max_tokens の固定値（D-15）
 _MAX_TOKENS_WIZARD_GENERATE = 2048
@@ -223,7 +224,7 @@ class LoggingConfig:
 
     level: str = "INFO"
     file_level: str = "DEBUG"
-    max_bytes: int = 5242880
+    max_bytes: int = _DEFAULT_LOG_MAX_BYTES
     backup_count: int = 3
 
 

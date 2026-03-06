@@ -130,7 +130,7 @@ class TrendsProposalManager:
     proposal_count: int = 0
     max_proposals_per_session: int = 2
     prompt_addition: str = ""
-    _proposal_history: list[dict] = field(default_factory=list)
+    _proposal_history: list[dict] = field(default_factory=list, init=False, repr=False)
 
     # ------------------------------------------------------------------
     # トリガー評価
@@ -297,7 +297,7 @@ class TrendsProposalManager:
 
         inner = response[start_idx + len(_PROPOSAL_START):end_idx].strip()
 
-        section = "関係性の変化"
+        section = None
         content = inner
 
         for line in inner.split("\n"):
@@ -308,9 +308,9 @@ class TrendsProposalManager:
                     section = _SECTION_MAP[kind]
                 else:
                     logger.warning(
-                        "未知の提案種別 '%s' — デフォルト '関係性の変化' にフォールバック", kind,
+                        "未知の提案種別 '%s' — 提案を破棄", kind,
                     )
-                    section = "関係性の変化"
+                    return None
             elif stripped.startswith("内容:") or stripped.startswith("内容："):
                 content = re.split(r"[:：]", stripped, maxsplit=1)[-1].strip()
 
@@ -318,7 +318,7 @@ class TrendsProposalManager:
             logger.error(
                 "未知のセクション '%s' — 提案を破棄", section,
             )
-            return
+            return None
         trigger_type = _TRIGGER_TYPE_MAP[section]
 
         proposal = TrendsProposal(

@@ -11,6 +11,7 @@ import ctypes.wintypes
 import logging
 import sys
 import threading
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ _shutdown_done = threading.Event()
 _ctrl_handler_ref: _HandlerRoutine | None = None
 
 
-def _make_ctrl_handler(shutdown_callback):
+def _make_ctrl_handler(shutdown_callback: Callable[[], None]):
     """SetConsoleCtrlHandler 用コールバックを生成する."""
 
     def handler(ctrl_type: int) -> bool:
@@ -57,7 +58,7 @@ def _make_ctrl_handler(shutdown_callback):
     return handler
 
 
-def register_windows_ctrl_handler(shutdown_callback) -> bool:
+def register_windows_ctrl_handler(shutdown_callback: Callable[[], None]) -> bool:
     """SetConsoleCtrlHandler を登録する (D-11 Section 5.2).
 
     Args:
@@ -97,7 +98,7 @@ def register_windows_ctrl_handler(shutdown_callback) -> bool:
     return False
 
 
-def make_atexit_handler(shutdown_callback):
+def make_atexit_handler(shutdown_callback: Callable[[], None]):
     """atexit 用のラッパーを生成する (D-11 Section 5.2).
 
     _shutdown_done フラグで2重実行を防止する。

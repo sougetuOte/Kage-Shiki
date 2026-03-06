@@ -447,6 +447,7 @@ class AgentCore:
         prompt_builder: PromptBuilder,
         *,
         data_dir: Path | None = None,
+        trends_manager: TrendsProposalManager | None = None,
     ) -> None:
         self._config = config
         self._db_conn = db_conn
@@ -467,7 +468,7 @@ class AgentCore:
         )
 
         # W-T25: TrendsProposalManager（セッション開始時にトリガー評価）
-        self._trends_manager: TrendsProposalManager | None = None
+        self._trends_manager = trends_manager
 
     def generate_session_start_message(self) -> str:
         """セッション開始メッセージを LLM で生成する.
@@ -508,7 +509,10 @@ class AgentCore:
 
         # 3. FTS5 検索（Cold Memory 取得）
         try:
-            cold_memories = search_observations_fts(self._db_conn, user_input)
+            cold_memories = search_observations_fts(
+                self._db_conn, user_input,
+                top_k=self._config.memory.cold_top_k,
+            )
         except Exception:
             logger.warning("FTS5 検索失敗（Cold Memory スキップ）", exc_info=True)
             cold_memories = None
