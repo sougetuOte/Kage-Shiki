@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Phase 2a: 基盤強化 — PLANNING 完了
+### Phase 2a: 基盤強化
+
+#### Wave 1 (2026-03-06)
+
+- **T-27**: スモークテスト手順書 `docs/testing/smoke-test.md`（FR-8.1）+ GUI手動テスト手順書 `docs/testing/gui-manual-test.md`（FR-8.2）
+- **T-28**: `LLMProtocol`（`typing.Protocol`, `@runtime_checkable`）抽出 + `LLMClient.chat()` 委譲メソッド追加（FR-8.6, D-17）
+- **T-28**: `AgentCore`, `MemoryWorker`, `WizardController` の型注釈を `LLMProtocol` に変更
+- **T-29**: トランケートアルゴリズム `build_with_truncation()` 実装（FR-8.7, D-18）
+- **T-29**: `agent/truncation.py` 新規（定数 + `estimate_tokens` + `get_effective_token_limit`）
+- **T-30**: 統合テスト追加 — マルチスレッド（FR-8.3）、永続状態（FR-8.4）、シャットダウン（FR-8.5）
+- **fix(test)**: `process_turn` の `build_with_truncation` 切替に伴う既存テストモック修正（2件）
+- **test**: 687 tests / 97% coverage（Phase 1: 649 tests → +38 tests）
 
 #### PLANNING 完了 (2026-03-06)
 
