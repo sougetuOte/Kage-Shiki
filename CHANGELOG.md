@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 2a: 基盤強化
 
+#### スモークテスト修正 (2026-03-08)
+
+- **fix(gui)**: 突っつきボタン(♪)追加、チャット追記表示、ユーザー名表示対応
+- **fix(gui)**: ウィザード — キーワード区切り日本語対応、凍結完了メッセージ改善
+- **fix(main)**: on_click接続、ウィザード再起動コールバック、キャラ名/ユーザー名設定、root.destroy追加
+- **fix(memory)**: FTS5クエリサニタイズ（特殊文字エスケープ）
+- **fix(persona)**: ウィザード — リスト値→文字列変換
+- **fix(tray)**: toggle表示/最小化、ウィザードメニュー、wizard_callback追加
+- **fix(config)**: window_height デフォルト 300→450
+- **test**: FTS5特殊文字・リスト値変換・toggle/wizard関連テスト追加
+- **test**: 722 tests / 92% coverage
+
 #### Wave 3 + Full Review (2026-03-07)
 
 - **T-32**: 応答タイミング統合テスト `test_response_timing.py` 新規（FR-8.11, D-20 Section 4.4）
