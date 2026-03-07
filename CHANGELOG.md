@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 2a: 基盤強化
 
+#### Wave 3 + Full Review (2026-03-07)
+
+- **T-32**: 応答タイミング統合テスト `test_response_timing.py` 新規（FR-8.11, D-20 Section 4.4）
+- **fix(gui)**: `tkinter_view.py` `_warning_bar_toggle` 未初期化修正
+- **fix(gui)**: `wizard_gui.py` ValueError 後の画面遷移漏れ修正
+- **docs(specs)**: D-17 仕様を実装に同期（`send_message_for_purpose` Protocol 昇格を反映）
+- **chore**: `pyproject.toml` に `pytest.mark.integration` マーカー登録
+- **chore**: Full Review 監査 — 修正7件（据置は Phase 2b 追跡済み）
+- **test**: 711 tests / 92% coverage（Wave 2: 710 tests → +1 test）
+
 #### Wave 2 + Full Review + 構造リファクタリング (2026-03-07)
 
 - **T-31**: ウィザードGUI `gui/wizard_gui.py` 新規（FR-8.8, D-19）
