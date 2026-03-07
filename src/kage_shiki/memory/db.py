@@ -294,6 +294,10 @@ def search_observations_fts(
     """
     if len(query) < 3:
         return []
+    # FTS5 特殊文字をエスケープ（trigram トークナイザ用）
+    sanitized = query.translate(str.maketrans("", "", '[](){}*+^~:"-'))
+    if len(sanitized) < 3:
+        return []
     rows = conn.execute(
         "SELECT o.content, o.speaker, o.created_at, o.session_id "
         "FROM observations_fts "
@@ -301,7 +305,7 @@ def search_observations_fts(
         "WHERE observations_fts MATCH ? "
         "ORDER BY bm25(observations_fts) "
         "LIMIT ?",
-        (query, top_k),
+        (sanitized, top_k),
     ).fetchall()
     return [dict(row) for row in rows]
 

@@ -55,16 +55,20 @@ class SystemTray:
     Args:
         mascot_view: MascotView Protocol を実装するインスタンス。
         shutdown_callback: 「終了」選択時に呼び出すコールバック。
+        wizard_callback: 「ウィザード起動」選択時に呼び出すコールバック（省略可）。
     """
 
     def __init__(
         self,
         mascot_view: MascotView,
         shutdown_callback: Callable[[], None],
+        wizard_callback: Callable[[], None] | None = None,
     ) -> None:
         self._view = mascot_view
         self._shutdown_callback = shutdown_callback
+        self._wizard_callback = wizard_callback
         self._icon: Any | None = None
+        self._visible: bool = True
 
         # 遅延通知フラグ (D-9 Section 5.3)
         self.error_notification_pending: bool = False
@@ -74,21 +78,40 @@ class SystemTray:
         """メニュー項目のリストを返す.
 
         Returns:
-            「表示」「終了」の2項目。
+            メニュー項目のリスト。wizard_callback が設定されている場合は
+            「ウィザード起動」も含む。
         """
-        return [
+        items = [
             _MenuItem("表示", self.action_show),
-            _MenuItem("終了", self.action_quit),
+            _MenuItem("最小化", self.action_hide),
         ]
+        if self._wizard_callback is not None:
+            items.append(_MenuItem("ウィザード起動", self.action_wizard))
+        items.append(_MenuItem("終了", self.action_quit))
+        return items
 
     def action_show(self) -> None:
         """マスコットウィンドウを表示し、遅延通知があれば表示する."""
         self._view.show()
+        self._visible = True
         self.check_pending_notification()
 
     def action_hide(self) -> None:
         """マスコットウィンドウをトレイに格納する (FR-2.8)."""
         self._view.hide()
+        self._visible = False
+
+    def action_toggle(self) -> None:
+        """ウィンドウの表示/非表示をトグルする（トレイアイコン左クリック用）."""
+        if self._visible:
+            self.action_hide()
+        else:
+            self.action_show()
+
+    def action_wizard(self) -> None:
+        """ウィザードモードで再起動する（persona バックアップ後）."""
+        if self._wizard_callback is not None:
+            self._wizard_callback()
 
     def action_quit(self) -> None:
         """シャットダウンシーケンスを開始し、トレイアイコンを停止する."""
@@ -133,10 +156,27 @@ class SystemTray:
             # pystray 未インストール環境でも起動可能にするための遅延インポート
             import pystray
 
-            menu = pystray.Menu(
+            menu_items = [
+                pystray.MenuItem(
+                    "表示切替",
+                    lambda _icon, _item: self.action_toggle(),
+                    default=True,
+                    visible=False,
+                ),
                 pystray.MenuItem("表示", lambda _icon, _item: self.action_show()),
+                pystray.MenuItem("最小化", lambda _icon, _item: self.action_hide()),
+            ]
+            if self._wizard_callback is not None:
+                menu_items.append(
+                    pystray.MenuItem(
+                        "ウィザード起動",
+                        lambda _icon, _item: self.action_wizard(),
+                    ),
+                )
+            menu_items.append(
                 pystray.MenuItem("終了", lambda _icon, _item: self.action_quit()),
             )
+            menu = pystray.Menu(*menu_items)
             self._icon = pystray.Icon(
                 name="kage_shiki",
                 icon=self.create_icon_image(),

@@ -49,6 +49,7 @@ class TkinterMascotView:
         self._input_queue = input_queue
         self._config = config
         self._click_handler: Callable[[int, int], None] | None = None
+        self._user_display_name: str = "あなた"
 
         # ドラッグ移動用の座標記録
         self._drag_start_x: int = 0
@@ -92,14 +93,30 @@ class TkinterMascotView:
             else ("", config.font_size)
         )
 
-        # キャラクター名ラベル（上部）
+        # 上部フレーム（キャラクター名 + 突っつきボタン）
+        top_frame = tk.Frame(self._root)
+        top_frame.pack(fill="x", padx=8, pady=(8, 0))
+
         self._name_var = tk.StringVar(master=self._root, value="影式")
         self._name_label = tk.Label(
-            self._root,
+            top_frame,
             textvariable=self._name_var,
             font=font_spec,
         )
-        self._name_label.pack(anchor="nw", padx=8, pady=(8, 0))
+        self._name_label.pack(side="left")
+
+        # 突っつきボタン (FR-2.5)
+        self._poke_button = tk.Label(
+            top_frame,
+            text=" ♪ ",
+            font=(font_spec[0], max(font_spec[1] - 2, 8)),
+            bg="#FFB366",
+            fg="#FFFFFF",
+            cursor="hand2",
+            relief="raised",
+            bd=1,
+        )
+        self._poke_button.pack(side="right", padx=(4, 0))
 
         # セリフ表示エリア（中央 — スクロール付き Text ウィジェット）
         text_frame = tk.Frame(self._root)
@@ -146,6 +163,21 @@ class TkinterMascotView:
         self._root.bind("<Button-1>", self._on_drag_start)
         self._root.bind("<B1-Motion>", self._on_drag_motion)
 
+        # 突っつきボタン (FR-2.5) — ドラッグ伝播を防止
+        self._poke_button.bind("<Button-1>", self._on_poke_click)
+        self._poke_button.bind("<B1-Motion>", lambda e: "break")
+
+    def _on_poke_click(self, event: tk.Event) -> None:  # type: ignore[type-arg]
+        """突っつきボタンクリック時にハンドラーを呼び出す (FR-2.5).
+
+        Args:
+            event: tkinter のマウスイベント。
+        """
+        if self._click_handler is not None:
+            screen_x = self._root.winfo_x() + event.x
+            screen_y = self._root.winfo_y() + event.y
+            self._click_handler(screen_x, screen_y)
+
     def _on_drag_start(self, event: tk.Event) -> None:  # type: ignore[type-arg]
         """ドラッグ開始時にマウス座標を記録する.
 
@@ -154,12 +186,6 @@ class TkinterMascotView:
         """
         self._drag_start_x = event.x
         self._drag_start_y = event.y
-
-        # 登録されたクリックハンドラーがあれば呼び出す
-        if self._click_handler is not None:
-            screen_x = self._root.winfo_x() + event.x
-            screen_y = self._root.winfo_y() + event.y
-            self._click_handler(screen_x, screen_y)
 
     def _on_drag_motion(self, event: tk.Event) -> None:  # type: ignore[type-arg]
         """ドラッグ中にウィンドウ位置を更新する.
@@ -174,11 +200,12 @@ class TkinterMascotView:
     def _submit(self) -> None:
         """入力欄のテキストを input_queue に enqueue して入力欄をクリアする.
 
-        空文字の場合は enqueue しない。
+        空文字の場合は enqueue しない。送信時にユーザー発言をチャット欄に表示する。
         """
         text = self.entry_var.get()
         if not text:
             return
+        self._append_chat(f"{self._user_display_name}: {text}\n\n")
         self._input_queue.put(text)
         self.entry_var.set("")
 
@@ -194,18 +221,22 @@ class TkinterMascotView:
         """ウィンドウを非表示にする."""
         self._root.withdraw()
 
+    def _append_chat(self, text: str) -> None:
+        """チャット欄にテキストを追記してスクロールする."""
+        self._text_widget.configure(state="normal")
+        self._text_widget.insert("end", text)
+        self._text_widget.configure(state="disabled")
+        self._text_widget.see("end")
+
     def display_text(self, text: str) -> None:
-        """マスコットのセリフテキストを更新する.
+        """マスコットのセリフテキストをチャット欄に追記する.
 
         Args:
             text: 表示するテキスト。空文字も許容する。
         """
         self.text_var.set(text)
-        self._text_widget.configure(state="normal")
-        self._text_widget.delete("1.0", "end")
-        self._text_widget.insert("1.0", text)
-        self._text_widget.configure(state="disabled")
-        self._text_widget.see("end")
+        display = f"{self._name_var.get()}: {text}\n\n" if text else ""
+        self._append_chat(display)
 
     def set_body_state(self, state: str) -> None:
         """ボディ表示状態を設定する（Phase 1 は no-op）.
@@ -232,6 +263,22 @@ class TkinterMascotView:
             handler: クリック時に呼ばれるコールバック。引数は (x, y) のスクリーン座標。
         """
         self._click_handler = handler
+
+    def set_persona_name(self, name: str) -> None:
+        """キャラクター名ラベルを更新する.
+
+        Args:
+            name: キャラクター名。
+        """
+        self._name_var.set(name)
+
+    def set_user_display_name(self, name: str) -> None:
+        """チャット欄に表示するユーザー名を設定する.
+
+        Args:
+            name: ユーザーの表示名。空文字の場合は「あなた」を使用。
+        """
+        self._user_display_name = name if name else "あなた"
 
     # ------------------------------------------------------------------
     # エラー表示 UI（D-6 Section 5.4）

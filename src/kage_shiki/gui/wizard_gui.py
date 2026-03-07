@@ -137,6 +137,7 @@ class WizardGUI:
         self._current_persona: PersonaCore | None = None
         self._current_style: str = ""
         self._preview_turns: list[dict[str, str]] = []
+        self._user_display_name: str = "あなた"
 
         # ウィジェット参照（テストからアクセス可能、show() 前は None）
         self._btn_method_a: tk.Button | None = None
@@ -252,7 +253,7 @@ class WizardGUI:
         )
         self._entry_keywords = tk.Entry(frame)
         self._entry_keywords.pack(fill="x", padx=40, pady=(0, 4))
-        tk.Label(frame, text="（カンマ区切りで複数入力可能）").pack(
+        tk.Label(frame, text="（スペース・カンマ・読点で区切って複数入力可能）").pack(
             anchor="w", padx=40,
         )
 
@@ -280,7 +281,11 @@ class WizardGUI:
         keywords_raw = self._entry_keywords.get().strip()
         if not keywords_raw:
             return
-        keywords = [k.strip() for k in keywords_raw.split(",") if k.strip()]
+        keywords = [
+            k.strip()
+            for k in re.split(r"[,、。\s]+", keywords_raw)
+            if k.strip()
+        ]
         user_name = self._entry_user_name.get().strip()
 
         self._is_processing = True
@@ -468,6 +473,7 @@ class WizardGUI:
         self._current_persona = persona
         self._current_style = style
         self._preview_turns = []
+        self._user_display_name = persona.c3_second_person or "あなた"
         self._show_preview()
 
     def _on_generation_error(self, msg: str) -> None:
@@ -558,7 +564,7 @@ class WizardGUI:
         self._preview_send_btn.configure(state="disabled")
         self._preview_entry.delete(0, "end")
 
-        self._append_preview_text(f"あなた: {user_input}\n")
+        self._append_preview_text(f"{self._user_display_name}: {user_input}\n")
         self._preview_turns.append({"role": "user", "content": user_input})
 
         def _bg() -> None:
@@ -596,7 +602,7 @@ class WizardGUI:
             return
         self._preview_entry.delete(0, "end")
 
-        self._append_preview_text(f"あなた: {user_input}\n")
+        self._append_preview_text(f"{self._user_display_name}: {user_input}\n")
         self._preview_turns.append({"role": "user", "content": user_input})
 
         if self._current_persona is None:
@@ -674,4 +680,9 @@ class WizardGUI:
 
         self._current_step = WizardStep.DONE
         logger.info("ウィザード完了: %s", self._current_persona.c1_name)
+        messagebox.showinfo(
+            "セットアップ完了",
+            f"{self._current_persona.c1_name} の人格を保存しました。\n\n"
+            "アプリケーションを再起動すると対話を開始できます。",
+        )
         self._root.quit()

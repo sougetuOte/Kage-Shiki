@@ -163,7 +163,7 @@ class GuiConfig:
     """
 
     window_width: int = 400
-    window_height: int = 300
+    window_height: int = 450
     opacity: float = 0.95
     topmost: bool = True
     font_size: int = 14

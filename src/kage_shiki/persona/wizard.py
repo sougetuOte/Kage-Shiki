@@ -235,7 +235,13 @@ def _dict_to_persona_core(d: dict[str, str]) -> PersonaCore:
     for f in _REQUIRED_PERSONA_FIELDS:
         if not d.get(f):
             raise ValueError(f"必須フィールド '{f}' が欠損または空です")
-    return PersonaCore(**{f: d.get(f, "") for f in _PERSONA_CORE_FIELDS})
+    def _to_str(v: object) -> str:
+        """リストや非文字列値を文字列に正規化する."""
+        if isinstance(v, list):
+            return "\n".join(str(item) for item in v)
+        return str(v) if v else ""
+
+    return PersonaCore(**{f: _to_str(d.get(f, "")) for f in _PERSONA_CORE_FIELDS})
 
 
 # ---------------------------------------------------------------------------
