@@ -130,6 +130,17 @@ class TestDictToPersonaCore:
         with pytest.raises(ValueError, match="c1_name"):
             _dict_to_persona_core({"c1_name": "", "c4_personality_core": "元気"})
 
+    def test_list_values_converted_to_str(self) -> None:
+        """LLM がリストを返した場合に文字列に変換されること."""
+        core = _dict_to_persona_core({
+            "c1_name": "テスト",
+            "c4_personality_core": "好奇心旺盛",
+            "c5_personality_axes": ["明るい", "活発", "社交的"],
+            "c9_values": ["誠実", "優しさ"],
+        })
+        assert core.c5_personality_axes == "明るい\n活発\n社交的"
+        assert core.c9_values == "誠実\n優しさ"
+
 
 # ---------------------------------------------------------------------------
 # W-1: 連想拡張 (FR-5.7)

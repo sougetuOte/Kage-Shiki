@@ -141,7 +141,7 @@ class TestDataclassDefaults:
         """GuiConfig のデフォルト値が仕様通りであること。"""
         cfg = GuiConfig()
         assert cfg.window_width == 400
-        assert cfg.window_height == 300
+        assert cfg.window_height == 450
         assert cfg.opacity == pytest.approx(0.95)
         assert cfg.topmost is True
         assert cfg.font_size == 14

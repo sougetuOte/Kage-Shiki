@@ -52,7 +52,25 @@ class TestSystemTrayMenu:
         menu_items = tray.get_menu_items()
         labels = [item.text for item in menu_items]
         assert "表示" in labels
+        assert "最小化" in labels
         assert "終了" in labels
+
+    def test_menu_includes_wizard_when_callback_set(self) -> None:
+        """wizard_callback 設定時にウィザードメニューが含まれること."""
+        view = FakeMascotView()
+        tray = SystemTray(
+            view, shutdown_callback=MagicMock(),
+            wizard_callback=MagicMock(),
+        )
+        labels = [item.text for item in tray.get_menu_items()]
+        assert "ウィザード起動" in labels
+
+    def test_menu_excludes_wizard_when_no_callback(self) -> None:
+        """wizard_callback 未設定時にウィザードメニューが含まれないこと."""
+        view = FakeMascotView()
+        tray = SystemTray(view, shutdown_callback=MagicMock())
+        labels = [item.text for item in tray.get_menu_items()]
+        assert "ウィザード起動" not in labels
 
 
 class TestSystemTrayActions:
@@ -75,6 +93,62 @@ class TestSystemTrayActions:
 
         tray.action_hide()
         assert view.hidden is True
+
+    def test_toggle_hides_when_visible(self) -> None:
+        """action_toggle() で表示中→非表示になること."""
+        view = FakeMascotView()
+        tray = SystemTray(view, shutdown_callback=MagicMock())
+
+        assert tray._visible is True
+        tray.action_toggle()
+        assert view.hidden is True
+        assert tray._visible is False
+
+    def test_toggle_shows_when_hidden(self) -> None:
+        """action_toggle() で非表示→表示になること."""
+        view = FakeMascotView()
+        tray = SystemTray(view, shutdown_callback=MagicMock())
+
+        tray.action_hide()
+        assert tray._visible is False
+
+        tray.action_toggle()
+        assert view.shown is True
+        assert tray._visible is True
+
+    def test_show_sets_visible_flag(self) -> None:
+        """action_show() で _visible が True になること."""
+        view = FakeMascotView()
+        tray = SystemTray(view, shutdown_callback=MagicMock())
+        tray._visible = False
+
+        tray.action_show()
+        assert tray._visible is True
+
+    def test_hide_sets_visible_flag(self) -> None:
+        """action_hide() で _visible が False になること."""
+        view = FakeMascotView()
+        tray = SystemTray(view, shutdown_callback=MagicMock())
+
+        tray.action_hide()
+        assert tray._visible is False
+
+    def test_wizard_action_calls_callback(self) -> None:
+        """「ウィザード起動」で wizard_callback が呼ばれること."""
+        view = FakeMascotView()
+        wizard_cb = MagicMock()
+        tray = SystemTray(
+            view, shutdown_callback=MagicMock(),
+            wizard_callback=wizard_cb,
+        )
+        tray.action_wizard()
+        wizard_cb.assert_called_once()
+
+    def test_wizard_action_noop_without_callback(self) -> None:
+        """wizard_callback 未設定時に action_wizard がエラーにならないこと."""
+        view = FakeMascotView()
+        tray = SystemTray(view, shutdown_callback=MagicMock())
+        tray.action_wizard()  # should not raise
 
     def test_quit_action_calls_shutdown(self) -> None:
         """「終了」メニュー選択時にシャットダウンコールバックが呼ばれること."""

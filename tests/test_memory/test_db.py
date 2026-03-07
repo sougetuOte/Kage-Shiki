@@ -603,6 +603,29 @@ class TestSearchObservationsFts:
         assert r["created_at"] == now
         assert r["session_id"] == "sess_123"
 
+    def test_fts5_special_chars_sanitized(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """FTS5 特殊文字を含むクエリでエラーにならないこと."""
+        now = time.time()
+        save_observation(
+            db_conn, "ユーザーがウィンドウをクリックして突っつきました",
+            "user", now, "s1",
+        )
+        # [クリックイベント] は FTS5 構文エラーを起こしていた
+        results = search_observations_fts(
+            db_conn,
+            "[クリックイベント] ユーザーがウィンドウをクリックして突っつきました",
+        )
+        assert isinstance(results, list)
+
+    def test_fts5_only_special_chars_returns_empty(
+        self, db_conn: sqlite3.Connection,
+    ) -> None:
+        """特殊文字のみのクエリで空リストを返すこと."""
+        assert search_observations_fts(db_conn, "[()]") == []
+        assert search_observations_fts(db_conn, '[]""') == []
+
 
 # ---------------------------------------------------------------------------
 # get_day_observations — 日次サマリー生成用 (T-06)
