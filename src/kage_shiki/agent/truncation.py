@@ -31,7 +31,7 @@ _CONTEXT_WINDOW_SAFETY_RATIO = 0.80
 _CHARS_TO_TOKENS_RATIO = 2.0
 
 # Hot Memory 削減時の style_samples 保持最大文字数
-_STYLE_SAMPLES_TRUNCATION_CHARS = 500
+STYLE_SAMPLES_TRUNCATION_CHARS = 500
 
 
 # ---------------------------------------------------------------------------

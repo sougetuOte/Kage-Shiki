@@ -12,8 +12,7 @@
 - [ ] **Performance Check**: 応答速度やリソース消費が許容範囲内である。
 - [ ] **Documentation Updated**: 変更内容が `CHANGELOG.md` およびユーザーマニュアルに反映されている。
 
-<!-- TODO(Phase1): パッケージング方法確定後に更新 -->
-<!-- 候補: PyInstaller, Nuitka, zipapp 等。決定後に Section 2 を具体化する。 -->
+<!-- Phase 2b 以降でパッケージング方法（PyInstaller, Nuitka 等）を確定予定 -->
 
 ## 2. Release Flow (リリースフロー)
 

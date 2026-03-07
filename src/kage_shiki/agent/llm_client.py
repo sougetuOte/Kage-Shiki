@@ -59,6 +59,7 @@ class LLMProtocol(Protocol):
 
     Methods:
         chat: LLM に対話リクエストを送信し、応答テキストを返す。
+        send_message_for_purpose: 用途に応じたパラメータで LLM を呼び出す。
     """
 
     def chat(
@@ -85,6 +86,24 @@ class LLMProtocol(Protocol):
 
         Raises:
             実装依存のエラー。AuthenticationError、LLMError 等。
+        """
+        ...
+
+    def send_message_for_purpose(
+        self,
+        system: str,
+        messages: list[dict],
+        purpose: str,
+    ) -> str:
+        """用途識別子から model/max_tokens/temperature を自動解決して API を呼び出す.
+
+        Args:
+            system: システムプロンプト。
+            messages: 会話メッセージ配列。
+            purpose: 用途識別子（"conversation", "wizard_generate" 等）。
+
+        Returns:
+            LLM の応答テキスト。
         """
         ...
 

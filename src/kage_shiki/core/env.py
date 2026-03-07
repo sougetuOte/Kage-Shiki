@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 _API_KEY_ENV = "ANTHROPIC_API_KEY"
-_DEFAULT_ENV_PATH = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+_DEFAULT_ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 
 
 def load_dotenv_file(env_path: Path | None = None) -> None:

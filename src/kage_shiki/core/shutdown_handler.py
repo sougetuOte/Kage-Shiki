@@ -41,18 +41,17 @@ def _make_ctrl_handler(shutdown_callback: Callable[[], None]):
     """SetConsoleCtrlHandler 用コールバックを生成する."""
 
     def handler(ctrl_type: int) -> bool:
-        if ctrl_type in _SHUTDOWN_EVENTS:  # noqa: SIM102
-            if not _shutdown_done.is_set():
-                _shutdown_done.set()
-                logger.info(
-                    "Windows コントロールイベント受信: ctrl_type=%d", ctrl_type,
+        if ctrl_type in _SHUTDOWN_EVENTS and not _shutdown_done.is_set():
+            _shutdown_done.set()
+            logger.info(
+                "Windows コントロールイベント受信: ctrl_type=%d", ctrl_type,
+            )
+            try:
+                shutdown_callback()
+            except Exception:
+                logger.error(
+                    "シャットダウン処理でエラー", exc_info=True,
                 )
-                try:
-                    shutdown_callback()
-                except Exception:
-                    logger.error(
-                        "シャットダウン処理でエラー", exc_info=True,
-                    )
         return False
 
     return handler

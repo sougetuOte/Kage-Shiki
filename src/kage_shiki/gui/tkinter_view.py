@@ -328,7 +328,7 @@ class TkinterMascotView:
                 label.configure(text=f"[!] {first_line}")
 
         label.bind("<Button-1>", _toggle_expand)
-        bar._toggle_expand = _toggle_expand  # type: ignore[attr-defined]
+        self._warning_bar_toggle = _toggle_expand
 
         close_btn = tk.Button(
             bar,

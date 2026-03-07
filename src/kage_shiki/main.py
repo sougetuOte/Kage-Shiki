@@ -40,6 +40,7 @@ from kage_shiki.core.shutdown_handler import (
     register_windows_ctrl_handler,
 )
 from kage_shiki.gui.tkinter_view import TkinterMascotView
+from kage_shiki.gui.wizard_gui import WizardGUI
 from kage_shiki.memory.db import (
     Database,
     get_recent_day_summaries,
@@ -69,6 +70,8 @@ def _run_background_loop(
     input_queue: queue.Queue[str],
     response_queue: queue.Queue[str],
     shutdown_event: threading.Event,
+    *,
+    persona_name: str = "",
 ) -> None:
     """バックグラウンドスレッドのメインループ.
 
@@ -80,14 +83,19 @@ def _run_background_loop(
         input_queue: ユーザー入力キュー（メイン → バックグラウンド）。
         response_queue: 応答キュー（バックグラウンド → メイン）。
         shutdown_event: graceful shutdown 通知。
+        persona_name: ペルソナ名（EM-006 メッセージ用）。
     """
+    name_prefix = f"{persona_name}「" if persona_name else ""
+
     # セッション開始メッセージ生成
     try:
         greeting = agent_core.generate_session_start_message()
         response_queue.put(greeting)
     except Exception:
         logger.error("セッション開始メッセージの生成に失敗", exc_info=True)
-        response_queue.put(format_error_message("EM-006"))
+        response_queue.put(
+            format_error_message("EM-006", name_prefix=name_prefix),
+        )
 
     # 対話ループ
     while not shutdown_event.is_set():
@@ -101,7 +109,9 @@ def _run_background_loop(
             response_queue.put(response)
         except Exception:
             logger.error("process_turn 失敗", exc_info=True)
-            response_queue.put(format_error_message("EM-006"))
+            response_queue.put(
+                format_error_message("EM-006", name_prefix=name_prefix),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +141,6 @@ def _start_response_polling(
         if shutdown_event.is_set():
             logger.debug("shutdown_event 検出 — root.quit() 呼び出し")
             root.quit()
-            root.destroy()
             return
 
         try:
@@ -170,6 +179,10 @@ def _make_shutdown_callback(
         シャットダウンコールバック関数。
     """
 
+    # _done: コールバック自体の2重実行を防止する。
+    # shutdown_handler.py の _shutdown_done はハンドラ（atexit/Ctrl）レベルの
+    # 2重ディスパッチを防止する。2つの Event は責務が異なるため意図的に分離。
+    # _done はすべての呼び出し経路（SystemTray 直接呼び出し含む）をガードする。
     _done = threading.Event()
 
     def _shutdown() -> None:
@@ -207,29 +220,27 @@ def _make_shutdown_callback(
 
 def _run_wizard(
     config: "AppConfig",  # noqa: F821
-    api_key: str,
     data_dir: Path,
     db: "Database",
     persona_system: PersonaSystem,
+    *,
+    config_path: Path = Path("config.toml"),
 ) -> None:
-    """ウィザードモードで起動する.
+    """ウィザードモードで起動する (T-31, D-19).
 
-    persona_core.md が不在の場合に呼ばれる。WizardController の
-    個別メソッドを TkinterMascotView のウィザードフレームと連携させる。
+    persona_core.md が不在の場合に呼ばれる。WizardGUI が
+    WizardController のビジネスロジックと tkinter GUI を統合する。
     ウィザード完了後はプロセスを終了し、次回起動で通常モードになる。
     """
     llm_client = LLMClient(config)
-    wizard = WizardController(llm_client, config)  # noqa: F841
+    wizard_ctrl = WizardController(llm_client, config)
 
     root = tk.Tk()
-    input_queue_w: queue.Queue[str] = queue.Queue()
-    mascot_view = TkinterMascotView(root, input_queue_w, config.gui)  # noqa: F841
-
-    # TODO(T-25): ウィザード GUI フレームとの接続
-    # WizardController の個別メソッドと TkinterMascotView の
-    # ウィザードフレームを接続する。Phase 1 MVP では
-    # ウィザードの GUI 統合は最小限とする。
-
+    wizard_gui = WizardGUI(
+        root, wizard_ctrl, persona_system, data_dir, config,
+        config_path=config_path,
+    )
+    wizard_gui.show()
     root.mainloop()
 
 
@@ -248,12 +259,13 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Step 1: config.toml 読み込み (FR-1.1, FR-1.2, FR-1.3)
     # ------------------------------------------------------------------
-    config = load_config(Path("config.toml"))
+    config_path = Path("config.toml")
+    config = load_config(config_path)
 
     # ------------------------------------------------------------------
     # Step 2: ANTHROPIC_API_KEY 存在確認 (FR-1.6)
     # ------------------------------------------------------------------
-    api_key = ensure_api_key()
+    ensure_api_key()
 
     # ------------------------------------------------------------------
     # Step 3: data_dir 初期化 + logging + SQLite DB (FR-1.4, FR-1.5)
@@ -269,7 +281,14 @@ def main() -> None:
         initialize_db(db_conn)
     except Exception as e:
         logger.critical("DB 初期化失敗: %s", e, exc_info=True)
-        print(format_error_message("EM-003", detail=str(e)), file=sys.stderr)
+        print(
+            format_error_message(
+                "EM-003",
+                persona_path=str(data_dir / "memory.db"),
+                error_detail=str(e),
+            ),
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     logger.info("影式を起動しています...")
@@ -292,7 +311,10 @@ def main() -> None:
 
     if persona_core is None:
         logger.info("persona_core.md が見つかりません。ウィザードを起動します。")
-        _run_wizard(config, api_key, data_dir, db, persona_system)
+        _run_wizard(
+            config, data_dir, db, persona_system,
+            config_path=config_path,
+        )
         return
 
     # ------------------------------------------------------------------
@@ -393,6 +415,7 @@ def main() -> None:
     bg_thread = threading.Thread(
         target=_run_background_loop,
         args=(agent_core, input_queue, response_queue, shutdown_event),
+        kwargs={"persona_name": persona_core.c1_name},
         daemon=True,
     )
     bg_thread.start()
@@ -407,6 +430,7 @@ def main() -> None:
     mascot_view.show()
     logger.info("影式の起動が完了しました")
     root.mainloop()
+    root.destroy()
 
 
 if __name__ == "__main__":

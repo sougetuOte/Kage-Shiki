@@ -130,6 +130,7 @@ class SystemTray:
         実際のトレイアイコンの表示は run_detached() で開始する。
         """
         try:
+            # pystray 未インストール環境でも起動可能にするための遅延インポート
             import pystray
 
             menu = pystray.Menu(

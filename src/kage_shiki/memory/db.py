@@ -25,9 +25,12 @@ logger = logging.getLogger(__name__)
 # PRAGMA 設定（D-7）
 # ---------------------------------------------------------------------------
 
+_JOURNAL_MODE_WAL = "WAL"
+_CACHE_SIZE_KIBIBYTES = "-2000"  # 負の値 = キビバイト単位（約2MB）
+
 _PRAGMA_SETTINGS: dict[str, str] = {
-    "journal_mode": "WAL",
-    "cache_size": "-2000",
+    "journal_mode": _JOURNAL_MODE_WAL,
+    "cache_size": _CACHE_SIZE_KIBIBYTES,
 }
 
 # ---------------------------------------------------------------------------
@@ -211,7 +214,6 @@ def _retry_on_lock(func):
                     "DB locked, retry %d/%d",
                     attempt + 1, _DB_RETRY_MAX,
                 )
-        raise RuntimeError("Unreachable")  # pragma: no cover
 
     return wrapper
 

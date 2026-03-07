@@ -26,6 +26,11 @@ _SECTION_PATTERN = re.compile(r"^##\s+C(\d+):\s*(.+)$", re.MULTILINE)
 _METADATA_TABLE_ROW = re.compile(r"^\|\s*(.+?)\s*\|\s*(.+?)\s*\|$")
 _REQUIRED_FIELDS = ("c1_name", "c4_personality_core")
 
+# フィールド名 → C番号の逆引きマップ
+_FIELD_TO_C_NUM: dict[str, int] = {
+    f: int(f.split("_")[0][1:]) for f in _REQUIRED_FIELDS
+}
+
 # メタデータの凍結キー名（requirements.md Section 4.3.1 準拠）
 _FREEZE_KEY = "凍結状態"
 _FREEZE_VALUE_FROZEN = "frozen"
@@ -256,8 +261,7 @@ class PersonaSystem:
         for req_field in _REQUIRED_FIELDS:
             value = getattr(core, req_field, "")
             if not value.strip():
-                # フィールド名から C番号を抽出してラベルを取得
-                c_num = int(req_field.split("_")[0][1:])
+                c_num = _FIELD_TO_C_NUM[req_field]
                 label = _SECTION_LABELS[c_num]
                 raise PersonaLoadError(
                     f"必須フィールド C{c_num}（{label}）が欠損しています",
@@ -433,11 +437,25 @@ class PersonaSystem:
             ファイル全文。
         """
         if not path.exists():
-            path.write_text(_TRENDS_TEMPLATE, encoding="utf-8")
-            logger.info(
-                "personality_trends.md テンプレートを生成しました: %s", path,
+            try:
+                path.write_text(_TRENDS_TEMPLATE, encoding="utf-8")
+                logger.info(
+                    "personality_trends.md テンプレートを生成しました: %s", path,
+                )
+            except OSError:
+                logger.warning(
+                    "personality_trends.md テンプレートの書き込みに失敗: %s",
+                    path, exc_info=True,
+                )
+                return _TRENDS_TEMPLATE
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning(
+                "personality_trends.md の読み込みに失敗: %s",
+                path, exc_info=True,
             )
-        return path.read_text(encoding="utf-8")
+            return _TRENDS_TEMPLATE
 
     def append_personality_trends(
         self, path: Path, section: str, entry: str,

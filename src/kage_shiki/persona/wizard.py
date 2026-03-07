@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 # PersonaCore フィールド定義
 # ---------------------------------------------------------------------------
 
+_BLANK_PERSONA_CORE_TEMPLATE = "{name}です。よろしくね。"
+
 _PERSONA_CORE_FIELDS: list[str] = [
     "c1_name",
     "c2_first_person",
@@ -538,7 +540,7 @@ class WizardController:
             style_samples は S1-S7 の空テンプレートテキスト。
         """
         second_person = user_name if user_name else "あなた"
-        personality_core = f"{name}です。よろしくね。"
+        personality_core = _BLANK_PERSONA_CORE_TEMPLATE.format(name=name)
 
         persona = PersonaCore(
             c1_name=name,

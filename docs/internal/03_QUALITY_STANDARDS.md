@@ -74,7 +74,7 @@
 - **Type Hints**: 全ての関数シグネチャに型アノテーションを付与する（`def func(x: int) -> str:`）。
   複雑な型は `from __future__ import annotations` または `typing` モジュールを活用する。
 - **Linter/Formatter**: `ruff` を使用する（linting + formatting）。
-  <!-- TODO(Phase1): ruff 設定（pyproject.toml）の詳細は設定確定後に更新 -->
+  pyproject.toml の `[tool.ruff]` で `line-length = 100`、`select = ["E", "W", "F", "I", "UP", "B", "SIM"]` を設定済み。
 - **Docstrings**: モジュール・クラス・関数レベルで Google スタイルの docstring を記述する。
 
 ## 7. Building Defect Prevention (実装不具合防止)
