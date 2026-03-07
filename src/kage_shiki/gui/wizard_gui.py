@@ -664,6 +664,8 @@ class WizardGUI:
                 exc_info=True,
             )
             messagebox.showerror("エラー", "設定ファイルの形式が不正です。やり直してください。")
+            self._show_method_select()
+            return
         except Exception:
             logger.error("凍結処理に失敗しました", exc_info=True)
             messagebox.showerror("エラー", "凍結処理に失敗しました。やり直してください。")

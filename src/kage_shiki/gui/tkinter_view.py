@@ -57,6 +57,7 @@ class TkinterMascotView:
         # エラー表示 UI（show_error_screen / show_warning_bar で生成）
         self._error_window: tk.Toplevel | None = None
         self._warning_bar: tk.Frame | None = None
+        self._warning_bar_toggle: Callable | None = None
 
         # StringVar は root が生きている間のみ有効
         self.text_var = tk.StringVar(master=root)
