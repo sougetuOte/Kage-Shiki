@@ -29,14 +29,15 @@
 
 | Phase | 内容 | 状況 |
 |-------|------|------|
-| **Phase 1: 基盤（MVP）** | tkinter GUI + pystray 常駐、API 接続、人格生成ウィザード、記憶システム、日次サマリー | **BUILDING 中** |
+| **Phase 1: 基盤（MVP）** | tkinter GUI + pystray 常駐、API 接続、人格生成ウィザード、記憶システム、日次サマリー | **完了** |
+| **Phase 2a: 基盤強化** | LLMProtocol 抽出、トランケート、ウィザードGUI、統合テスト強化 | **BUILDING 中** |
 | **Phase 2: 自律性** | 欲求システム、自律発言、セマンティック検索（sqlite-vec）、忘却曲線 | 未着手 |
 | **Phase 3: 知性** | 好奇心システム、Theory of Mind、傾向メモ層の承認制更新 | 未着手 |
 | **Phase 4: 成熟** | 整合性チェック精度向上、月次記憶要約 | 未着手 |
 
-### Phase 1 進捗
+### Phase 2a 進捗
 
-テスト: 580 passed / カバレッジ: 97%
+テスト: 710 passed / カバレッジ: 93%
 
 実装済みモジュール:
 - `main.py` — **起動シーケンス統合**（13ステップ + スレッド管理 + シャットダウンCB）
@@ -45,8 +46,10 @@
 - `core/errors.py` — エラーメッセージ定義（EM-001〜EM-011）
 - `core/logging_setup.py` — ログ設定（RotatingFileHandler）
 - `core/shutdown_handler.py` — シャットダウン2層防御（atexit + SetConsoleCtrlHandler）
-- `agent/llm_client.py` — LLM クライアント（purpose ベースモデルスロット）
+- `agent/llm_client.py` — LLM クライアント + LLMProtocol（purpose ベースモデルスロット）
 - `agent/agent_core.py` — AgentCore ReAct ループ + 整合性チェック + クリック処理
+- `agent/prompt_builder.py` — PromptBuilder（SystemPrompt + Messages + トランケート）
+- `agent/truncation.py` — トランケートアルゴリズム定数 + トークン推定
 - `agent/trends_proposal.py` — personality_trends 承認フロー（トリガー + 承認判定）
 - `agent/human_block_updater.py` — human_block 自己編集（ガードレール付き）
 - `memory/db.py` — SQLite + FTS5 CRUD + リトライ + Warm Memory ロード
@@ -54,6 +57,7 @@
 - `persona/persona_system.py` — 3段階ペルソナロード + 凍結制御 + freeze_and_save
 - `persona/wizard.py` — ウィザードモード A/B/C + プレビュー + 凍結 + 白紙育成
 - `gui/tkinter_view.py` — MascotView Protocol + 枠なしウィンドウ
+- `gui/wizard_gui.py` — ウィザードGUI（tkinter ダイアログ）
 - `tray/system_tray.py` — pystray 統合 + メニュー + 通知
 
 ---

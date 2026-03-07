@@ -136,6 +136,10 @@ day_summaries = get_recent_day_summaries(db_conn, config.memory.warm_days)
 新規関数。Section 5 で詳述。
 
 #### Step 9: プロンプト構築
+
+> **Note**: `PromptBuilder` は Phase 2a で `agent/prompt_builder.py` に分離された。
+> `agent_core.py` からも re-export されているため、既存の import パスは引き続き有効。
+
 ```python
 prompt_builder = PromptBuilder(
     persona_core=persona_core.to_markdown(),

@@ -29,14 +29,15 @@ Memory carries over between sessions, and the personality is frozen after initia
 
 | Phase | Contents | Status |
 |-------|----------|--------|
-| **Phase 1: Foundation (MVP)** | tkinter GUI + pystray tray, API connection, personality generation wizard, memory system, daily summaries | **Building** |
+| **Phase 1: Foundation (MVP)** | tkinter GUI + pystray tray, API connection, personality generation wizard, memory system, daily summaries | **Complete** |
+| **Phase 2a: Foundation Enhancement** | LLMProtocol extraction, truncation, wizard GUI, integration test hardening | **Building** |
 | **Phase 2: Autonomy** | Desire system, autonomous utterances, semantic search (sqlite-vec), forgetting curve | Not started |
 | **Phase 3: Intelligence** | Curiosity system, Theory of Mind, approval-gated personality trend updates | Not started |
 | **Phase 4: Maturity** | Consistency check improvements, monthly memory summarization | Not started |
 
-### Phase 1 Progress
+### Phase 2a Progress
 
-Tests: 580 passed / Coverage: 97%
+Tests: 710 passed / Coverage: 93%
 
 Implemented modules:
 - `main.py` — **Startup sequence integration** (13 steps + thread management + shutdown CB)
@@ -45,8 +46,10 @@ Implemented modules:
 - `core/errors.py` — Error message definitions (EM-001 to EM-011)
 - `core/logging_setup.py` — Log configuration (RotatingFileHandler)
 - `core/shutdown_handler.py` — 2-layer shutdown defense (atexit + SetConsoleCtrlHandler)
-- `agent/llm_client.py` — LLM client (purpose-based model slots)
+- `agent/llm_client.py` — LLM client + LLMProtocol (purpose-based model slots)
 - `agent/agent_core.py` — AgentCore ReAct loop + consistency check + click handling
+- `agent/prompt_builder.py` — PromptBuilder (SystemPrompt + Messages + truncation)
+- `agent/truncation.py` — Truncation algorithm constants + token estimation
 - `agent/trends_proposal.py` — personality_trends approval flow (triggers + judgment)
 - `agent/human_block_updater.py` — human_block self-editing (with guardrails)
 - `memory/db.py` — SQLite + FTS5 CRUD + retry + Warm Memory loading
@@ -54,6 +57,7 @@ Implemented modules:
 - `persona/persona_system.py` — 3-stage persona loading + freeze control + freeze_and_save
 - `persona/wizard.py` — Wizard mode A/B/C + preview + freeze + blank cultivation
 - `gui/tkinter_view.py` — MascotView Protocol + borderless window
+- `gui/wizard_gui.py` — Wizard GUI (tkinter dialog)
 - `tray/system_tray.py` — pystray integration + menu + notifications
 
 ---

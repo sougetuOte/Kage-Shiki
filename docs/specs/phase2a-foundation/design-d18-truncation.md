@@ -166,8 +166,11 @@ def estimate_tokens(text: str) -> int:
 Phase 1 の `PromptBuilder` は `build_system_prompt()` と `build_messages()` の2メソッドで構成される。
 トランケートロジックは `PromptBuilder` に `build_with_truncation()` メソッドとして追加する。
 
+> **Note (Phase 2a 構造リファクタリング)**: `PromptBuilder` は `agent/agent_core.py` から
+> `agent/prompt_builder.py` に分離された。`agent_core.py` からは後方互換のため re-export している。
+
 ```
-PromptBuilder（Phase 1 から変更なし）
+PromptBuilder（agent/prompt_builder.py に分離）
 ├── build_system_prompt()  ← 変更なし
 ├── build_messages()       ← 変更なし
 └── build_with_truncation()  ← Phase 2a で追加（新規メソッド）
@@ -385,7 +388,8 @@ Cold Memory が最初に削減されることを確認する。
 
 | 影響先 | 内容 | 変更規模 |
 |--------|------|---------|
-| `src/kage_shiki/agent/agent_core.py` | `PromptBuilder.build_with_truncation()` 追加、`process_turn()` で呼び出し変更 | 中 |
+| `src/kage_shiki/agent/prompt_builder.py` | `PromptBuilder` を `agent_core.py` から分離。`build_with_truncation()` 追加 | 中 |
+| `src/kage_shiki/agent/agent_core.py` | `PromptBuilder` を re-export、`process_turn()` で `build_with_truncation()` 呼び出し | 小 |
 | `src/kage_shiki/agent/truncation.py` | `get_effective_token_limit()`、`estimate_tokens()` 定数・関数の追加（新規ファイル） | 小 |
 | `tests/test_agent/test_agent_core.py` | トランケートテスト追加（FR-8.7 対応） | 中（追加のみ） |
 | Phase 1 の既存テスト | `build_system_prompt()`・`build_messages()` を使う既存テストは変更なし | なし |

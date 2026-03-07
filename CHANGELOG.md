@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file.
 
 ### Phase 2a: 基盤強化
 
+#### Wave 2 + Full Review + 構造リファクタリング (2026-03-07)
+
+- **T-31**: ウィザードGUI `gui/wizard_gui.py` 新規（FR-8.8, D-19）
+- **feat(agent)**: `LLMProtocol` に `send_message_for_purpose` 追加（テスト mock の spec 統一）
+- **refactor(agent)**: `PromptBuilder` を `agent/prompt_builder.py` に分離（agent_core.py から ~350行抽出、re-export 維持）
+- **refactor(agent)**: `format_history_line` 共通ヘルパー追加（human_block_updater / trends_proposal の履歴フォーマット重複解消）
+- **refactor(test)**: テスト fixture 統一 — `tests/conftest.py` に共通 `mock_llm(spec=LLMProtocol)` / `config()` 配置
+- **fix(main)**: `_run_wizard` の未使用 `api_key` 引数削除、EM-003 テンプレートキー修正
+- **fix(main)**: `root.destroy()` 競合修正、シャットダウン二重実行防止の設計意図コメント追加
+- **fix(test)**: `test_e2e.py` Cold Memory assertion の vacuous truth バグ修正
+- **fix(agent)**: `trends_proposal.py` R-6 違反修正（未知 trigger_type で raise ValueError）
+- **fix(persona)**: `load_personality_trends` に OSError 処理追加（load_human_block と対称化）
+- **chore**: Full Review 監査 — Critical 5件 + Warning 14件 + Info 9件 修正（対応不可 4件は追跡記録済み）
+- **chore(memory)**: `db.py` PRAGMA 値を名前付き定数化、Unreachable 行削除
+- **docs**: 設計書 d16/d18 に PromptBuilder 分離を反映、00_PROJECT_STRUCTURE.md 更新
+- **test**: 710 tests / 93% coverage（Wave 1: 687 tests → +23 tests）
+
 #### Wave 1 (2026-03-06)
 
 - **T-27**: スモークテスト手順書 `docs/testing/smoke-test.md`（FR-8.1）+ GUI手動テスト手順書 `docs/testing/gui-manual-test.md`（FR-8.2）

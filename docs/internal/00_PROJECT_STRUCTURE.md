@@ -8,8 +8,13 @@
 ```
 /
 ├── src/                    # ソースコード (実装)
-│   └── kage_shiki/         # Python パッケージ (詳細構造は TODO)
-│       # TODO(Phase1): モジュール構成確定後に更新
+│   └── kage_shiki/         # Python パッケージ
+│       ├── agent/          #   対話エンジン (AgentCore, PromptBuilder, LLMClient, 整合性チェック等)
+│       ├── core/           #   基盤 (config, errors, logging, shutdown, env)
+│       ├── gui/            #   GUI (TkinterMascotView, WizardGUI)
+│       ├── memory/         #   記憶管理 (DB, MemoryWorker)
+│       ├── persona/        #   人格管理 (PersonaSystem, Wizard)
+│       └── tray/           #   システムトレイ (SystemTray)
 ├── tests/                  # テストコード (pytest)
 ├── docs/                   # ドキュメント資産
 │   ├── specs/              # 要求仕様書 (Source of Truth)
