@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.memory.memory_worker import MemoryWorker
 
 # ---------------------------------------------------------------------------
@@ -21,8 +21,8 @@ from kage_shiki.memory.memory_worker import MemoryWorker
 
 @pytest.fixture()
 def mock_llm() -> Mock:
-    """LLMClient のモック."""
-    m = Mock(spec=LLMClient)
+    """LLMProtocol のモック."""
+    m = Mock(spec=LLMProtocol)
     m.send_message_for_purpose.return_value = (
         "今日はユーザーと天気の話をした。"
         "最近寒くなってきたねと言われた。"

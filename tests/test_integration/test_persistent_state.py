@@ -20,6 +20,7 @@ Building Checklist:
 """
 
 import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -27,6 +28,11 @@ import pytest
 
 from kage_shiki.memory.db import Database, initialize_db, save_observation
 from kage_shiki.memory.memory_worker import MemoryWorker
+
+# テスト用固定日付（実行日に依存しないよう十分な過去日を使用）
+_YESTERDAY = (date.today() - timedelta(days=1)).isoformat()
+_TWO_DAYS_AGO = (date.today() - timedelta(days=2)).isoformat()
+_THREE_DAYS_AGO = (date.today() - timedelta(days=3)).isoformat()
 
 # ---------------------------------------------------------------------------
 # FR-8.4: 2回目起動での UNIQUE 制約エラーなしテスト
@@ -52,7 +58,7 @@ class TestSecondStartup:
         """
         db_path = tmp_path / "memory.db"
         # 過去日付（今日ではない）のタイムスタンプを使用（get_missing_summary_dates は今日を除外）
-        yesterday_date = "2026-03-05"
+        yesterday_date = _YESTERDAY
         yesterday_ts = _date_to_timestamp(yesterday_date)
 
         mock_llm = MagicMock()
@@ -101,7 +107,7 @@ class TestSecondStartup:
         assert count == 1
 
         # 2回目でも当日サマリー生成を呼んでエラーなし
-        today_date = "2026-03-06"  # テスト固定日付（今日扱い）
+        today_date = date.today().isoformat()
         # 今日はget_missing_summary_datesで除外されるので直接generate_daily_summary_syncをテスト
         # 今日の observations がない場合は None が返るだけ
         result = worker2.generate_daily_summary_sync(today_date)
@@ -116,8 +122,8 @@ class TestSecondStartup:
         db_path = tmp_path / "memory.db"
 
         # 2日分の過去データ（異なる日付）
-        day1 = "2026-03-04"
-        day2 = "2026-03-05"
+        day1 = _THREE_DAYS_AGO
+        day2 = _TWO_DAYS_AGO
         day1_ts = _date_to_timestamp(day1)
         day2_ts = _date_to_timestamp(day2)
 
@@ -158,7 +164,7 @@ class TestSecondStartup:
     def test_existing_summary_not_duplicated(self, tmp_path: Path) -> None:
         """既存サマリーがある日に generate_daily_summary を呼んでも重複しない."""
         db_path = tmp_path / "memory.db"
-        date_str = "2026-03-05"
+        date_str = _YESTERDAY
         ts = _date_to_timestamp(date_str)
 
         mock_llm = MagicMock()
@@ -193,13 +199,13 @@ class TestSecondStartup:
 
 
 def _date_to_timestamp(date_str: str) -> float:
-    """YYYY-MM-DD 文字列を UTC 正午のタイムスタンプに変換する.
+    """YYYY-MM-DD 文字列をローカルタイム正午のタイムスタンプに変換する.
 
-    get_day_observations はローカルタイムで判定するため、
-    テスト実行環境のタイムゾーンに依存しないよう UTC 正午を使用する。
+    get_day_observations はローカルタイム（'localtime'）で日付境界を判定するため、
+    ローカルタイムの正午を使用する。正午を選ぶことで、どのタイムゾーンでも
+    同じ日付として判定される。
     """
     import datetime
     d = datetime.date.fromisoformat(date_str)
-    # ローカルタイムの正午として作成（ローカルタイムでの日付判定に合わせる）
     dt = datetime.datetime(d.year, d.month, d.day, 12, 0, 0)
     return dt.timestamp()

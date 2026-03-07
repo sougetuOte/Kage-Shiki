@@ -415,10 +415,10 @@ class TestShowWarningBar:
         assert label.cget("text") == "[!] 警告の概要"
 
         # トグルで展開
-        bar._toggle_expand()
+        view._warning_bar_toggle()
         assert label.cget("text") == f"[!] {full_msg}"
 
         # 再トグルで折りたたみ
-        bar._toggle_expand()
+        view._warning_bar_toggle()
         assert label.cget("text") == "[!] 警告の概要"
         bar.destroy()

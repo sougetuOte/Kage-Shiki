@@ -146,7 +146,7 @@ class TestBackgroundThreadWithQueue:
 
         responses = []
         for _ in range(n_turns):
-            responses.append(response_q.get_nowait())
+            responses.append(response_q.get(timeout=5.0))
 
         assert responses == ["応答1", "応答2", "応答3"]
         db.close()

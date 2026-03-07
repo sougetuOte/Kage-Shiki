@@ -27,6 +27,7 @@ from kage_shiki.core.config import (
     get_temperature,
     load_config,
 )
+from kage_shiki.persona.persona_system import PersonaSystem
 
 # ---------------------------------------------------------------------------
 # E6-1: config.toml → load_config → AppConfig 変換
@@ -229,9 +230,7 @@ class TestConfigToAgentCoreIntegration:
         config.memory.consistency_interval = 2
         config.general.data_dir = str(persona_data_dir)
 
-        persona_system = __import__(
-            "kage_shiki.persona.persona_system", fromlist=["PersonaSystem"],
-        ).PersonaSystem()
+        persona_system = PersonaSystem()
         prompt_builder = PromptBuilder(
             persona_core=SAMPLE_PERSONA_CORE.to_markdown(),
             style_samples=SAMPLE_STYLE_SAMPLES,

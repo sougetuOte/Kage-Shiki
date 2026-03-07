@@ -219,11 +219,12 @@ class TestMemorySystemIntegration:
         self, db_conn, mock_llm_client, integration_config, persona_data_dir,
     ):
         """過去の observations が Cold Memory としてプロンプトに注入されること."""
-        # 事前に observations を挿入
+        # 事前に observations を挿入（trigram 検索でマッチするよう
+        # クエリ「プログラミングの勉強」と共通部分文字列を持つ内容にする）
         insert_test_observations(db_conn, [
             ("あたしはプログラミングが好きだよ", "mascot"),
-            ("Pythonを勉強してるんだ", "user"),
-            ("Pythonいいよね！あたしも好き", "mascot"),
+            ("プログラミングの勉強を始めたんだ", "user"),
+            ("プログラミング楽しいよね！", "mascot"),
         ])
 
         persona_system = PersonaSystem()
@@ -243,20 +244,16 @@ class TestMemorySystemIntegration:
         mock_llm_client.send_message_for_purpose.return_value = "挨拶"
         agent.generate_session_start_message()
 
-        mock_llm_client.send_message_for_purpose.return_value = "Python楽しいよね！"
-        agent.process_turn("Pythonについて教えて")
+        mock_llm_client.send_message_for_purpose.return_value = "プログラミング楽しいよね！"
+        agent.process_turn("プログラミングの勉強")
 
-        # LLM に渡された messages を検証
+        # LLM に渡された messages を検証（keyword 引数で呼ばれる前提）
         call_args = mock_llm_client.send_message_for_purpose.call_args_list[-1]
-        messages = call_args.kwargs.get("messages") or call_args[1].get("messages")
-        if messages is None:
-            # positional args の場合
-            messages = call_args[0][1] if len(call_args[0]) > 1 else call_args.kwargs["messages"]
+        messages = call_args.kwargs["messages"]
 
         # 最新の user メッセージに retrieved_memories が含まれることを確認
         last_user_msg = [m for m in messages if m["role"] == "user"][-1]
-        assert "retrieved_memories" in last_user_msg["content"] or \
-            "Pythonについて教えて" in last_user_msg["content"]
+        assert "retrieved_memories" in last_user_msg["content"]
 
     def test_fts5_search_returns_empty_for_short_query(self, db_conn):
         """3文字未満のクエリで空リストが返ること (trigram 制約)."""
@@ -556,15 +553,21 @@ class TestConsistencyCheckIntegration:
 
         # 大量ターンを回しても consistency_check_active にならないことを確認
         build_calls = []
-        original_build = prompt_builder.build_system_prompt
+        original_build_trunc = prompt_builder.build_with_truncation
 
-        def capture_build(**kwargs):
-            build_calls.append(kwargs.get("consistency_check_active", False))
-            return original_build(**kwargs)
+        def capture_build_trunc(*args, **kwargs):
+            # positional: session_start_message, turns, latest_input, cold_memories,
+            #             model, max_tokens_for_output, consistency_check_active
+            if len(args) > 6:
+                build_calls.append(args[6])
+            else:
+                build_calls.append(kwargs.get("consistency_check_active", False))
+            return original_build_trunc(*args, **kwargs)
 
-        prompt_builder.build_system_prompt = capture_build
+        prompt_builder.build_with_truncation = capture_build_trunc
 
         for i in range(20):
             agent.process_turn(f"入力{i}")
 
+        assert len(build_calls) == 20, f"build_with_truncation が{len(build_calls)}回呼ばれた"
         assert all(not active for active in build_calls)

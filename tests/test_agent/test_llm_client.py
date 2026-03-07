@@ -356,7 +356,8 @@ class TestLLMProtocol:
         assert isinstance(client, LLMProtocol)
 
     def test_mock_client_satisfies_protocol(self) -> None:
-        """FR-8.6-3: chat() のみを実装したモッククラスが LLMProtocol を満足すること."""
+        """FR-8.6-3: chat() + send_message_for_purpose() を実装した
+        モッククラスが LLMProtocol を満足すること."""
         class MockLLMClient:
             """テスト用 LLMProtocol 実装（D-17 Section 6.2 のモック設計に準拠）."""
 
@@ -380,6 +381,14 @@ class TestLLMProtocol:
                     "max_tokens": max_tokens,
                     "temperature": temperature,
                 })
+                return self._response
+
+            def send_message_for_purpose(
+                self,
+                system: str,
+                messages: list[dict],
+                purpose: str,
+            ) -> str:
                 return self._response
 
         mock_client = MockLLMClient()
@@ -409,7 +418,10 @@ class TestLLMProtocol:
         """FR-8.6-5: chat() を実装していないクラスは LLMProtocol を満足しないこと（異常系）."""
         class NoChatClass:
             """chat() メソッドを持たないクラス."""
-            def send_message(self, messages: list[dict], *, system: str, model: str, max_tokens: int, temperature: float) -> str:
+            def send_message(
+                self, messages: list[dict], *,
+                system: str, model: str, max_tokens: int, temperature: float,
+            ) -> str:
                 return "no chat"
 
         instance = NoChatClass()

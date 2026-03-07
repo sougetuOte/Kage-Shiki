@@ -21,7 +21,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from kage_shiki.agent.llm_client import LLMClient, LLMError
+from kage_shiki.agent.llm_client import LLMError
 from kage_shiki.core.config import AppConfig
 from kage_shiki.persona.persona_system import PersonaCore, PersonaSystem
 from kage_shiki.persona.wizard import (
@@ -36,19 +36,7 @@ from kage_shiki.persona.wizard import (
 
 
 @pytest.fixture()
-def mock_llm() -> Mock:
-    """LLMClient のモック."""
-    return Mock(spec=LLMClient)
-
-
-@pytest.fixture()
-def config() -> AppConfig:
-    """デフォルト AppConfig."""
-    return AppConfig()
-
-
-@pytest.fixture()
-def controller(mock_llm: Mock, config: AppConfig) -> WizardController:
+def controller(mock_llm: Mock, config) -> WizardController:
     """WizardController インスタンス."""
     return WizardController(mock_llm, config)
 

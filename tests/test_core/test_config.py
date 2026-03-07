@@ -37,13 +37,13 @@ from kage_shiki.core.config import (
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
+@pytest.fixture()
 def tmp_config_dir(tmp_path: Path) -> Path:
     """一時ディレクトリを返す。"""
     return tmp_path
 
 
-@pytest.fixture
+@pytest.fixture()
 def valid_config_toml(tmp_config_dir: Path) -> Path:
     """有効な config.toml を一時ディレクトリに作成して返す。"""
     config_path = tmp_config_dir / "config.toml"

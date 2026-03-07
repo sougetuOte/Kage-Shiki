@@ -38,7 +38,7 @@ from kage_shiki.agent.agent_core import (
     check_consistency_rules,
     generate_session_id,
 )
-from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.core.config import AppConfig
 from kage_shiki.persona.persona_system import PersonaSystem
 
@@ -332,6 +332,7 @@ class TestPromptBuilderMessages:
             turns=turns,
             latest_input="そっか",
         )
+        # 4件 = session_start(assistant) + turn_user + turn_assistant + latest_input(user)
         assert len(msgs) == 4
         assert msgs[1]["content"] == "元気？"
         assert msgs[2]["content"] == "元気だよ"
@@ -469,8 +470,8 @@ class TestCheckConsistencyRules:
 
 @pytest.fixture()
 def mock_llm() -> Mock:
-    """LLMClient のモック."""
-    m = Mock(spec=LLMClient)
+    """LLMProtocol のモック（カスタム戻り値）."""
+    m = Mock(spec=LLMProtocol)
     m.send_message_for_purpose.return_value = "テスト応答だよ。"
     return m
 
@@ -490,12 +491,6 @@ def persona_system() -> PersonaSystem:
     ps._human_block_text = ""
     ps._personality_trends_text = ""
     return ps
-
-
-@pytest.fixture()
-def config() -> AppConfig:
-    """デフォルト AppConfig."""
-    return AppConfig()
 
 
 @pytest.fixture()
@@ -687,12 +682,13 @@ class TestProcessTurn:
         )
         core.session_start_message = "やあ"
         with patch.object(
-            core._prompt_builder, "build_system_prompt",
-            wraps=core._prompt_builder.build_system_prompt,
+            core._prompt_builder, "build_with_truncation",
+            wraps=core._prompt_builder.build_with_truncation,
         ) as mock_build:
             for i in range(20):
                 core.process_turn(f"入力{i}")
             # 20回全て consistency_check_active=False であること
+            assert mock_build.call_count == 20
             for call in mock_build.call_args_list:
                 assert call.kwargs.get("consistency_check_active") is False
 

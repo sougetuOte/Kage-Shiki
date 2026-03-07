@@ -259,7 +259,8 @@ class TestPersonaSystemFreezeGuard:
         original = system.load_persona_core(path)
         assert original is not None
 
-        # 全フィールドにデータを設定
+        # 全フィールドにデータを設定（dataclasses.replace ではなく直接代入、
+        # PersonaCore は frozen=False なので安全）
         original.c2_first_person = "ぼく"
         original.c3_second_person = "きみ"
         original.c5_personality_axes = "好奇心旺盛"

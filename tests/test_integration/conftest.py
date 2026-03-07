@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.core.config import AppConfig
 from kage_shiki.memory.db import Database, initialize_db, save_observation
 from kage_shiki.persona.persona_system import PersonaCore
@@ -45,14 +46,14 @@ def db_conn(integration_db: tuple) -> sqlite3.Connection:
 
 @pytest.fixture()
 def mock_llm_client():
-    """LLMClient のモック.
+    """LLMProtocol のモック.
 
     send_message_for_purpose のデフォルト戻り値を設定。
     テストケースごとに side_effect でカスタマイズ可能。
     """
-    client = MagicMock()
+    client = MagicMock(spec=LLMProtocol)
     client.send_message_for_purpose.return_value = "モック応答テキスト"
-    client.send_message.return_value = "モック応答テキスト"
+    client.chat.return_value = "モック応答テキスト"
     return client
 
 

@@ -10,19 +10,17 @@ FR 番号一覧（R-4 チェックリスト）:
     2. test_cold_memory_truncated_first           — Cold Memory が最初に削減される
     3. test_warm_memory_truncated_after_cold      — Cold 全削除後に Warm が削減される
     4. test_session_truncated_after_warm          — Warm 全削除後に Session が削減される
-    5. test_persona_core_never_truncated          — persona_core は上限超過時でも最終プロンプトに含まれる
-    6. test_hot_memory_reduction_order            — Hot Memory 削減順: personality_trends → human_block → style_samples
-    7. test_empty_cold_memories                   — cold_memories=None でスキップ
-    8. test_empty_day_summaries                   — day_summaries=[] でスキップ
-    9. test_empty_turns                           — turns=[] でスキップ
-    10. test_promptbuilder_state_unchanged        — build_with_truncation() が PromptBuilder のフィールドを変更しない
+    5. test_persona_core_never_truncated   — persona_core は上限超過時でも含まれる
+    6. test_hot_memory_reduction_order     — Hot Memory 削減順: trends → human → style
+    7. test_empty_cold_memories            — cold_memories=None でスキップ
+    8. test_empty_day_summaries            — day_summaries=[] でスキップ
+    9. test_empty_turns                    — turns=[] でスキップ
+    10. test_promptbuilder_state_unchanged — フィールド不変保証
 """
 
-import pytest
 
 from kage_shiki.agent.agent_core import PromptBuilder
 from kage_shiki.agent.truncation import estimate_tokens, get_effective_token_limit
-
 
 # ---------------------------------------------------------------------------
 # テスト用ヘルパー・フィクスチャ
@@ -75,11 +73,11 @@ class TestEstimateTokens:
         assert estimate_tokens("") == 0
 
     def test_ascii_text(self) -> None:
-        # 10文字 × 2.0 = 20
+        # 10文字 × 2.0 = 20  (D-18 Section 5.1: _CHARS_TO_TOKENS_RATIO = 2.0)
         assert estimate_tokens("helloworld") == 20
 
     def test_japanese_text(self) -> None:
-        # 5文字 × 2.0 = 10
+        # 5文字 × 2.0 = 10  (D-18 Section 5.1: _CHARS_TO_TOKENS_RATIO = 2.0)
         assert estimate_tokens("あいうえお") == 10
 
 
@@ -180,11 +178,11 @@ class TestBuildWithTruncationColdMemory:
         assert "昨日のまとめ" in system_out
         # turns は維持される（セッション開始メッセージを除いた会話ターン）
         assert any("ユーザー発言0" in str(m) for m in messages_out)
-        # Cold Memory が削減されているか（元は5件、何らか削減済み）
+        # Cold Memory が削減されているか（元は5件、削減後は5件未満）
         cold_count_in_output = sum(
             1 for m in messages_out if "記憶" in str(m["content"])
         )
-        assert cold_count_in_output < 5 * len(cold_memories[0]["content"])
+        assert cold_count_in_output < 5
 
 
 class TestBuildWithTruncationWarmMemory:
@@ -399,7 +397,7 @@ class TestEdgeCases:
 
 
 class TestPromptBuilderStateUnchanged:
-    """テスト 10: build_with_truncation() が PromptBuilder のフィールドを変更しない（FR-8.7 Section 5.7）."""
+    """テスト 10: build_with_truncation() のフィールド不変保証（FR-8.7 Section 5.7）."""
 
     def test_promptbuilder_state_unchanged(self) -> None:
         """build_with_truncation() 呼び出し後も PromptBuilder のフィールドが不変."""

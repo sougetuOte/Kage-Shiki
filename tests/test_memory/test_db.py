@@ -245,19 +245,20 @@ class TestFts5Trigger:
         now = time.time()
         # 「プログラミング」が1回だけ出現するエントリ
         db_conn.execute(
-            "INSERT INTO observations (content, speaker, created_at) "
-            "VALUES (?, ?, ?)",
-            ("今日はプログラミングをした", "user", now),
+            "INSERT INTO observations (content, speaker, created_at, session_id) "
+            "VALUES (?, ?, ?, ?)",
+            ("今日はプログラミングをした", "user", now, "test_session"),
         )
         # 「プログラミング」が複数回出現するエントリ（より関連度が高い）
         db_conn.execute(
-            "INSERT INTO observations (content, speaker, created_at) "
-            "VALUES (?, ?, ?)",
+            "INSERT INTO observations (content, speaker, created_at, session_id) "
+            "VALUES (?, ?, ?, ?)",
             (
                 "プログラミングが好きです。プログラミングは楽しい。"
                 "プログラミングを毎日やっています",
                 "mascot",
                 now,
+                "test_session",
             ),
         )
         db_conn.commit()
