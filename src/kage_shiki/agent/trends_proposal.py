@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from kage_shiki.agent.human_block_updater import format_history_line
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -392,14 +394,11 @@ class TrendsProposalManager:
             追記する Markdown テキスト。
         """
         date_str = datetime.now().strftime("%Y-%m-%d")
-        if proposal.trigger_type in _SECTION_LABEL_MAP:
-            label = _SECTION_LABEL_MAP[proposal.trigger_type]
-        else:
-            logger.warning(
-                "未知のトリガータイプ '%s' — ラベルを '関係性の変化' にフォールバック",
-                proposal.trigger_type,
+        if proposal.trigger_type not in _SECTION_LABEL_MAP:
+            raise ValueError(
+                f"未知のトリガータイプ: {proposal.trigger_type!r}"
             )
-            label = "関係性の変化"
+        label = _SECTION_LABEL_MAP[proposal.trigger_type]
 
         if proposal.trigger_type == "T3":
             return f"### [{date_str}] {label}\n\n- {proposal.content}"
@@ -415,7 +414,6 @@ class TrendsProposalManager:
         Returns:
             履歴行テキスト。
         """
-        date_str = datetime.now().strftime("%Y-%m-%d")
         if result in _RESULT_LABEL_MAP:
             result_label = _RESULT_LABEL_MAP[result]
         else:
@@ -424,7 +422,8 @@ class TrendsProposalManager:
             )
             result_label = result
         label = _SECTION_LABEL_MAP.get(proposal.trigger_type, "不明")
-        return f"- [{date_str}] {label}: 「{proposal.content}」→ {result_label}"
+        body = f"「{proposal.content}」→ {result_label}"
+        return format_history_line(label, body)
 
     # ------------------------------------------------------------------
     # 内部ユーティリティ

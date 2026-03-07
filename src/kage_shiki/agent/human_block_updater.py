@@ -87,9 +87,9 @@ def parse_human_block_updates(response: str) -> list[HumanBlockUpdate]:
         for line in raw.split("\n"):
             line = line.strip()
             if line.startswith("セクション:") or line.startswith("セクション："):
-                section = line.split(":", 1)[-1].split("：", 1)[-1].strip()
+                section = re.split(r"[:：]", line, maxsplit=1)[-1].strip()
             elif line.startswith("内容:") or line.startswith("内容："):
-                content_lines.append(line.split(":", 1)[-1].split("：", 1)[-1].strip())
+                content_lines.append(re.split(r"[:：]", line, maxsplit=1)[-1].strip())
             elif content_lines:
                 # 内容の続き行
                 content_lines.append(line)
@@ -147,6 +147,22 @@ def validate_update(update: HumanBlockUpdate) -> tuple[bool, str]:
     return True, ""
 
 
+def format_history_line(label: str, body: str) -> str:
+    """履歴行の共通フォーマットを生成する.
+
+    human_block / personality_trends の両方の履歴エントリで使用する共通ヘルパー。
+
+    Args:
+        label: ラベル（セクション名やトリガー種別名）。
+        body: 本文テキスト。
+
+    Returns:
+        ``- [YYYY-MM-DD] label: body`` 形式の文字列。
+    """
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    return f"- [{date_str}] {label}: {body}"
+
+
 def format_history_entry(update: HumanBlockUpdate) -> str:
     """更新履歴エントリをフォーマットする.
 
@@ -156,6 +172,5 @@ def format_history_entry(update: HumanBlockUpdate) -> str:
     Returns:
         更新履歴に追記するテキスト（日付・セクション・コンテンツ先頭50文字）。
     """
-    date_str = datetime.now().strftime("%Y-%m-%d")
     truncated_content = update.content[:50]
-    return f"- [{date_str}] {update.section}: {truncated_content}"
+    return format_history_line(update.section, truncated_content)
