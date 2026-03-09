@@ -4,9 +4,9 @@
 
 > LAM（Living Architect Model）の概要は [概念説明スライド](docs/slides/index.html) を参照。
 
-1. Claude Code CLI を起動する
-2. プロジェクトルートで Claude が `CLAUDE.md` を読み込む
-3. `/planning` で設計フェーズを開始する
+1. Claude Code CLI を起動する（LAM の設定は自動で読み込まれる）
+2. `/planning` で設計フェーズを開始し、要件を定義する
+3. 要件確定後、LAM をプロジェクトに適応させる（AI に依頼するだけ）
 
 ```
 典型的な流れ:
@@ -35,28 +35,43 @@
 ├── commands/              # スラッシュコマンド
 ├── agents/                # サブエージェント
 ├── skills/                # オーケストレーション・テンプレート出力
+├── hooks/                 # PreToolUse / PostToolUse / Stop / PreCompact
+├── logs/                  # permission.log, loop-*.json
 ├── states/                # 機能ごとの進捗状態
 └── current-phase.md       # 現在のフェーズ
 
 CLAUDE.md                  # 憲法（コア原則 + 技術スタック）
-CHEATSHEET.md              # このファイル
+CHEATSHEET.md              # このファイル（クイックリファレンス）
 docs/internal/             # プロセス SSOT
 docs/specs/                # 仕様書
 docs/adr/                  # アーキテクチャ決定記録
 docs/memos/middle-draft/   # 設計中間文書
 ```
 
+## 権限等級（PG/SE/PM）
+
+v4.0.0 で導入された変更リスク分類。PreToolUse hook がファイルパスから自動判定する。
+
+| 等級 | 修正権限 | 例 |
+|------|---------|-----|
+| **PG級** | 自動修正・報告不要 | フォーマット、typo、lint 修正 |
+| **SE級** | 修正後に報告 | テスト追加、内部リファクタリング |
+| **PM級** | 承認が必要 | 仕様変更、アーキテクチャ変更、ルール変更 |
+
+迷ったら SE級に丸める。詳細: `.claude/rules/permission-levels.md`
+
 ## Rules ファイル一覧
 
 | ファイル | 内容 |
 |---------|------|
-| `core-identity.md` | Living Architect 行動規範 |
+| `core-identity.md` | Living Architect 行動規範 + 権限等級サマリー |
 | `phase-rules.md` | フェーズ別ガードレール（PLANNING/BUILDING/AUDITING） |
-| `security-commands.md` | コマンド安全基準（Allow/Deny List） |
+| `security-commands.md` | コマンド安全基準（Layer 0/1/2） |
 | `decision-making.md` | 意思決定プロトコル |
-| `building-checklist.md` | BUILDING 品質チェックリスト（R-1〜R-11） |
-| `spec-sync.md` | 仕様・実装同期ルール（S-1〜S-4） |
-| `audit-fix-policy.md` | 監査修正ポリシー（A-1〜A-4） |
+| `permission-levels.md` | 権限等級分類基準（PG/SE/PM）v4.0.0 新規 |
+| `upstream-first.md` | プラットフォーム仕様優先原則 v4.0.0 新規 |
+| `building-checklist.md` | 影式 BUILDING 品質チェックリスト（R-2〜R-11, S-2）影式固有 |
+| `auto-generated/` | TDD 内省パイプライン自動生成ルール v4.0.0 新規 |
 
 ## フェーズコマンド
 
@@ -64,7 +79,7 @@ docs/memos/middle-draft/   # 設計中間文書
 |---------|------|---------|
 | `/planning` | 要件定義・設計・タスク分解 | コード生成禁止 |
 | `/building` | TDD実装 | 仕様なし実装禁止 |
-| `/auditing` | レビュー・監査・リファクタ | 修正の直接実施禁止 |
+| `/auditing` | レビュー・監査・リファクタ | PM級の修正禁止（PG/SE級は許可） |
 | `/project-status` | 進捗状況の表示 | - |
 
 ## 承認ゲート
@@ -109,7 +124,7 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `task-decomposer` | 「タスクを分割して」 | PLANNING |
 | `tdd-developer` | 「TASK-001を実装して」 | BUILDING |
 | `quality-auditor` | 「src/を監査して」 | AUDITING |
-| `doc-writer` | 「ドキュメントを更新して」 | ALL |
+| `doc-writer` | 「ドキュメントを更新して」「仕様を策定して」 | ALL |
 | `test-runner` | 「テストを実行して」 | BUILDING |
 | `code-reviewer` | 「コードレビューして」 | AUDITING |
 
@@ -117,25 +132,30 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 | スキル | 用途 | 呼び出し例 |
 |--------|------|-----------|
-| `adr-template` | ADR作成テンプレート | `/adr-create` 実行時に自動適用 |
-| `spec-template` | 仕様書作成テンプレート | 仕様書作成時に自動適用 |
-| `skill-creator` | スキル作成ガイド | 「新しいスキルを作りたい」 |
 | `lam-orchestrate` | タスク分解・並列実行の自動調整 | 「lam-orchestrateで実行して」 |
 | `ultimate-think` | AoT + Three Agents + Reflection 統合思考 | `/ultimate-think 議題` |
+| `skill-creator` | スキル作成ガイド | 「新しいスキルを作りたい」 |
+| `adr-template` | ADR作成テンプレート | `/adr-create` 実行時に自動適用 |
+| `spec-template` | 仕様書作成テンプレート | 仕様書作成時に自動適用 |
 
 ## ワークフローコマンド
 
 | コマンド | 用途 |
 |---------|------|
-| `/ship` | 変更の棚卸し → 論理グループ分け → コミット → 手動作業通知 |
-| `/full-review` | 全ソース網羅レビュー + 全 Issue 修正（3エージェント並列監査） |
+| `/ship` | 論理グループ分けコミット（棚卸し → 分類 → コミット） |
+| `/full-review` | 並列監査 + 全修正 + 検証（4エージェント、一気通貫） |
+
+## 補助コマンド
+
+| コマンド | 用途 |
+|---------|------|
 | `/focus` | 現在のタスクに集中 |
-| `/daily` | 日次振り返り |
+| `/daily` | 日次振り返り（KPI 集計含む） |
 | `/adr-create` | ADR作成支援 |
 | `/security-review` | セキュリティレビュー |
-| `/impact-analysis` | 変更の影響分析 |
-| `/wave-plan` | 次Waveのタスク選定・実行順序策定 |
-| `/retro` | Wave/Phase完了時の振り返り（KPT） |
+| `/impact-analysis` | 変更の影響分析（PG/SE/PM 分類含む） |
+| `/wave-plan` | 次Waveのタスク選定・実行順序策定（影式固有） |
+| `/retro` | Wave/Phase完了時の振り返り（KPT）（影式固有） |
 
 ## 状態管理
 
@@ -165,6 +185,13 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 - 影響レイヤー/モジュールが **3つ以上**
 - 有効な選択肢が **3つ以上**
 
+**Atom テーブル形式**
+
+| Atom | 内容 | 依存 | 並列可否 |
+|------|------|------|---------|
+| A1 | [判断1] | なし | — |
+| A2 | [判断2] | A1 | — |
+
 **ワークフロー**
 ```
 1. Decomposition: 議題を Atom に分解
@@ -193,14 +220,14 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 ```
 Red → Green → Refactor → 報告 → (次のサイクル)
-  - building-checklist の R-1〜R-10 を適用
-  - spec-sync の S-1〜S-4 を適用
+  - phase-rules.md の R-1, R-4 + building-checklist.md の R-2〜R-11 を適用
+  - phase-rules.md の S-1, S-3, S-4 + building-checklist.md の S-2 を適用
 ```
 
 ### Wave 終了
 
 ```
-/full-review           # 並列監査 + 全修正
+/full-review           # 並列監査 + 全修正（4エージェント）
 /ship                  # 論理グループ分けコミット
 /retro wave            # 振り返り（KPT + アクション抽出）
 /quick-save            # セッション状態保存
@@ -228,6 +255,9 @@ Red → Green → Refactor → 報告 → (次のサイクル)
 
 ## クイックリファレンス
 
+**次のセッションを始めるときは？**
+→ `/quick-load`（前回の続き）または `/full-load`（数日ぶり）
+
 **PLANNINGで実装を頼まれたら？**
 → 警告を表示し、3つの選択肢を提示
 
@@ -245,6 +275,12 @@ Red → Green → Refactor → 報告 → (次のサイクル)
 
 **仕様書はどこ？**
 → `docs/specs/`
+
+**ADRはどこ？**
+→ `docs/adr/`
+
+**Rulesはどこ？**
+→ `.claude/rules/`
 
 **設計中間文書はどこ？**
 → `docs/memos/middle-draft/`

@@ -1,5 +1,7 @@
 # 意思決定プロトコル
 
+> **SSOT**: `docs/internal/06_DECISION_MAKING.md`。本ファイルは実行時の要約版。
+
 ## Three Agents Model
 
 | Agent | ペルソナ | フォーカス |

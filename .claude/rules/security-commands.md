@@ -11,7 +11,7 @@
 | パッケージ情報 | `npm list`, `pip list` |
 | プロセス情報 | `ps` |
 
-## Deny List（承認必須）
+## 高リスクコマンド（Layer 0: 承認必須）
 
 | カテゴリ | コマンド | リスク |
 |---------|---------|--------|
@@ -21,7 +21,24 @@
 | ファイル操作 | `mv`, `cp`, `mkdir`, `touch` | 意図しない変更 |
 | Git 書込 | `git push`, `git commit`, `git merge` | リモート影響 |
 | ネットワーク | `curl`, `wget`, `ssh` | 外部通信 |
-| 実行 | `npm start`, `make` | リソース枯渇 |
+| 実行 | `npm start`, `python main.py`, `make` | リソース枯渇 |
 
-上記に含まれないコマンドは **Deny List 扱い**（承認必須）。
+上記に含まれないコマンドは **高リスク扱い**（承認必須）。
+
+> Layer 1（`settings.json`）では、上記コマンドの多くが `deny` または `ask` に分類されている。
+
 「止めて」「ストップ」等の指示で直ちに停止。
+
+---
+
+## v4.0.0: ネイティブ権限モデルへの移行
+
+v4.0.0 以降、コマンド安全基準は以下の三層で管理される:
+
+- **Layer 0（プロンプティング）**: 本ファイルの Allow/Deny List。憲法的ルールとして常に有効
+- **Layer 1（ネイティブ権限）**: `.claude/settings.json` の `permissions`（allow/ask/deny）で粗粒度の境界を設定
+- **Layer 2（PreToolUse hook）**: `.claude/hooks/pre-tool-use.py` でファイルパスベースの動的判定（PG/SE/PM 分類）
+
+Layer 1 の `permissions.allow` に PG級コマンド（`ruff format`, `ruff check --fix` 等）が追加されている。
+
+権限等級の詳細: `.claude/rules/permission-levels.md`
