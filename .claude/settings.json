@@ -17,14 +17,14 @@
       "Bash(pytest *)",
       "Bash(npm test *)",
       "Bash(go test *)",
-      "Bash(python *)",
-      "Bash(python3 *)",
-      "Bash(python -m *)",
-      "Bash(python3 -m *)",
       "Bash(npm list *)",
       "Bash(pip list *)",
       "Bash(pip show *)",
-      "Bash(ps *)"
+      "Bash(ps *)",
+      "Bash(npx prettier *)",
+      "Bash(npx eslint --fix *)",
+      "Bash(ruff check --fix *)",
+      "Bash(ruff format *)"
     ],
     "deny": [
       "Bash(rm *)",
@@ -56,6 +56,41 @@
       "Bash(mkdir *)",
       "Bash(touch *)",
       "Bash(cp *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-tool-use.py"
+        }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-tool-use.py"
+        }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lam-stop-hook.py"
+        }]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-compact.py"
+        }]
+      }
     ]
   }
 }

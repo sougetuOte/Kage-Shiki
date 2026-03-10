@@ -1,8 +1,9 @@
 # Current Phase
 
-**BUILDING**
+**BUILDING** (LAM 4.0.1 移行作業中 — 影式 Phase 2a は一時中断)
 
-_TDD実装フェーズ_
+_TDD実装フェーズ — 移行完了後に影式作業を再開_
+_影式作業状況: `docs/memos/v4-update-plan/00-kageshiki-state-preservation.md`_
 
 ---
 
@@ -21,4 +22,4 @@ _TDD実装フェーズ_
 - `/auditing` コマンド実行時 → `AUDITING`
 
 ### 参照するルール
-- `rules/phase-rules.md` - フェーズ別ガードレール（PLANNING/BUILDING/AUDITING）
+- `.claude/rules/phase-rules.md` - フェーズ別ガードレール（PLANNING/BUILDING/AUDITING）

@@ -1,6 +1,9 @@
 ---
-description: "振り返り - Wave/Phase完了時の学習サイクル"
+description: "振り返り - Wave/Phase完了時の学習サイクル（KPT）を実施"
 ---
+
+# permission-level: PM
+# 振り返りの結論がルール・プロセスに影響するため
 
 # Retrospective（振り返り）
 

@@ -33,7 +33,7 @@
 | **System Mutation**     | `apt`, `yum`, `brew`, `systemctl`, `service`, `reboot`, `shutdown`          | システム設定の変更、パッケージ導入、再起動。                 |
 | **Network**             | `curl`, `wget`, `ssh`, `ping`, `nc`                                         | 外部へのデータ送信、不正なスクリプトのダウンロード。         |
 | **Build/Run**           | `python main.py`, `python -m kage_shiki`                                    | アプリケーションの実行（無限ループやリソース枯渇のリスク）。 |
-| **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。                       |
+| **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。v4.0.0 以降は PG級自動修正可（本ドキュメント Section 5 参照）。 |
 | **Package Install**     | `pip install`, `pip uninstall`                                              | 環境への変更。                                               |
 
 > **Note**: ファイルリネームが必要な場合、`mv` は Deny List に含まれるため以下の代替手段を用いる:
@@ -58,3 +58,44 @@
 ## 4. Emergency Stop
 
 ユーザーから「止めて」「ストップ」等の指示があった場合、直ちに実行中のコマンドを停止（`Ctrl+C` / `SIGINT`）し、全ての自動化プロセスを中断すること。
+
+## Section 5: Hooks-Based Permission System（v4.0.0）
+
+v4.0.0 で導入された hooks ベースの権限管理システム。
+
+### PreToolUse Hook
+
+ファイルパスに基づく PG/SE/PM の動的判定を行う:
+
+- PM級パス（承認必須）: `docs/specs/`, `docs/adr/`, `docs/internal/`, `.claude/rules/`, `pyproject.toml`
+- SE級パス（修正後報告）: `src/kage_shiki/`, `tests/`, `config/`, `docs/`（上記以外）
+- PG級ツール（常に許可）: Read, Glob, Grep, WebSearch, WebFetch
+
+実装: `.claude/hooks/pre-tool-use.py`（Python 版、Windows 互換）
+定義: `.claude/rules/permission-levels.md`
+
+### PostToolUse Hook
+
+テスト実行結果の自動記録とドキュメント同期フラグの管理:
+
+1. **TDD パターン記録**: テスト失敗→成功パターンを `.claude/tdd-patterns.log` に記録
+2. **doc-sync-flag**: `src/` 配下のファイル変更を `.claude/doc-sync-flag` に記録
+3. **ループログ**: 自律ループ時の tool_events を `lam-loop-state.json` に追記
+
+### Stop Hook (lam-stop-hook)
+
+自律ループの収束判定（Green State チェック）:
+- G1: テスト全パス、G2: lint エラーゼロ、G3: 対応可能 Issue ゼロ、G4: 仕様差分ゼロ、G5: セキュリティチェック通過
+
+### PreCompact Hook
+
+コンテキスト圧縮前の自動状態保存。SESSION_STATE.md にタイムスタンプを記録。
+
+## Section 6: Recommended Security Tools（v4.0.0）
+
+| ツール | 用途 | 影式での利用 |
+|--------|------|------------|
+| `ruff` | Python linter + formatter | 導入済み（PG級自動修正可） |
+| `pip-audit` | Python 依存パッケージの脆弱性チェック | Green State G5 で使用 |
+| `safety` | Python 依存パッケージの安全性チェック | pip-audit の代替 |
+| `bandit` | Python セキュリティ静的解析 | 将来導入検討 |

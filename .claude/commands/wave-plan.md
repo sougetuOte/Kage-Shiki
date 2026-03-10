@@ -1,6 +1,9 @@
 ---
-description: "Wave計画 - 次Waveのタスク選定と実行順序を策定"
+description: "次 Wave のタスク選定と実行順序を策定"
 ---
+
+# permission-level: SE
+# タスク編成は設計判断を含むため
 
 # Wave Plan（Wave 計画策定）
 
@@ -15,7 +18,7 @@ description: "Wave計画 - 次Waveのタスク選定と実行順序を策定"
 
 ### Step 1: 現状把握
 
-1. `docs/specs/phase1-mvp/tasks.md`（または該当するタスク定義）を読み込む
+1. `SESSION_STATE.md` および `docs/tasks/` 配下（または `docs/specs/*/tasks.md`）から現在のタスク定義を読み込む
 2. `SESSION_STATE.md` で完了済み Wave を確認
 3. git log で直近の Wave のコミット履歴を確認
 

@@ -1,11 +1,11 @@
 ---
 name: ultimate-think
+version: 1.0.0
 description: >
   AoT + Three Agents + Reflection を統合した多層思考スキル。
   複雑な意思決定・設計判断・リスク評価でハルシネーションを抑制する。
   全フェーズ（PLANNING/BUILDING/AUDITING）で利用可能。
   手動起動専用: /ultimate-think で呼び出す。
-disable-model-invocation: true
 ---
 
 # ultimate-think
@@ -23,9 +23,7 @@ Phase 0: Grounding → Level 1: AoT → Level 2: Debate → Level 3: Reflection 
 
 ### Phase 0: Grounding + 複雑度判定
 
-1. 議題から重要キーワードを抽出し、WebSearch を 1-2 回実行する
-   - `--no-web` 指定時またはオフライン環境では WebSearch をスキップする
-   - 検索精度は完璧を求めない。失敗時は警告して続行する
+1. 議題から重要キーワードを抽出し、WebSearch を 1-2 回実行する（失敗時は警告して続行する）
 2. 複雑度を判定しレベルを選択する:
 
 | レベル | 条件 |

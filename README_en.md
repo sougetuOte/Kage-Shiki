@@ -24,6 +24,7 @@ Memory carries over between sessions, and the personality is frozen after initia
 | LLM API | anthropic (official SDK) |
 | DB | SQLite + FTS5 |
 | Config | TOML (tomllib) |
+| Testing | pytest |
 
 ## Phase Roadmap
 
@@ -37,7 +38,7 @@ Memory carries over between sessions, and the personality is frozen after initia
 
 ### Phase 2a Progress
 
-Tests: 710 passed / Coverage: 93%
+Tests: 722 passed / Coverage: 92%
 
 Implemented modules:
 - `main.py` — **Startup sequence integration** (13 steps + thread management + shutdown CB)
@@ -64,7 +65,7 @@ Implemented modules:
 
 ## Development Process (LAM Framework)
 
-To quickly understand the LAM (Living Architect Model) concepts, see the [Concept Overview Slides](docs/slides/index.html).
+To quickly understand the LAM (Living Architect Model) concepts, see the Concept Overview Slides (`docs/slides/index.html`, planned for future creation).
 
 ### Phase Commands
 
@@ -72,7 +73,7 @@ To quickly understand the LAM (Living Architect Model) concepts, see the [Concep
 |---------|---------|------------|
 | `/planning` | Requirements, design, task decomposition | Code generation |
 | `/building` | TDD implementation | Implementation without specs |
-| `/auditing` | Review, audit, refactoring | Direct fixes |
+| `/auditing` | Review, audit, refactoring | PM-level fixes prohibited (PG/SE allowed) |
 | `/project-status` | Display progress status | - |
 
 ### Approval Gates

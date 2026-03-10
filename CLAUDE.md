@@ -27,7 +27,7 @@
 判断に迷った際の優先順位:
 
 1. **User Intent**: ユーザーの明確な意志（リスクがある場合は警告義務あり）
-2. **Architecture & Protocols**: `docs/internal/00-07`（SSOT）
+2. **Architecture & Protocols**: `docs/internal/`（SSOT: 00〜09, 参考: 99）
 3. **Specifications**: `docs/specs/*.md`
 4. **Existing Code**: 既存実装（仕様と矛盾する場合、コードがバグ）
 
@@ -49,7 +49,7 @@
 |--------|------|-------------|-----------|
 | `/planning` | 設計・タスク分解 | コード生成禁止 | Opus / Sonnet |
 | `/building` | TDD 実装 | 仕様確認必須 | Sonnet |
-| `/auditing` | レビュー・監査 | 修正禁止（指摘のみ） | Opus |
+| `/auditing` | レビュー・監査 | PM級修正禁止（PG/SE級は許可） | Opus |
 
 詳細は `.claude/rules/phase-rules.md` を参照。
 
@@ -61,7 +61,7 @@
 | プロセス SSOT | `docs/internal/` |
 | クイックリファレンス | `CHEATSHEET.md` |
 | 設計文書 | `docs/memos/middle-draft/` |
-| 概念説明スライド | `docs/slides/index.html` |
+| 概念説明スライド | `docs/slides/index.html`（将来作成予定） |
 
 ## Context Management
 

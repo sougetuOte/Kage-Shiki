@@ -16,6 +16,15 @@ AI がやるのは「仕様化・実装・検証・自律ループ」。
 
 ## B. Phase-by-Phase Generic Example
 
+### フェーズモードタグ
+
+コマンドやスキルの frontmatter でフェーズ制約を示す:
+
+- `[PLANNING]`: PLANNING フェーズでのみ使用可
+- `[BUILDING]`: BUILDING フェーズでのみ使用可
+- `[AUDITING]`: AUDITING フェーズでのみ使用可
+- `[ALL]`: 全フェーズで使用可
+
 ### Phase 0: Requirement → Spec (Definition of Ready)
 
 **Input:** docs/memos/idea.md

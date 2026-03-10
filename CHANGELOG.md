@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### LAM 4.0.1 移行 — Phase 2: コマンド/スキル/エージェント (2026-03-10)
+
+- **chore(agents)**: 全8エージェントに permission-level 注記追加、test-runner→Haiku、quality-auditor に仕様ドリフトチェック・R-1〜R-11 完全テーブル追加
+- **chore(commands)**: full-review 4エージェント並列構成・Green State G1-G5・自動ループ制御追加、ship doc-sync-flag 対応、/pattern-review 新規作成
+- **chore(skills)**: version:1.0.0 追加、lam-orchestrate ループ統合（lam-loop-state.json スキーマ）
+- **docs(specs)**: docs/specs/lam/ 新規作成（免疫システム要件・設計、Green State 定義、KPI、ループログスキーマ、doc-writer 仕様、v3.9.0 改善採用 — 計7ファイル）
+- **docs(adr)**: ADR-0001 免疫システムアーキテクチャ決定記録
+- **docs(internal)**: /full-review 3並列→4並列、R-1〜R-11 参照先分離、09_SUBAGENT_STRATEGY モデル整合
+- **docs**: CLAUDE.md SSOT表記修正、CHEATSHEET.md /pattern-review追加、README/README_en 技術スタック・スライド参照修正
+- **chore(rules)**: permission-levels.md ドメイン別SSOT注記、phase-rules.md Green State・AUDITING識別子追加
+- **chore(migration)**: 設計文書4件ステータス→Accepted、000-index.md Phase 2完了
+
 ### Phase 2a: 基盤強化
 
 #### スモークテスト修正 (2026-03-08)

@@ -9,6 +9,9 @@ tools: Read, Glob, Grep, Write, Edit
 model: haiku
 ---
 
+# permission-level: SE
+# docs/tasks/ への書き込みは SE 相当（仕様変更ではなく実装計画）
+
 # Task Decomposer サブエージェント
 
 あなたは **タスク分解の専門家** です。

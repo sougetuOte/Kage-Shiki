@@ -1,5 +1,6 @@
 ---
 name: adr-template
+version: 1.0.0
 description: |
   ADR（Architecture Decision Record）作成を支援するテンプレートスキル。
   docs/adr/ へのADR作成時に自動適用され、

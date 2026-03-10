@@ -23,6 +23,9 @@
 │   ├── internal/           # プロジェクト運用ルール (本フォルダ)
 │   └── memos/              # [Input] ユーザーからの生メモ・資料
 ├── .claude/                # Claude Code用設定・コマンド・状態管理
+│   ├── hooks/              #   PreToolUse / PostToolUse / Stop / PreCompact フック
+│   ├── logs/               #   権限判定ログ、ループログ
+│   └── states/             #   フェーズ承認ゲート・タスク進捗の永続状態
 └── CLAUDE.md               # プロジェクト憲法
 ```
 
@@ -41,7 +44,7 @@
 
 ### C. ADR (Architectural Decision Records)
 
-- **Naming**: `docs/adr/YYYY-MM-DD_{decision_title}.md`
+- **Naming**: `docs/adr/NNNN-kebab-case-title.md`
 - **Immutable**: 一度確定した ADR は原則変更せず、変更が必要な場合は新しい ADR を作成して "Supersedes" と明記する。
 
 ### D. State Management (状態管理)
@@ -55,3 +58,17 @@
 - **Directories**: `snake_case` (例: `user_auth`)
 - **Files (Code)**: 言語標準に従う (Python: `snake_case.py`)
 - **Files (Docs)**: `snake_case.md` または `kebab-case.md` (プロジェクト内で統一)
+
+## SSOT 3層アーキテクチャ
+
+| 層 | 場所 | 読込タイミング | 変更頻度 |
+|----|------|-------------|---------|
+| **憲法層** | `CLAUDE.md` | 毎セッション自動 | 低（プロジェクト方針変更時のみ） |
+| **ルール層** | `.claude/rules/*.md` | 毎セッション自動 | 中（Phase/Wave 終了時のレビュー） |
+| **プロセス層** | `docs/internal/*.md` | 必要時に参照 | 中（プロセス改善時） |
+
+### 層間の関係
+
+- 上位層は下位層に優先する（CLAUDE.md > rules > docs/internal）
+- 矛盾がある場合は上位層が正とし、下位層を修正する
+- hooks（`.claude/hooks/`）はルール層の自動実行メカニズムとして機能する

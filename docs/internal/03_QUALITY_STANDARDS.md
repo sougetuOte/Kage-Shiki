@@ -80,7 +80,7 @@
 ## 7. Building Defect Prevention (実装不具合防止)
 
 Phase 1 監査で発見された不具合パターン分析に基づく防止ルール。
-ルール本体は `.claude/rules/building-checklist.md` に定義（自動ロード対象）。
+ルール本体は `.claude/rules/phase-rules.md`（R-1, R-4）および `.claude/rules/building-checklist.md`（R-2, R-3, R-5〜R-11, S-2）に定義（自動ロード対象）。
 
 | ルール | 防止する不具合パターン | 適用タイミング |
 |--------|----------------------|---------------|

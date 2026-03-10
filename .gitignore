@@ -31,6 +31,9 @@ htmlcov/
 # Agent
 .agent/
 memos/
+!docs/memos/
+docs/memos/*
+!docs/memos/v4-update-plan/
 .serena/
 data/
 SESSION_STATE.md
