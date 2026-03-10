@@ -23,7 +23,7 @@ description: "新しいADRを作成"
 
 ## 作成手順
 
-1. `docs/adr/YYYY-MM-DD_{title-in-kebab-case}.md` を作成
+1. `docs/adr/NNNN-kebab-case-title.md` を作成（NNNN は 4 桁連番）
 2. 以下のテンプレートを使用:
 
 ```markdown
