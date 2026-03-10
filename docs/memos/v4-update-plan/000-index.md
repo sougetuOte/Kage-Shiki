@@ -1,7 +1,7 @@
 # LAM 4.0.1 移行 — マスターインデックス
 
 **作成日**: 2026-03-10
-**ステータス**: Phase 2 完了（未コミット）
+**ステータス**: Phase 3 完了（コミット済み、push待ち）
 
 ---
 
@@ -146,35 +146,35 @@ master (現状)
 
 #### 作業項目
 
-- [ ] docs/internal/ のマージ
-  - [ ] 00_PROJECT_STRUCTURE.md: SSOT 3 層アーキテクチャ追加、.claude/ 配下構造更新
-  - [ ] 02_DEVELOPMENT_FLOW.md: TDD Introspection + 権限等級修正制御追加
-  - [ ] 07_SECURITY_AND_AUTOMATION.md: Section 5 (Hooks) + Section 6 (Security Tools) 追加
-  - [ ] 99_reference_generic.md: フェーズモードタグ追加（軽微）
-  - [ ] 03_QUALITY_STANDARDS.md: 影式固有セクション (6, 7) の保護を確認
-- [ ] .claude/rules/ の更新
-  - [ ] permission-levels.md: 新規追加（影式パス分類をカスタマイズ）
-  - [ ] upstream-first.md: 新規追加
-  - [ ] auto-generated/README.md: 新規追加
-  - [ ] auto-generated/trust-model.md: 新規追加
-  - [ ] core-identity.md: 権限等級セクション追加
-  - [ ] decision-making.md: SSOT 参照注記追加
-  - [ ] phase-rules.md: TDD 品質チェック統合 + AUDITING 修正ルール変更 + 影式固有保持
-  - [ ] security-commands.md: Layer 0/1/2 三層モデル追加 + Python コマンド保持
-  - [ ] building-checklist.md: R-5〜R-11, S-2 を維持、S-1/S-3/S-4 統合に合わせて再編
-  - [ ] audit-fix-policy.md → A-3 を phase-rules.md に統合、ファイル自体は廃止
-  - [ ] spec-sync.md → S-2 を building-checklist.md に移動、ファイル自体は廃止
-- [ ] CLAUDE.md 更新（影式固有 Project Overview は保持）
-- [ ] CHEATSHEET.md 更新（権限等級セクション追加、コマンド分類再編、影式固有は保持）
+- [x] docs/internal/ のマージ
+  - [x] 00_PROJECT_STRUCTURE.md: SSOT 3 層アーキテクチャ追加、.claude/ 配下構造更新
+  - [x] 02_DEVELOPMENT_FLOW.md: TDD Introspection + 権限等級修正制御追加
+  - [x] 07_SECURITY_AND_AUTOMATION.md: Section 5 (Hooks) + Section 6 (Security Tools) 追加
+  - [x] 99_reference_generic.md: フェーズモードタグ追加（軽微）
+  - [x] 03_QUALITY_STANDARDS.md: 影式固有セクション (6, 7) の保護を確認
+- [x] .claude/rules/ の更新
+  - [x] permission-levels.md: 新規追加（影式パス分類をカスタマイズ）
+  - [x] upstream-first.md: 新規追加
+  - [x] auto-generated/README.md: 新規追加
+  - [x] auto-generated/trust-model.md: 新規追加
+  - [x] core-identity.md: 権限等級セクション追加
+  - [x] decision-making.md: SSOT 参照注記追加
+  - [x] phase-rules.md: TDD 品質チェック統合 + AUDITING 修正ルール変更 + 影式固有保持
+  - [x] security-commands.md: Layer 0/1/2 三層モデル追加 + Python コマンド保持
+  - [x] building-checklist.md: R-5〜R-11, S-2 を維持、S-1/S-3/S-4 統合に合わせて再編
+  - [x] audit-fix-policy.md → A-3 を phase-rules.md に統合、ファイル自体は廃止
+  - [x] spec-sync.md → S-2 を building-checklist.md に移動、ファイル自体は廃止
+- [x] CLAUDE.md 更新（影式固有 Project Overview は保持）
+- [x] CHEATSHEET.md 更新（権限等級セクション追加、コマンド分類再編、影式固有は保持）
 
 #### Phase 1 検証チェックリスト
 
-- [ ] 全 rules ファイルが構文エラーなく読み込めること（Claude Code 起動で確認）
-- [ ] `/quick-load` が正常動作すること
-- [ ] `/planning`、`/building`、`/auditing` の切替が正常動作すること
-- [ ] 影式固有ルール (R-2〜R-11) が参照可能であること
-- [ ] Phase 完了判定スモークテスト要件が phase-rules.md に残っていること
-- [ ] コミット: `[LAM-4.0.1] Phase 1: 基盤移行 — rules/docs/CLAUDE.md`
+- [x] 全 rules ファイルが構文エラーなく読み込めること（Claude Code 起動で確認）
+- [x] `/quick-load` が正常動作すること
+- [x] `/planning`、`/building`、`/auditing` の切替が正常動作すること
+- [x] 影式固有ルール (R-2〜R-11) が参照可能であること
+- [x] Phase 完了判定スモークテスト要件が phase-rules.md に残っていること
+- [x] コミット: `[LAM-4.0.1] Phase 1: 基盤移行 — rules/docs/CLAUDE.md` (79c24db)
 
 ---
 
@@ -185,51 +185,51 @@ master (現状)
 
 #### 作業項目
 
-- [ ] agents/ の更新
-  - [ ] 全 8 エージェントに `# permission-level` コメント追加
-  - [ ] quality-auditor: 仕様ドリフト + 構造整合性チェック追加（model は opus 維持）
-  - [ ] test-runner: model を haiku に変更
-  - [ ] code-reviewer: PG/SE/PM 分類出力追加
-  - [ ] doc-writer: ドキュメント自動追従モード追加
-  - [ ] 他 4 エージェント: 軽微な差分適用
-- [ ] skills/ の更新
-  - [ ] 全スキルに `version: 1.0.0` 追加
-  - [ ] lam-orchestrate: ループ統合セクション追加
-  - [ ] adr-template: `/ship` 連携フロー追加
-  - [ ] spec-template: 権限等級セクション追加
-  - [ ] ultimate-think: frontmatter 更新
-  - [ ] ui-design-guide: 新規追加（任意、GUI 設計時に有用）
-- [ ] commands/ の更新
-  - [ ] full-review.md: 4 エージェント構成、Green State、自動ループ（最大の変更）
-  - [ ] auditing.md: 権限等級修正ルール追加
-  - [ ] building.md: TDD 内省パイプライン連携（影式 R-1〜R-6 参照は維持）
-  - [ ] ship.md: doc-sync-flag 連携
-  - [ ] daily.md: KPI 集計セクション追加
-  - [ ] project-status.md: KPI ダッシュボード追加（Wave 進捗は維持）
-  - [ ] impact-analysis.md: PG/SE/PM 分類ステップ追加
-  - [ ] security-review.md: 権限等級対応表 + 自動化ツール連携
-  - [ ] pattern-review.md: 新規追加
-  - [ ] その他 (adr-create, focus, full-load/save, quick-load/save, planning): 軽微な差分
+- [x] agents/ の更新
+  - [x] 全 8 エージェントに `# permission-level` コメント追加
+  - [x] quality-auditor: 仕様ドリフト + 構造整合性チェック追加（model は opus 維持）
+  - [x] test-runner: model を haiku に変更
+  - [x] code-reviewer: PG/SE/PM 分類出力追加
+  - [x] doc-writer: ドキュメント自動追従モード追加
+  - [x] 他 4 エージェント: 軽微な差分適用
+- [x] skills/ の更新
+  - [x] 全スキルに `version: 1.0.0` 追加
+  - [x] lam-orchestrate: ループ統合セクション追加
+  - [x] adr-template: `/ship` 連携フロー追加
+  - [x] spec-template: 権限等級セクション追加
+  - [x] ultimate-think: frontmatter 更新
+  - [x] ui-design-guide: 新規追加（任意、GUI 設計時に有用）
+- [x] commands/ の更新
+  - [x] full-review.md: 4 エージェント構成、Green State、自動ループ（最大の変更）
+  - [x] auditing.md: 権限等級修正ルール追加
+  - [x] building.md: TDD 内省パイプライン連携（影式 R-1〜R-6 参照は維持）
+  - [x] ship.md: doc-sync-flag 連携
+  - [x] daily.md: KPI 集計セクション追加
+  - [x] project-status.md: KPI ダッシュボード追加（Wave 進捗は維持）
+  - [x] impact-analysis.md: PG/SE/PM 分類ステップ追加
+  - [x] security-review.md: 権限等級対応表 + 自動化ツール連携
+  - [x] pattern-review.md: 新規追加
+  - [x] その他 (adr-create, focus, full-load/save, quick-load/save, planning): 軽微な差分
   - [x] retro.md, wave-plan.md: frontmatter 追加（description, 権限等級注記）
-- [ ] docs/specs/ LAM 仕様書の取り込み
-  - [ ] v4.0.0-immune-system-requirements.md
-  - [ ] v4.0.0-immune-system-design.md
-  - [ ] green-state-definition.md
-  - [ ] evaluation-kpi.md
-  - [ ] loop-log-schema.md
-  - [ ] doc-writer-spec.md
-  - [ ] v3.9.0-improvement-adoption.md
+- [x] docs/specs/ LAM 仕様書の取り込み
+  - [x] v4.0.0-immune-system-requirements.md
+  - [x] v4.0.0-immune-system-design.md
+  - [x] green-state-definition.md
+  - [x] evaluation-kpi.md
+  - [x] loop-log-schema.md
+  - [x] doc-writer-spec.md
+  - [x] v3.9.0-improvement-adoption.md
 
 #### Phase 2 検証チェックリスト
 
-- [ ] `/auditing` で権限等級 (PG/SE/PM) の分類が出力されること
-- [ ] `/building` で TDD サイクルの R-1〜R-6 参照が有効であること
-- [ ] `/impact-analysis` で PG/SE/PM 分類ステップが表示されること
-- [ ] `/daily` で KPI セクションの骨格が表示されること
-- [ ] `/project-status` で Wave 進捗 + KPI の両方が出力されること
-- [ ] `/ship` が doc-sync-flag の存在を確認するステップを含むこと
-- [ ] 影式固有コマンド (`/retro`, `/wave-plan`) が変更なく動作すること
-- [ ] コミット: `[LAM-4.0.1] Phase 2: commands/skills/agents + specs`
+- [x] `/auditing` で権限等級 (PG/SE/PM) の分類が出力されること
+- [x] `/building` で TDD サイクルの R-1〜R-6 参照が有効であること
+- [x] `/impact-analysis` で PG/SE/PM 分類ステップが表示されること
+- [x] `/daily` で KPI セクションの骨格が表示されること
+- [x] `/project-status` で Wave 進捗 + KPI の両方が出力されること
+- [x] `/ship` が doc-sync-flag の存在を確認するステップを含むこと
+- [x] 影式固有コマンド (`/retro`, `/wave-plan`) が変更なく動作すること
+- [x] コミット: 5件 (208e85d〜5c21ed5) で完了、push済み
 
 ---
 
@@ -240,41 +240,43 @@ master (現状)
 
 #### 事前確認（Phase 3 開始前に必須）
 
-- [ ] Claude Code の hooks 機能が Windows でどう動作するか公式ドキュメントを確認
-  - [ ] `.sh` スクリプトが直接実行できるか
-  - [ ] `.py` / `.cmd` / `.ps1` が代替として使えるか
-  - [ ] settings.json の hooks 定義フォーマットを確認
-- [ ] 影式既存の hooks (`notify-sound.py`) との共存方法を確認
+- [x] Claude Code の hooks 機能が Windows でどう動作するか公式ドキュメントを確認
+  - [x] `.sh` スクリプトが直接実行できるか → Python で実装（Windows 互換）
+  - [x] `.py` / `.cmd` / `.ps1` が代替として使えるか → `.py` を採用
+  - [x] settings.json の hooks 定義フォーマットを確認
+- [x] 影式既存の hooks (`notify-sound.py`) との共存方法を確認
 
 #### 作業項目
 
-- [ ] settings.json マージ
-  - [ ] LAM 4.0.1 の permissions 設定を導入
-  - [ ] 影式固有の Python 権限を維持 (settings.local.json)
-  - [ ] hooks 定義を追加（Windows 対応版）
-- [ ] hooks スクリプト作成
-  - [ ] pre-tool-use: ファイルパスベース PG/SE/PM 判定（Windows パス対応）
-  - [ ] post-tool-use: TDD パターン記録 + doc-sync-flag
-  - [ ] lam-stop-hook: 自動ループ制御
-  - [ ] pre-compact: コンパクト前自動セーブ
-  - [ ] 既存 notify-sound.py との共存
-- [ ] auto-generated/ ディレクトリの実運用準備
-- [ ] Green State 定義の影式版策定
-  - [ ] G1: pytest 全パス
-  - [ ] G2: ruff エラーゼロ
-  - [ ] G3: 対応可能 Issue ゼロ
-  - [ ] G4: 仕様差分ゼロ
-  - [ ] G5: セキュリティチェック通過
+- [x] settings.json マージ
+  - [x] LAM 4.0.1 の permissions 設定を導入
+  - [x] 影式固有の Python 権限を維持 (settings.local.json)
+  - [x] hooks 定義を追加（Windows 対応版: Python スクリプト）
+- [x] hooks スクリプト作成
+  - [x] hook_utils.py: 共通ユーティリティ（stdin/JSON/パス正規化/フェーズ取得）
+  - [x] pre-tool-use: ファイルパスベース PG/SE/PM 判定（Windows パス対応）
+  - [x] post-tool-use: TDD パターン記録 + doc-sync-flag + ループログ
+  - [x] lam-stop-hook: 自動ループ制御（Green State G1/G2/G5 + ツール不在即停止）
+  - [x] pre-compact: コンパクト前自動セーブ（アトミック書き込み）
+  - [x] 既存 notify-sound.py との共存（sampwidth修正 + 一時ファイル改善）
+- [x] auto-generated/ ディレクトリの実運用準備（README.md + trust-model.md は Phase 1 で完了）
+- [x] Green State 定義の影式版策定
+  - [x] G1: pytest 全パス
+  - [x] G2: ruff エラーゼロ
+  - [x] G3: 対応可能 Issue ゼロ（手動判断、コメントで明記）
+  - [x] G4: 仕様差分ゼロ（手動判断、コメントで明記）
+  - [x] G5: セキュリティチェック通過（pip-audit/safety 動的解決）
 
 #### Phase 3 検証チェックリスト
 
-- [ ] hooks が Windows 環境で実行されること（エラーなし）
-- [ ] pre-tool-use hook がファイルパスから PG/SE/PM を正しく判定すること
-- [ ] post-tool-use hook がテスト実行結果を `.claude/tdd-patterns.log` に記録すること
-- [ ] notify-sound.py が引き続き動作すること（共存確認）
-- [ ] `/full-review` の自動ループが 1 回は正常に回ること
-- [ ] pre-compact hook が auto-compact 前に状態を保存すること
-- [ ] コミット: `[LAM-4.0.1] Phase 3: hooks + settings + Green State`
+- [x] hooks が Windows 環境で実行されること（エラーなし）
+- [x] pre-tool-use hook がファイルパスから PG/SE/PM を正しく判定すること
+- [x] post-tool-use hook がテスト実行結果を `.claude/tdd-patterns.log` に記録すること
+- [x] notify-sound.py が引き続き動作すること（共存確認）
+- [x] `/full-review` の自動ループが 3 イテレーション正常に回ること（Green State 達成）
+- [x] pre-compact hook が auto-compact 前に状態を保存すること
+- [x] テスト: 822 passed (hook テスト 100件)、カバレッジ 92%、ruff clean
+- [x] コミット: `[LAM-4.0.1] Phase 3: Hooks + Automation — 免疫システム基盤` (b6e0200)
 
 ---
 
@@ -416,6 +418,9 @@ master (現状)
 |------|------|------|
 | 完了 | design 文書作成 | `designs/01-design-*.md` (4ファイル) |
 | 完了 | tasks 文書作成 | `tasks/02-tasks-*.md` (4ファイル) |
-| **次** | tasks 文書の承認 | ユーザー承認 |
-| その次 | git tag + branch 作成 | `pre-lam-4.0.1` タグ |
-| 以降 | Phase 1〜4 実施 | 各 Phase のコミット |
+| 完了 | tasks 文書の承認 | ユーザー承認 |
+| 完了 | git tag + branch 作成 | `pre-lam-4.0.1` タグ |
+| 完了 | Phase 1 実施 | 79c24db |
+| 完了 | Phase 2 実施 | 208e85d〜5c21ed5 (5コミット) |
+| 完了 | Phase 3 実施 | b6e0200 |
+| **次** | Phase 4 実施 | 統合検証 + master マージ |
