@@ -1,7 +1,9 @@
 # 権限等級分類基準
 
-> **SSOT**: 本ファイルが PG/SE/PM 分類の唯一の定義源。
+> **SSOT**: 本ファイルが PG/SE/PM 分類の唯一の定義源（ドメイン別 SSOT）。
 > phase-rules.md の AUDITING セクション、core-identity.md の権限等級サマリーから参照される。
+> 注: `.claude/rules/` 内の各ファイルは担当ドメインの SSOT として機能する。
+> プロセス全体の SSOT は `docs/internal/` にある（`00_PROJECT_STRUCTURE.md` 等）。
 
 ## PG級（自動修正・報告不要）
 

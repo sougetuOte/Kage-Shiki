@@ -1,7 +1,7 @@
 # 設計: docs/internal / CLAUDE.md / CHEATSHEET.md 移行
 
 **作成日**: 2026-03-10
-**ステータス**: レビュー待ち
+**ステータス**: Accepted（Phase 1 実装完了）
 **前提資料**: `specs/00-diff-docs-internal.md`, `specs/00-diff-claude-md.md`, `000-index.md`
 
 ---

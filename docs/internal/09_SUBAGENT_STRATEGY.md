@@ -8,12 +8,12 @@
 
 | エージェント | 役割 | 推奨モデル | 主な使用フェーズ |
 |:------------|:-----|:----------|:---------------|
-| `requirement-analyst` | 要件分析・仕様変換 | Opus | PLANNING |
-| `design-architect` | 設計・アーキテクチャ | Opus / Sonnet | PLANNING |
-| `task-decomposer` | タスク分解・依存整理 | Sonnet | PLANNING |
+| `requirement-analyst` | 要件分析・仕様変換 | Sonnet | PLANNING |
+| `design-architect` | 設計・アーキテクチャ | Sonnet | PLANNING |
+| `task-decomposer` | タスク分解・依存整理 | Haiku | PLANNING |
 | `tdd-developer` | TDD 実装（Red-Green-Refactor） | Sonnet | BUILDING |
-| `test-runner` | テスト実行・分析 | Sonnet | BUILDING / AUDITING |
-| `code-reviewer` | コードレビュー | Opus / Sonnet | AUDITING |
+| `test-runner` | テスト実行・分析 | Haiku | BUILDING / AUDITING |
+| `code-reviewer` | コードレビュー | Sonnet | AUDITING |
 | `quality-auditor` | 品質監査・改善提案 | Opus | AUDITING |
 | `doc-writer` | ドキュメント作成・更新 | Sonnet | 全フェーズ |
 
@@ -54,16 +54,17 @@
 
 ## 3. 並列実行パターン
 
-### `/full-review`（3 並列監査）
+### `/full-review`（4 並列監査）
 
 ```
 メイン（Opus）
-  ├─ code-reviewer: コード品質レビュー
-  ├─ quality-auditor: アーキテクチャ・仕様整合性監査
-  └─ test-runner: テスト実行 + カバレッジ確認
+  ├─ #1 code-reviewer: ソースコード品質
+  ├─ #2 code-reviewer: テスト品質
+  ├─ #3 quality-auditor: アーキテクチャ・仕様ドリフト
+  └─ #4 code-reviewer: セキュリティ（OWASP Top 10）
   │
   ▼ 結果統合
-  メイン: Issue 一覧作成 → 修正実施 → 再検証
+  メイン: Issue 一覧作成 → 修正実施 → Green State 検証
 ```
 
 ### `/ship`（論理コミット）
@@ -90,7 +91,7 @@
 |:------|:-----|:---------|
 | **Opus** | 深い推論、複雑な判断、大局的分析 | 設計判断、要件分析、品質監査、意思決定 |
 | **Sonnet** | 高速、コスト効率、十分な品質 | TDD 実装、テスト実行、ドキュメント作成、定型タスク |
-| **Haiku** | 最速、最低コスト | 単純な検索、フォーマット変換（現在未使用） |
+| **Haiku** | 最速、最低コスト | テスト実行・分析（test-runner）、単純な検索、フォーマット変換 |
 
 ### 選択基準
 

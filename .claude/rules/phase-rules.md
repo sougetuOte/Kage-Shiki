@@ -148,6 +148,25 @@ ruff: All checks passed
 
 上記を満たさない限り、監査完了とはしない。
 
+### Green State 5条件との対応
+
+監査完了条件は `docs/internal/07_SECURITY_AND_AUTOMATION.md` Section 5 の Green State（G1〜G5）に対応する:
+
+| 監査完了条件 | Green State | 識別子 |
+|:-----------|:-----------|:-------|
+| テスト結果: 全件 PASSED | テスト全パス | G1 |
+| ruff: All checks passed | lint エラーゼロ | G2 |
+| PG/SE級 Issue: 全件修正済み | 対応可能 Issue ゼロ | G3 |
+| 仕様書との整合確認 | 仕様差分ゼロ | G4 |
+| セキュリティチェック通過 | セキュリティチェック通過 | G5 |
+
+### AUDITING ルール識別子
+
+- **A-1**: 全重篤度への対応義務（Critical/Warning/Info）
+- **A-2**: 対応不可 Issue の明示（PM級は承認ゲートへ）
+- **A-3**: 修正後の再検証（テスト + ruff）
+- **A-4**: 仕様ズレの同時修正（Atomic Commit）
+
 ---
 
 ## フェーズ警告テンプレート

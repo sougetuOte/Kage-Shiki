@@ -33,7 +33,7 @@
 | **System Mutation**     | `apt`, `yum`, `brew`, `systemctl`, `service`, `reboot`, `shutdown`          | システム設定の変更、パッケージ導入、再起動。                 |
 | **Network**             | `curl`, `wget`, `ssh`, `ping`, `nc`                                         | 外部へのデータ送信、不正なスクリプトのダウンロード。         |
 | **Build/Run**           | `python main.py`, `python -m kage_shiki`                                    | アプリケーションの実行（無限ループやリソース枯渇のリスク）。 |
-| **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。                       |
+| **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。v4.0.0 以降は PG級自動修正可（本ドキュメント Section 5 参照）。 |
 | **Package Install**     | `pip install`, `pip uninstall`                                              | 環境への変更。                                               |
 
 > **Note**: ファイルリネームが必要な場合、`mv` は Deny List に含まれるため以下の代替手段を用いる:

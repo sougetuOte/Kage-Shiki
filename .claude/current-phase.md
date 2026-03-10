@@ -22,4 +22,4 @@ _影式作業状況: `docs/memos/v4-update-plan/00-kageshiki-state-preservation.
 - `/auditing` コマンド実行時 → `AUDITING`
 
 ### 参照するルール
-- `rules/phase-rules.md` - フェーズ別ガードレール（PLANNING/BUILDING/AUDITING）
+- `.claude/rules/phase-rules.md` - フェーズ別ガードレール（PLANNING/BUILDING/AUDITING）

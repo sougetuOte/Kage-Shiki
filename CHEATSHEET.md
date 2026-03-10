@@ -2,7 +2,7 @@
 
 ## はじめに
 
-> LAM（Living Architect Model）の概要は [概念説明スライド](docs/slides/index.html) を参照。
+> LAM（Living Architect Model）の概要は 概念説明スライド（`docs/slides/index.html`、将来作成予定）を参照。
 
 1. Claude Code CLI を起動する（LAM の設定は自動で読み込まれる）
 2. `/planning` で設計フェーズを開始し、要件を定義する
@@ -156,6 +156,7 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `/impact-analysis` | 変更の影響分析（PG/SE/PM 分類含む） |
 | `/wave-plan` | 次Waveのタスク選定・実行順序策定（影式固有） |
 | `/retro` | Wave/Phase完了時の振り返り（KPT）（影式固有） |
+| `/pattern-review` | TDD内省パターンの審査・承認（PM級） |
 
 ## 状態管理
 
@@ -177,6 +178,8 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `docs/internal/05_MCP_INTEGRATION.md` | MCP 連携・MEMORY.md 運用ポリシー |
 | `docs/internal/06_DECISION_MAKING.md` | 意思決定（3 Agents + AoT） |
 | `docs/internal/07_SECURITY_AND_AUTOMATION.md` | コマンド安全基準（Allow/Deny List） |
+| `docs/internal/08_SESSION_MANAGEMENT.md` | セッション管理・コンテキスト戦略 |
+| `docs/internal/09_SUBAGENT_STRATEGY.md` | Subagent 運用戦略 |
 
 ## AoT（Atom of Thought）クイックガイド
 

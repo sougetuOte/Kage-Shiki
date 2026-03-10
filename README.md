@@ -24,6 +24,7 @@
 | LLM API | anthropic（公式 SDK） |
 | DB | SQLite + FTS5 |
 | 設定 | TOML（tomllib） |
+| テスト | pytest |
 
 ## Phase ロードマップ
 
@@ -37,7 +38,7 @@
 
 ### Phase 2a 進捗
 
-テスト: 710 passed / カバレッジ: 93%
+テスト: 722 passed / カバレッジ: 92%
 
 実装済みモジュール:
 - `main.py` — **起動シーケンス統合**（13ステップ + スレッド管理 + シャットダウンCB）
@@ -64,7 +65,7 @@
 
 ## 開発プロセス（LAM フレームワーク）
 
-LAM（Living Architect Model）の概念を素早く理解するには、[概念説明スライド](docs/slides/index.html)をご覧ください。
+LAM（Living Architect Model）の概念を素早く理解するには、概念説明スライド（`docs/slides/index.html`、将来作成予定）をご覧ください。
 
 ### フェーズコマンド
 
@@ -72,7 +73,7 @@ LAM（Living Architect Model）の概念を素早く理解するには、[概念
 |---------|------|---------|
 | `/planning` | 要件定義・設計・タスク分解 | コード生成禁止 |
 | `/building` | TDD 実装 | 仕様なし実装禁止 |
-| `/auditing` | レビュー・監査・リファクタ | 修正の直接実施禁止 |
+| `/auditing` | レビュー・監査・リファクタ | PM級修正禁止（PG/SE級は許可） |
 | `/project-status` | 進捗状況の表示 | - |
 
 ### 承認ゲート

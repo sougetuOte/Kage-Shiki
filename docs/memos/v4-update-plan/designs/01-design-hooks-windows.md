@@ -1,7 +1,7 @@
 # 設計: Hooks Windows 実装戦略
 
 **作成日**: 2026-03-10
-**ステータス**: 承認待ち
+**ステータス**: Accepted（Phase 3 で実装予定）
 **対象 Phase**: Phase 3 (Hooks + 自動化)
 
 ---

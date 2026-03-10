@@ -154,14 +154,15 @@ Wave 計画 (/wave-plan)
 3. グループごとに順次コミット（依存順）
 4. CHANGELOG 更新、README 進捗同期
 
-### `/full-review` — 3 並列監査 + 全修正
+### `/full-review` — 4 並列監査 + 全修正
 
-3 つの Subagent を並列起動し、網羅的な監査を実施する。
+4 つの Subagent を並列起動し、網羅的な監査を実施する。
 
-1. `code-reviewer`: コード品質レビュー
-2. `quality-auditor`: アーキテクチャ・仕様整合性
-3. `test-runner`: テスト実行 + カバレッジ
-4. メインが結果を統合し、対応可能な Issue を全て修正（`audit-fix-policy.md`）
+1. `code-reviewer`: ソースコード品質レビュー
+2. `code-reviewer`: テスト品質レビュー
+3. `quality-auditor`: アーキテクチャ・仕様ドリフト
+4. `code-reviewer`: セキュリティ（OWASP Top 10）
+5. メインが結果を統合し、対応可能な Issue を全て修正（権限等級に基づく修正制御）
 
 ### `/wave-plan` — Wave 計画策定
 
@@ -224,7 +225,8 @@ AUDITING（監査フェーズ）
 
 | ルール群 | ファイル | 適用フェーズ |
 |:---------|:--------|:------------|
-| R-1〜R-11 | `.claude/rules/building-checklist.md` | BUILDING |
+| R-1, R-4 | `.claude/rules/phase-rules.md`（TDD 品質チェック） | BUILDING |
+| R-2, R-3, R-5〜R-11 | `.claude/rules/building-checklist.md` | BUILDING |
 | S-1, S-3, S-4 | `.claude/rules/phase-rules.md`（仕様同期ルール） | BUILDING / AUDITING |
 | S-2 | `.claude/rules/building-checklist.md` | BUILDING |
 | A-1〜A-4 | `.claude/rules/phase-rules.md`（AUDITING セクション） | AUDITING |

@@ -1,7 +1,7 @@
 # LAM 4.0.1 移行 — マスターインデックス
 
 **作成日**: 2026-03-10
-**ステータス**: Phase 0 準備中
+**ステータス**: Phase 2 完了（未コミット）
 
 ---
 
@@ -210,7 +210,7 @@ master (現状)
   - [ ] security-review.md: 権限等級対応表 + 自動化ツール連携
   - [ ] pattern-review.md: 新規追加
   - [ ] その他 (adr-create, focus, full-load/save, quick-load/save, planning): 軽微な差分
-  - [ ] retro.md, wave-plan.md: 影式固有として変更なし
+  - [x] retro.md, wave-plan.md: frontmatter 追加（description, 権限等級注記）
 - [ ] docs/specs/ LAM 仕様書の取り込み
   - [ ] v4.0.0-immune-system-requirements.md
   - [ ] v4.0.0-immune-system-design.md
