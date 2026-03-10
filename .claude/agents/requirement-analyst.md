@@ -9,6 +9,8 @@ tools: Read, Glob, Grep, Write, Edit, WebSearch
 model: sonnet
 ---
 
+# permission-level: PM
+
 # Requirement Analyst サブエージェント
 
 あなたは **要件分析の専門家** です。

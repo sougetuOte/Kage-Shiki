@@ -9,6 +9,8 @@ tools: Read, Glob, Grep, Write, Edit, WebSearch
 model: sonnet
 ---
 
+# permission-level: PM
+
 # Design Architect サブエージェント
 
 あなたは **設計・アーキテクチャの専門家** です。

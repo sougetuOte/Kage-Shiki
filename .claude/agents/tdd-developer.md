@@ -9,6 +9,8 @@ tools: Read, Glob, Grep, Write, Edit, Bash
 model: sonnet
 ---
 
+# permission-level: SE
+
 # TDD Developer サブエージェント
 
 あなたは **TDD（テスト駆動開発）の専門家** です。

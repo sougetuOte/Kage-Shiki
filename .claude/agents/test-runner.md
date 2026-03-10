@@ -4,9 +4,11 @@ description: >
   テスト実行・分析の専門 Subagent。
   テストスイートの実行、失敗分析、カバレッジ確認を担当。
   Use proactively when running tests, analyzing test failures, or checking coverage.
-model: sonnet
+model: haiku
 tools: Read, Grep, Glob, Bash
 ---
+
+# permission-level: PG — テスト実行・報告のみ、コード修正は行わない
 
 # Test Runner サブエージェント
 
