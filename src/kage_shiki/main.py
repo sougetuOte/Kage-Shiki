@@ -440,6 +440,7 @@ def main() -> None:
         subprocess.Popen(  # noqa: S603
             [sys.executable, "-m", "kage_shiki"],
         )
+        root.quit()
 
     system_tray = SystemTray(mascot_view, shutdown_cb, wizard_callback=_wizard_restart)
     _tray_ref[0] = system_tray
