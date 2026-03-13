@@ -10,12 +10,8 @@ from tests.test_hooks.conftest import load_hook_module
 
 @pytest.fixture
 def mod(hook_project_root):
-    """pre-tool-use モジュールをロードし、PROJECT_ROOT を差し替える。"""
-    m = load_hook_module("pre-tool-use.py")
-    m.PROJECT_ROOT = hook_project_root
-    # hook_utils の PROJECT_ROOT も差し替え
-    m.hook_utils.PROJECT_ROOT = hook_project_root
-    return m
+    """pre-tool-use モジュールをロードする。"""
+    return load_hook_module("pre-tool-use.py")
 
 
 @pytest.fixture
@@ -31,87 +27,125 @@ def setup_phase(hook_project_root):
     return _set
 
 
-class TestClassifyPermission:
-    """classify_permission 関数のテスト。"""
+class TestDetermineLevel:
+    """_determine_level_and_reason 関数のテスト。"""
 
-    def test_read_tool_is_pg(self, mod):
-        level, reason = mod.classify_permission("Read", "", "", "BUILDING")
-        assert level == "PG"
-
-    def test_glob_tool_is_pg(self, mod):
-        level, reason = mod.classify_permission("Glob", "", "", "BUILDING")
-        assert level == "PG"
-
-    def test_grep_tool_is_pg(self, mod):
-        level, reason = mod.classify_permission("Grep", "", "", "BUILDING")
-        assert level == "PG"
-
-    def test_edit_specs_is_pm(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "docs/specs/config.md", "", "BUILDING"
+    def test_edit_specs_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "docs/specs/config.md", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_edit_adr_is_pm(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "docs/adr/ADR-0001.md", "", "BUILDING"
+    def test_edit_adr_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "docs/adr/ADR-0001.md", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_edit_internal_is_pm(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "docs/internal/00_PROJECT_STRUCTURE.md", "", "BUILDING"
+    def test_edit_internal_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "docs/internal/00_PROJECT_STRUCTURE.md", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_write_rules_is_pm(self, mod):
-        level, reason = mod.classify_permission(
-            "Write", ".claude/rules/new-rule.md", "", "BUILDING"
+    def test_write_rules_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Write", ".claude/rules/new-rule.md", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_write_rules_subdir_is_pm(self, mod):
-        level, reason = mod.classify_permission(
+    def test_write_rules_subdir_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
             "Write",
             ".claude/rules/auto-generated/draft-001.md",
             "",
-            "BUILDING",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_edit_settings_is_pm(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", ".claude/settings.json", "", "BUILDING"
+    def test_edit_settings_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", ".claude/settings.json", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_edit_pyproject_is_pm(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "pyproject.toml", "", "BUILDING"
+    def test_edit_pyproject_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "pyproject.toml", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "PM"
 
-    def test_edit_src_is_se(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "src/kage_shiki/core/config.py", "", "BUILDING"
+    def test_edit_src_is_se(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "src/kage_shiki/core/config.py", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "SE"
 
-    def test_edit_tests_is_se(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "tests/test_core.py", "", "BUILDING"
+    def test_edit_tests_is_se(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "tests/test_core.py", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "SE"
 
-    def test_edit_docs_general_is_se(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "docs/memos/note.md", "", "BUILDING"
+    def test_edit_docs_general_is_se(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "docs/memos/note.md", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "SE"
 
-    def test_unknown_path_is_se(self, mod):
-        level, reason = mod.classify_permission(
-            "Edit", "random/file.txt", "", "BUILDING"
+    def test_unknown_path_is_se(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", "random/file.txt", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
+        )
+        assert level == "SE"
+
+    def test_out_of_root_is_pm(self, mod, hook_project_root):
+        """プロジェクト外の絶対パスは __out_of_root__ マーカーで PM 級になる。"""
+        # Windows で確実にプロジェクト外の絶対パスを使う
+        abs_path = str(hook_project_root.parent / "other_project" / "secret.py")
+        level, reason = mod._determine_level_and_reason(
+            "Edit", abs_path, "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
+        )
+        assert level == "PM"
+
+    def test_auditing_pg_command(self, mod, hook_project_root, setup_phase):
+        setup_phase("AUDITING")
+        level, reason = mod._determine_level_and_reason(
+            "Bash", "", "ruff format .",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
+        )
+        assert level == "PG"
+
+    def test_building_same_command_is_se(self, mod, hook_project_root, setup_phase):
+        setup_phase("BUILDING")
+        level, reason = mod._determine_level_and_reason(
+            "Bash", "", "ruff format .",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
         assert level == "SE"
 
@@ -119,29 +153,13 @@ class TestClassifyPermission:
 class TestBashCommand:
     """Bash ツール内のコマンドからパスを抽出するテスト。"""
 
-    def test_bash_without_file_path_is_se(self, mod):
-        level, reason = mod.classify_permission(
-            "Bash", "", "cat docs/specs/config.md", "BUILDING"
+    def test_bash_without_file_path_is_se(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Bash", "", "cat docs/specs/config.md",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
         )
-        # Bash はファイルパスなし → SE 級（安全側に倒す）
         assert level == "SE"
-
-
-class TestAuditingPhase:
-    """AUDITING フェーズの特別処理テスト。"""
-
-    def test_auditing_pg_tool_allowed(self, mod):
-        level, reason = mod.classify_permission(
-            "Read", "docs/specs/config.md", "", "AUDITING"
-        )
-        assert level == "PG"
-
-    def test_auditing_pm_path_still_pm(self, mod):
-        """AUDITING でも PM パスへの Edit は PM 級。"""
-        level, reason = mod.classify_permission(
-            "Edit", "docs/specs/config.md", "", "AUDITING"
-        )
-        assert level == "PM"
 
 
 class TestMainFunction:
@@ -151,46 +169,36 @@ class TestMainFunction:
         data = {"tool_name": "Read", "tool_input": {"file_path": "/tmp/test.py"}}
         with mock_stdin(data):
             patcher, buf = capture_stdout()
-            with patcher:
+            with patcher, pytest.raises(SystemExit):
                 mod.main()
-        # PG 級は何も出力しない
         assert buf.getvalue() == ""
 
-    def test_pg_tool_writes_permission_log(
-        self, mod, mock_stdin, capture_stdout, hook_project_root,
+    def test_pm_tool_outputs_hookspecificoutput(
+        self, mod, mock_stdin, capture_stdout, hook_project_root, setup_phase,
     ):
-        data = {"tool_name": "Read", "tool_input": {"file_path": "/tmp/test.py"}}
-        with mock_stdin(data):
-            patcher, buf = capture_stdout()
-            with patcher:
-                mod.main()
-        log_file = hook_project_root / ".claude" / "logs" / "permission.log"
-        assert log_file.exists()
-        log_content = log_file.read_text(encoding="utf-8")
-        assert "[PG]" in log_content
-
-    def test_pm_tool_outputs_json(self, mod, mock_stdin, capture_stdout, setup_phase):
         setup_phase("BUILDING")
-        abs_path = str(mod.PROJECT_ROOT / "docs" / "specs" / "test.md")
+        abs_path = str(hook_project_root / "docs" / "specs" / "test.md")
         data = {"tool_name": "Edit", "tool_input": {"file_path": abs_path}}
         with mock_stdin(data):
             patcher, buf = capture_stdout()
-            with patcher:
+            with patcher, pytest.raises(SystemExit):
                 mod.main()
         output = json.loads(buf.getvalue())
-        assert output.get("decision") == "block"
-        assert "PM" in output.get("reason", "")
+        assert "hookSpecificOutput" in output
+        hso = output["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "ask"
+        assert "PM" in hso["permissionDecisionReason"]
 
     def test_invalid_json_exits_safely(self, mod, capture_stdout):
         with patch("sys.stdin", StringIO("not json")):
             patcher, buf = capture_stdout()
-            with patcher:
+            with patcher, pytest.raises(SystemExit):
                 mod.main()
         assert buf.getvalue() == ""
 
     def test_empty_input_exits_safely(self, mod, capture_stdout):
         with patch("sys.stdin", StringIO("")):
             patcher, buf = capture_stdout()
-            with patcher:
+            with patcher, pytest.raises(SystemExit):
                 mod.main()
         assert buf.getvalue() == ""

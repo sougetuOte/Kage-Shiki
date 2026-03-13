@@ -77,7 +77,7 @@ class TestHookScriptsDryRun:
     """全 hook スクリプトが python で起動可能であることを確認。"""
 
     HOOK_SCRIPTS = [
-        "hook_utils.py",
+        "_hook_utils.py",
         "pre-tool-use.py",
         "post-tool-use.py",
         "lam-stop-hook.py",
@@ -92,7 +92,7 @@ class TestHookScriptsDryRun:
     @pytest.mark.parametrize(
         "script",
         [
-            "hook_utils.py",
+            "_hook_utils.py",
             "pre-tool-use.py",
             "post-tool-use.py",
             "pre-compact.py",

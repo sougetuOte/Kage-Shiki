@@ -15,7 +15,7 @@ def load_hook_module(name: str):
     """hook スクリプトをモジュールとしてロードする。
 
     Args:
-        name: ファイル名（例: "pre-tool-use.py", "hook_utils.py"）
+        name: ファイル名（例: "pre-tool-use.py", "_hook_utils.py"）
 
     Returns:
         ロードされたモジュール
@@ -29,10 +29,11 @@ def load_hook_module(name: str):
 
 
 @pytest.fixture
-def hook_project_root(tmp_path):
+def hook_project_root(tmp_path, monkeypatch):
     """テスト用の擬似プロジェクトルートを作成する。
 
-    .claude/ ディレクトリと current-phase.md を含む。
+    LAM_PROJECT_ROOT 環境変数を設定し、_hook_utils.get_project_root() が
+    テスト用ディレクトリを返すようにする。
     """
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
@@ -44,6 +45,7 @@ def hook_project_root(tmp_path):
     phase_file = claude_dir / "current-phase.md"
     phase_file.write_text("# Current Phase\n\n**BUILDING**\n", encoding="utf-8")
 
+    monkeypatch.setenv("LAM_PROJECT_ROOT", str(tmp_path))
     return tmp_path
 
 

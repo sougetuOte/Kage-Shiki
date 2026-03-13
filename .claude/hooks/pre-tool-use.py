@@ -3,126 +3,177 @@
 stdin JSON から tool_name と file_path/command を取得し、
 権限等級を判定する。PM 級の場合は hookSpecificOutput を stdout に出力して
 ユーザーに確認を求める。
-"""
 
+判定結果:
+  PG級 → exit 0（許可）
+  SE級 → exit 0 + ログ記録
+  PM級 → stdout に hookSpecificOutput JSON（permissionDecision: "ask"）を出力して exit 0
+        Claude Code のネイティブ許可ダイアログでユーザーに判断を委ねる
+
+LAM v4.4.1 準拠 + 影式固有 PM パターン（docs/internal/, pyproject.toml）。
+"""
+from __future__ import annotations
+
+import json
 import re
 import sys
 from pathlib import Path
 
-# hook_utils を同ディレクトリからインポート
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import hook_utils  # noqa: E402
+# sys.path に hooks ディレクトリを追加（_hook_utils を import するため）
+_HOOKS_DIR = Path(__file__).resolve().parent
+if str(_HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HOOKS_DIR))
 
-PROJECT_ROOT = hook_utils.PROJECT_ROOT
+from _hook_utils import (  # noqa: E402
+    get_project_root,
+    get_tool_input,
+    get_tool_name,
+    log_entry,
+    normalize_path,
+    read_stdin_json,
+)
 
-# 読み取り専用ツール（常に PG 級）
-READONLY_TOOLS = frozenset({
-    "Read", "Glob", "Grep", "WebSearch", "WebFetch",
-    "Agent", "LSP", "TaskGet", "TaskList", "TaskOutput",
-})
+# 読み取り専用ツール: 常に PG 許可
+_READ_ONLY_TOOLS = frozenset({"Read", "Glob", "Grep", "WebSearch", "WebFetch"})
 
-# PM 級パスパターン（POSIX 形式の相対パスに対して match() で先頭一致）
-# - match() は暗黙の ^ アンカー付き（文字列先頭から照合）
-# - ディレクトリパターン（末尾 /）: 配下全ファイルに一致
-# - ファイルパターン（末尾 $）: プロジェクトルート直下の特定ファイルのみ
-PM_PATTERNS = [
-    re.compile(r"docs/specs/"),       # 仕様書（配下全体）
-    re.compile(r"docs/adr/"),         # ADR（配下全体）
-    re.compile(r"docs/internal/"),    # プロセス SSOT（配下全体）
-    re.compile(r"\.claude/rules/"),   # ルールファイル（配下全体）
-    re.compile(r"\.claude/settings.*\.json$"),  # 設定ファイル（ルート直下）
-    re.compile(r"pyproject\.toml$"),  # プロジェクト設定（ルート直下）
+# AUDITING フェーズの PG 許可コマンドのプレフィックス
+_AUDITING_PG_COMMANDS = (
+    "npx prettier",
+    "npx eslint --fix",
+    "ruff check --fix",
+    "ruff format",
+)
+
+# パス判定パターン（PM 級）
+_PM_PATTERNS = [
+    (re.compile(r"^__out_of_root__/"), "out-of-root path"),
+    (re.compile(r"^docs/specs/.*\.md$"), "specs/ path"),
+    (re.compile(r"^docs/adr/.*\.md$"), "adr/ path"),
+    (re.compile(r"^docs/internal/.*\.md$"), "internal/ path"),  # 影式固有
+    (re.compile(r"^\.claude/rules/.*\.md$"), "rules/ path"),
+    (re.compile(r"^\.claude/settings.*\.json$"), "settings path"),
+    (re.compile(r"^pyproject\.toml$"), "pyproject.toml"),  # 影式固有
+]
+
+# パス判定パターン（SE 級）
+_SE_PATTERNS = [
+    (re.compile(r"^docs/"), "docs/ path (non-specs/adr)"),
+    (re.compile(r"^src/"), "src/ path"),
 ]
 
 
-def classify_permission(
-    tool_name: str, file_path: str, command: str, phase: str
+def _determine_level_and_reason(
+    tool_name: str,
+    file_path: str,
+    command: str,
+    project_root: Path,
+    phase_file: Path,
 ) -> tuple[str, str]:
-    """権限等級を判定する。
-
-    Args:
-        tool_name: ツール名 (Read, Edit, Write, Bash, etc.)
-        file_path: 正規化済み相対パス (POSIX 形式)
-        command: Bash コマンド文字列
-        phase: 現在のフェーズ (PLANNING, BUILDING, AUDITING)
+    """ツール名とパスから権限等級とその理由を判定する。
 
     Returns:
-        (level, reason) のタプル。level は "PG", "SE", "PM" のいずれか。
+        (level, reason): level は "PG" | "SE" | "PM"
     """
-    # 読み取り専用ツールは常に PG
-    if tool_name in READONLY_TOOLS:
-        return "PG", f"read-only tool: {tool_name}"
+    # 1. ファイルパスが存在する場合はパスベース判定
+    if file_path:
+        normalized = normalize_path(file_path, project_root)
 
-    # ファイルパスがない場合は SE（安全側に倒す）
-    if not file_path:
-        return "SE", "no file path"
+        # PM パターン照合
+        for pattern, _reason in _PM_PATTERNS:
+            if pattern.match(normalized):
+                return "PM", f"protected path: {normalized}"
 
-    # PM パターンチェック（match() で先頭一致）
-    for pattern in PM_PATTERNS:
-        if pattern.match(file_path):
-            return "PM", f"protected path: {file_path}"
+        # SE パターン照合
+        for pattern, reason in _SE_PATTERNS:
+            if pattern.match(normalized):
+                return "SE", reason
 
-    # それ以外は SE
-    return "SE", f"general path: {file_path}"
+        return "SE", "default path"
+
+    # 2. コマンドベース判定（Bash ツール等）
+    if command:
+        # AUDITING フェーズの PG コマンド特別処理
+        current_phase = _read_current_phase(phase_file)
+        if current_phase == "AUDITING":
+            for pg_prefix in _AUDITING_PG_COMMANDS:
+                if command == pg_prefix or command.startswith(pg_prefix + " "):
+                    return "PG", "AUDITING phase PG allow"
+
+        return "SE", "command (default SE)"
+
+    # 3. パスもコマンドもない（Agent 等）
+    return "SE", "no-path (default SE)"
 
 
-def _extract_path(tool_input: dict) -> str:
-    """tool_input からファイルパスを抽出し、正規化する。"""
-    raw = tool_input.get("file_path", "") or tool_input.get("path", "")
-    if not raw:
+def _read_current_phase(phase_file: Path) -> str:
+    """current-phase.md から現在のフェーズ名を読み取る。
+
+    **PHASE** 形式から PHASE を抽出する。
+    ファイルが存在しない/読み込み失敗時は空文字を返す。
+    """
+    if not phase_file.exists():
         return ""
-    return hook_utils.normalize_path(raw)
-
-
-def _extract_command(tool_input: dict) -> str:
-    """tool_input から Bash コマンドを抽出する。"""
-    return tool_input.get("command", "")
-
-
-def _log_decision(level: str, tool_name: str, path: str, reason: str) -> None:
-    """権限判定をログファイルに記録する。"""
-    log_dir = PROJECT_ROOT / ".claude" / "logs"
     try:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "permission.log"
-        # パス表示を 100 文字にトランケート
-        display_path = path[:100] if len(path) > 100 else path
-        entry = f"{hook_utils.utc_now()} [{level}] {tool_name} {display_path} -- {reason}\n"
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(entry)
+        content = phase_file.read_text(encoding="utf-8")
+        for line in content.splitlines():
+            match = re.match(r"^\*\*([A-Z]+)\*\*", line)
+            if match:
+                return match.group(1)
     except Exception:
         pass
+    return ""
 
 
 def main() -> None:
-    """hook のメインエントリポイント。"""
-    input_data = hook_utils.read_stdin()
-    if not input_data:
-        return
+    project_root = get_project_root()
+    log_file = project_root / ".claude" / "logs" / "permission.log"
+    phase_file = project_root / ".claude" / "current-phase.md"
 
-    tool_name = input_data.get("tool_name", "")
-    tool_input = input_data.get("tool_input", {})
-    if isinstance(tool_input, str):
-        tool_input = {}
+    # stdin から JSON 読み込み
+    data = read_stdin_json()
 
-    file_path = _extract_path(tool_input)
-    command = _extract_command(tool_input)
-    phase = hook_utils.get_current_phase()
+    # ツール名を取得（取得失敗時は SE 扱いで終了）
+    tool_name = get_tool_name(data)
+    if not tool_name:
+        log_entry(log_file, "SE", "unknown", "tool_name extraction failed")
+        sys.exit(0)
 
-    level, reason = classify_permission(tool_name, file_path, command, phase)
+    # 1. 読み取り専用ツールは常に PG 許可
+    if tool_name in _READ_ONLY_TOOLS:
+        sys.exit(0)
 
-    _log_decision(level, tool_name, file_path, reason)
+    # ファイルパスとコマンドを取得
+    file_path = get_tool_input(data, "file_path")
+    command = get_tool_input(data, "command")
 
-    # PM 級の場合、hookSpecificOutput を出力
+    # 権限等級判定
+    level, reason = _determine_level_and_reason(
+        tool_name, file_path, command, project_root, phase_file
+    )
+
+    # ログ用のターゲット文字列（100 文字にトランケート、タブ/改行をエスケープ）
+    raw_target = file_path or command or "-"
+    target = raw_target[:100].replace("\t", " ").replace("\n", " ")
+
+    # ログ記録
+    log_entry(log_file, level, tool_name, f"{target}\t\"{reason}\"")
+
+    # 応答
     if level == "PM":
-        hook_utils.write_json({
-            "decision": "block",
-            "reason": f"[{level}] {reason} — 承認が必要です",
-        })
+        ask_output = {
+            "hookSpecificOutput": {
+                "permissionDecision": "ask",
+                "permissionDecisionReason": f"[PM] {reason} — 承認が必要です",
+            }
+        }
+        print(json.dumps(ask_output, ensure_ascii=False))
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception:
+        # フック障害時にも Claude をブロックしない
         sys.exit(0)

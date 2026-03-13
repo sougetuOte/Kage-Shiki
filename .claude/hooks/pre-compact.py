@@ -3,68 +3,91 @@
 1. pre-compact-fired にタイムスタンプを記録
 2. SESSION_STATE.md に PreCompact セクションを追記/更新（冪等）
 3. lam-loop-state.json のバックアップ作成
-"""
 
-import os
-import re
+LAM v4.4.1 準拠。
+"""
+from __future__ import annotations
+
+import pathlib
 import shutil
 import sys
-import tempfile
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import hook_utils  # noqa: E402
+_HOOKS_DIR = str(pathlib.Path(__file__).resolve().parent)
+if _HOOKS_DIR not in sys.path:
+    sys.path.insert(0, _HOOKS_DIR)
 
-PROJECT_ROOT = hook_utils.PROJECT_ROOT
+from _hook_utils import get_project_root, now_utc_iso8601, safe_exit  # noqa: E402
 
-PRECOMPACT_SECTION = "## PreCompact 発火記録"
+
+def write_pre_compact_flag(project_root: pathlib.Path, timestamp: str) -> None:
+    """PreCompact 発火フラグファイルにタイムスタンプを書き込む。"""
+    flag_path = project_root / ".claude" / "pre-compact-fired"
+    flag_path.write_text(timestamp + "\n", encoding="utf-8")
+
+
+def update_session_state(session_state: pathlib.Path, timestamp: str) -> None:
+    """SESSION_STATE.md に PreCompact 発火を記録する（冪等処理）。"""
+    content = session_state.read_text(encoding="utf-8")
+    section_header = "## PreCompact 発火"
+
+    if section_header in content:
+        lines = content.splitlines(keepends=True)
+        updated_lines = []
+        in_section = False
+        for line in lines:
+            if line.rstrip() == section_header:
+                in_section = True
+            elif line.startswith("## ") and line.strip() != section_header:
+                in_section = False
+            if in_section and line.startswith("- 時刻: "):
+                updated_lines.append(f"- 時刻: {timestamp}\n")
+            else:
+                updated_lines.append(line)
+        session_state.write_text("".join(updated_lines), encoding="utf-8")
+    else:
+        suffix = (
+            f"\n{section_header}\n"
+            f"- 時刻: {timestamp}\n"
+        )
+        with open(session_state, "a", encoding="utf-8", newline="\n") as f:
+            f.write(suffix)
+
+
+def fallback_log(project_root: pathlib.Path, timestamp: str) -> None:
+    """SESSION_STATE.md が存在しない場合に loop.log へフォールバック記録する。"""
+    log_path = project_root / ".claude" / "logs" / "loop.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "a", encoding="utf-8", newline="\n") as f:
+        f.write(f"{timestamp} PreCompact fired (no SESSION_STATE.md)\n")
+
+
+def backup_loop_state(project_root: pathlib.Path) -> None:
+    """lam-loop-state.json が存在すれば .bak にコピーする。"""
+    loop_state = project_root / ".claude" / "lam-loop-state.json"
+    if loop_state.exists():
+        shutil.copy2(loop_state, loop_state.with_suffix(".json.bak"))
 
 
 def main() -> None:
-    """hook のメインエントリポイント。"""
-    hook_utils.read_stdin()  # 消費するが内容は使わない
+    try:
+        project_root = get_project_root()
+        timestamp = now_utc_iso8601()
 
-    claude_dir = PROJECT_ROOT / ".claude"
-    timestamp = hook_utils.utc_now()
+        write_pre_compact_flag(project_root, timestamp)
 
-    # 1. タイムスタンプ記録
-    fired_file = claude_dir / "pre-compact-fired"
-    fired_file.write_text(timestamp + "\n", encoding="utf-8")
-
-    # 2. SESSION_STATE.md に PreCompact セクション追記（冪等）
-    session_file = PROJECT_ROOT / "SESSION_STATE.md"
-    if session_file.exists():
-        content = session_file.read_text(encoding="utf-8")
-        if PRECOMPACT_SECTION not in content:
-            new_content = (
-                content + f"\n{PRECOMPACT_SECTION}\n\n最終発火: {timestamp}\n"
-            )
+        session_state = project_root / "SESSION_STATE.md"
+        if session_state.exists():
+            update_session_state(session_state, timestamp)
         else:
-            new_content = re.sub(
-                r"最終発火: .+",
-                f"最終発火: {timestamp}",
-                content,
-            )
-        # アトミック書き込み
-        try:
-            fd, tmp_path = tempfile.mkstemp(
-                dir=str(session_file.parent), suffix=".tmp"
-            )
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(new_content)
-            os.replace(tmp_path, str(session_file))
-        except OSError:
-            session_file.write_text(new_content, encoding="utf-8")
+            fallback_log(project_root, timestamp)
 
-    # 3. lam-loop-state.json のバックアップ
-    state_file = claude_dir / "lam-loop-state.json"
-    if state_file.exists():
-        backup_file = claude_dir / "lam-loop-state.json.bak"
-        shutil.copy2(state_file, backup_file)
+        backup_loop_state(project_root)
+
+    except Exception:
+        pass
+
+    safe_exit(0)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception:
-        sys.exit(0)
+    main()
