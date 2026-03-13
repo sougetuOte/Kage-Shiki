@@ -1,3 +1,4 @@
+# permission-level: SE
 ---
 name: tdd-developer
 description: |

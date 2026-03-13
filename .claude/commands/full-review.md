@@ -4,8 +4,21 @@ description: "全ソース網羅レビュー + 全Issue修正を一括実行"
 
 # Full Review: 網羅的レビュー + 全修正
 
-全ソースコードの品質レビューを並列実行し、発見された Issue をすべて修正する。
+対象ファイル/ディレクトリの品質レビューを並列実行し、発見された Issue をすべて修正する。
 権限等級（PG/SE/PM）に基づく修正制御を適用する。
+
+## 引数（必須）
+
+```
+/full-review <target>
+
+target: 監査対象（必須）
+  - ファイル: src/kage_shiki/core.py
+  - ディレクトリ: src/kage_shiki/
+  - "." でプロジェクト全体
+```
+
+引数なしの場合は対象の指定を求める。
 
 ## 実行フロー
 
@@ -13,11 +26,12 @@ description: "全ソース網羅レビュー + 全Issue修正を一括実行"
 
 初回実行時:
 1. イテレーション番号を 1 に設定
-2. 差分チェックかフルスキャンかを判定:
-   - `fullscan_pending` フラグが存在する場合 → フルスキャン（hooks 導入後に機能）
-   - 直近の `/full-review` 以降に変更があった場合 → 差分チェック（変更ファイルのみ）
-   - 初回または明示指定 → フルスキャン
-   - **現在（hooks 未導入時）**: 常にフルスキャンとして扱う
+2. スキャン範囲: **常に指定範囲の全ファイルを対象とする（フルスキャン）**
+
+> **差分チェックモードは廃止。** 修正による周辺への波及影響、修正で蓋をされていた
+> 潜在的問題の露出、予期しない場所での影響発生を捕捉するため、
+> 毎イテレーションで指定範囲のすべてのファイルを探索する。
+> 変更ファイルのみの差分チェックでは、これらの間接的影響を見落とす。
 
 ### Phase 0.5: ツール検出
 
@@ -96,6 +110,17 @@ Phase 1 の監査エージェントは **指摘のみ** を行う。修正はメ
 3. Info Issue
 4. 仕様書の同期更新（S-1〜S-4 準拠）
 
+### Phase 3b: PM 級 Issue への対応
+
+PM 級の Issue を検出した場合:
+1. 対応不可エントリリストを出力
+2. `pm_pending` フラグを `lam-loop-state.json` に設定
+3. ループが自動停止（lam-stop-hook.py で収束条件に達する）
+
+ユーザー承認後:
+- `pm_pending` フラグを clear する: `python -c "import json; d=json.load(open('.claude/lam-loop-state.json')); d.pop('pm_pending',None); json.dump(d,open('.claude/lam-loop-state.json','w'))"`
+- ループを再開
+
 ### Phase 4: Green State 検証
 
 以下の5条件すべてを満たすか検証する:
@@ -112,9 +137,12 @@ Phase 1 の監査エージェントは **指摘のみ** を行う。修正はメ
 
 #### hooks 導入済みの場合
 lam-stop-hook による自動ループ（最大 5 イテレーション）:
-- Green State 未達 → 自動的に Phase 1 に戻る
+- Green State 未達 → 自動的に Phase 1 に戻る（**全ファイル再スキャン**）
 - Green State 達成 → Phase 5 へ
 - 5 イテレーション超過 → 残 Issue を報告して停止
+
+> **重要: 各イテレーションは常にフルスキャン。**
+> 前回修正したファイルだけでなく、指定範囲の全ファイルを対象とする。
 
 #### hooks 未導入の場合（現在）
 - Green State 未達の場合、修正内容を報告しユーザーに再実行を提案
@@ -140,3 +168,13 @@ Green State: G1 ✅ G2 ✅ G3 ✅ G4 ✅ G5 ✅
 - 修正後は必ずテスト + ruff で検証すること
 - 仕様ズレが見つかった場合は S-1〜S-4（仕様同期ルール）に従い同時修正すること
 - `.claude/rules/building-checklist.md` への参照を維持すること
+
+## 監査レポート出力
+
+成果物: `docs/artifacts/audit-reports/YYYY-MM-DD-iter{N}.md`
+
+形式:
+- 対象: `<target-file-or-dir>`
+- フェーズ: Phase 1 ~ Phase 4
+- Issue: Critical X件 / Warning X件 / Info X件
+- Summary: [A/B/C/D評価]

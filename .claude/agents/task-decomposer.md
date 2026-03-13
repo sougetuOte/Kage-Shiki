@@ -1,3 +1,4 @@
+# permission-level: SE
 ---
 name: task-decomposer
 description: |

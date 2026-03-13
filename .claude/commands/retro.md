@@ -42,6 +42,19 @@ SESSION_STATE.md と git log から対象範囲を特定:
 | 対応不可 Issue | N件 |
 | 仕様書更新数 | N |
 
+### Step 2.5: TDD パターン分析
+
+`.claude/tdd-patterns.log` を確認し、以下のパターンを検査:
+- 同一テスト失敗パターンが 2 回以上観測
+- ルール化の可能性がある
+
+見つかった場合:
+1. パターン詳細を `docs/artifacts/tdd-patterns/<pattern-name>.md` に記録
+2. ルール候補を `.claude/rules/auto-generated/draft-NNN.md` として提案
+3. 次の `/pattern-review` で PM 級承認を求める
+
+見つからなかった場合はスキップ。
+
 ### Step 3: 定性分析（KPT）
 
 以下の3カテゴリで振り返る:
@@ -80,7 +93,7 @@ SESSION_STATE.md と git log から対象範囲を特定:
 
 振り返り結果を以下に記録:
 
-- **出力先**: `docs/memos/retro-wave-{N}.md` または `docs/memos/retro-phase-{N}.md`
+- **出力先**: `docs/artifacts/retro-wave-{N}.md` または `docs/artifacts/retro-phase-{N}.md`
 - 高優先度のアクションはユーザー承認後に即時反映
 
 ### Step 6: 完了報告
@@ -89,7 +102,7 @@ SESSION_STATE.md と git log から対象範囲を特定:
 --- Retro 完了 ---
 Keep: X件 / Problem: X件 / Try: X件
 アクション: X件（即時反映: X件、次Wave: X件）
-記録: docs/memos/retro-wave-{N}.md
+記録: docs/artifacts/retro-wave-{N}.md
 ```
 
 ## Phase 振り返り（`/retro phase`）の追加ステップ
@@ -104,7 +117,7 @@ Phase 全体の場合、Step 2-3 に加えて以下を実施:
 
 ### 出力
 
-- `docs/memos/retro-phase-{N}.md`
+- `docs/artifacts/retro-phase-{N}.md`
 - 次 Phase の PLANNING 開始時に参照すべき教訓リスト
 
 ## 注意事項
