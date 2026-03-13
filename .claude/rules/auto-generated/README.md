@@ -1,30 +1,38 @@
-# auto-generated/ — TDD 内省ルール
-
-このディレクトリには TDD 内省パイプラインが自動生成したルール候補と承認済みルールを配置する。
+# 自動生成ルール
 
 ## ライフサイクル
 
-1. **PostToolUse hook** がテスト失敗→成功パターンを検出
-2. `.claude/tdd-patterns.log` に記録（PG級、自動）
-3. 同一パターンが **3回** に到達すると `draft-NNN.md` を自動生成
-4. `/pattern-review` で PM級承認
-5. 承認後 `rule-NNN.md` として配置
+1. PostToolUse hook がテスト結果（JUnit XML）を読み取り、
+   FAIL→PASS 遷移を `.claude/tdd-patterns.log` に記録
+   （FAIL→PASS 遷移時に systemMessage で `/retro` を推奨）
 
-## ファイル命名
+2. `/retro` 実行時（人間が判断）に `tdd-patterns.log` を分析
+   → 同一パターンが閾値（初期値: 2回）以上出現する場合
+   → `draft-NNN.md` としてルール候補を提案
 
-| パターン | 意味 |
-|---------|------|
-| `draft-NNN.md` | 承認待ちのルール候補 |
-| `rule-NNN.md` | 承認済みの自動生成ルール |
-| `trust-model.md` | 信頼度モデル定義 |
+3. PM級として人間に承認要求
+   → 承認: このディレクトリに配置
+   → 却下: draft を削除
 
-## ルール寿命管理
+4. ルール寿命管理
+   → 90日以上未使用のルールを `/quick-save`（Daily 記録）で棚卸し通知
+   → 削除は PM級（人間承認必須）
 
-- 各ルールに `last_matched` 日付メタデータを付与
-- **90日以上未使用**のルールは `/daily` で棚卸し通知
-- 棚卸し対象は PM級承認で削除または更新
+## ファイル命名規則
+
+- `draft-NNN.md`: 承認待ちルール候補
+- `rule-NNN.md`: 承認済みルール
+- `trust-model.md`: 信頼度モデルの定義
 
 ## 権限等級
 
-- パターン記録（`.claude/tdd-patterns.log` への追記）: **PG級**
-- ルール候補の生成・変更・削除: **PM級**
+- このディレクトリ配下のファイル追加・変更: **PM級**（人間承認必須）
+- パターン記録（`.claude/tdd-patterns.log`）: **PG級**（自動記録）
+
+## 参照
+
+- 信頼度モデル: `trust-model.md`（本ディレクトリ内）
+- テスト結果ルール: `.claude/rules/test-result-output.md`
+- パターン詳細記録先: `docs/artifacts/tdd-patterns/`
+- パターンログ: `.claude/tdd-patterns.log`
+- ルール候補: `.claude/rules/auto-generated/draft-*.md`

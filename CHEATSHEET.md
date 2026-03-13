@@ -66,12 +66,13 @@ v4.0.0 で導入された変更リスク分類。PreToolUse hook がファイル
 |---------|------|
 | `core-identity.md` | Living Architect 行動規範 + 権限等級サマリー |
 | `phase-rules.md` | フェーズ別ガードレール（PLANNING/BUILDING/AUDITING） |
-| `security-commands.md` | コマンド安全基準（Layer 0/1/2） |
+| `security-commands.md` | コマンド安全基準（Allow/deny/ask 三分類） |
 | `decision-making.md` | 意思決定プロトコル |
-| `permission-levels.md` | 権限等級分類基準（PG/SE/PM）v4.0.0 新規 |
-| `upstream-first.md` | プラットフォーム仕様優先原則 v4.0.0 新規 |
+| `permission-levels.md` | 権限等級分類基準（PG/SE/PM） |
+| `upstream-first.md` | プラットフォーム仕様優先原則 |
+| `test-result-output.md` | テスト結果 JUnit XML 出力ルール |
 | `building-checklist.md` | 影式 BUILDING 品質チェックリスト（R-2〜R-11, S-2）影式固有 |
-| `auto-generated/` | TDD 内省パイプライン自動生成ルール v4.0.0 新規 |
+| `auto-generated/` | TDD 内省パイプライン v2 自動生成ルール |
 
 ## フェーズコマンド
 
@@ -80,7 +81,6 @@ v4.0.0 で導入された変更リスク分類。PreToolUse hook がファイル
 | `/planning` | 要件定義・設計・タスク分解 | コード生成禁止 |
 | `/building` | TDD実装 | 仕様なし実装禁止 |
 | `/auditing` | レビュー・監査・リファクタ | PM級の修正禁止（PG/SE級は許可） |
-| `/project-status` | 進捗状況の表示 | - |
 
 ## 承認ゲート
 
@@ -95,16 +95,10 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 | コマンド | 用途 | コンテキスト消費 |
 |---------|------|----------------|
-| `/quick-save` | 軽量セーブ（SESSION_STATE.md のみ） | 3-4% |
-| `/quick-load` | 軽量ロード（SESSION_STATE.md のみ） | ~1% |
-| `/full-save` | フルセーブ（commit + push + daily） | 約10% |
-| `/full-load` | フルロード（状態確認 + 詳細報告） | 2-3% |
+| `/quick-save` | SESSION_STATE.md + Daily 記録 + ループログ | 3-4% |
+| `/quick-load` | SESSION_STATE.md 読込 + 関連ドキュメント特定 + 復帰サマリー | 2-3% |
 
-### セーブ/ロードの使い分け
-- **普段のセーブ**: `/quick-save`（残量 25% 以下でも安全）
-- **一日の終わり**: `/full-save`（残量に余裕があるとき）
-- **前回の続き**: `/quick-load`（日常の再開）
-- **数日ぶりの復帰**: `/full-load`（詳細な状態確認）
+git commit / push は `/ship` を使用。
 
 ### StatusLine
 画面下部にコンテキスト残量を常時表示（要 Python 3.x）:
@@ -132,11 +126,11 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 | スキル | 用途 | 呼び出し例 |
 |--------|------|-----------|
-| `lam-orchestrate` | タスク分解・並列実行の自動調整 | 「lam-orchestrateで実行して」 |
-| `ultimate-think` | AoT + Three Agents + Reflection 統合思考 | `/ultimate-think 議題` |
+| `lam-orchestrate` | タスク分解・並列実行 + 構造化思考（AoT + Three Agents） | 「lam-orchestrateで実行して」 |
 | `skill-creator` | スキル作成ガイド | 「新しいスキルを作りたい」 |
-| `adr-template` | ADR作成テンプレート | `/adr-create` 実行時に自動適用 |
+| `adr-template` | ADR作成テンプレート | ADR 作成時に自動適用 |
 | `spec-template` | 仕様書作成テンプレート | 仕様書作成時に自動適用 |
+| `frontend-design` | UI デザインガイド | UI コンポーネント作成時に使用 |
 
 ## ワークフローコマンド
 
@@ -144,19 +138,15 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 |---------|------|
 | `/ship` | 論理グループ分けコミット（棚卸し → 分類 → コミット） |
 | `/full-review` | 並列監査 + 全修正 + 検証（4エージェント、一気通貫） |
+| `/wave-plan` | 次 Wave のタスク選定・実行順序策定 |
+| `/retro` | Wave/Phase 完了時の振り返り（KPT + TDD パターン分析） |
 
 ## 補助コマンド
 
 | コマンド | 用途 |
 |---------|------|
-| `/focus` | 現在のタスクに集中 |
-| `/daily` | 日次振り返り（KPI 集計含む） |
-| `/adr-create` | ADR作成支援 |
-| `/security-review` | セキュリティレビュー |
-| `/impact-analysis` | 変更の影響分析（PG/SE/PM 分類含む） |
-| `/wave-plan` | 次Waveのタスク選定・実行順序策定（影式固有） |
-| `/retro` | Wave/Phase完了時の振り返り（KPT）（影式固有） |
 | `/pattern-review` | TDD内省パターンの審査・承認（PM級） |
+| `/project-status` | プロジェクト進捗状況の表示 |
 
 ## 状態管理
 
@@ -165,6 +155,8 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | `.claude/current-phase.md` | 現在のフェーズ |
 | `.claude/states/<feature>.json` | 機能ごとの進捗・承認状態 |
 | `SESSION_STATE.md` | セッション間の引き継ぎ（自動生成） |
+| `docs/artifacts/knowledge/` | `/retro` Step 4 の知見保存先 |
+| `.claude/agent-memory/` | Subagent Persistent Memory |
 
 ## 参照ドキュメント (SSOT)
 
@@ -208,7 +200,6 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 ```
 /quick-load            # 前回の状態を確認
-                       # （数日ぶりなら /full-load）
 ```
 
 ### Wave 開始
@@ -240,13 +231,13 @@ Red → Green → Refactor → 報告 → (次のサイクル)
 
 ```
 /retro phase           # Phase 全体の振り返り
-/full-save             # git commit + push + daily
+/ship                  # git commit + push
 ```
 
 ### 一日の終了
 
 ```
-/quick-save            # 残量に余裕があれば /full-save
+/quick-save            # セッション状態保存
 ```
 
 ### 割り込み・中断
@@ -259,7 +250,7 @@ Red → Green → Refactor → 報告 → (次のサイクル)
 ## クイックリファレンス
 
 **次のセッションを始めるときは？**
-→ `/quick-load`（前回の続き）または `/full-load`（数日ぶり）
+→ `/quick-load`
 
 **PLANNINGで実装を頼まれたら？**
 → 警告を表示し、3つの選択肢を提示

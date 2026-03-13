@@ -70,17 +70,24 @@
 auto-compact の発動を待たないこと。これは保険であり、基本はユーザーが StatusLine を監視する。
 
 ### セーブ/ロードの使い分け
-- `/quick-save`: SESSION_STATE.md のみ記録（軽量、3-4%消費）。普段使い
-- `/quick-load`: SESSION_STATE.md のみ読込（日常の再開）
-- `/full-save`: SESSION_STATE.md + git commit + push + daily（一日の終わり）
-- `/full-load`: 詳細な状態確認 + 復帰報告（数日ぶりの復帰）
+- `/quick-save`: SESSION_STATE.md + Daily 記録 + ループログ（普段使い）
+- `/quick-load`: SESSION_STATE.md 読込 + 関連ドキュメント特定 + 復帰サマリー（日常の再開）
+- git commit / push は `/ship` を使用
 - 残量 25% 以下では `/quick-save` を使うこと
-- `/full-save` は残量に余裕があるときのみ
 
 ## MEMORY.md Policy
 
-Claude Code の auto memory 機能（`MEMORY.md`）はプロジェクト固有情報の記録には使用しない。
-Subagent の役割ノウハウ蓄積のみに使用可。詳細は `docs/internal/05_MCP_INTEGRATION.md` Section 6 を参照。
+### Layer 1: Auto Memory
+Claude Code 本体の自動記憶機能。作業効率に関する学習（ビルドコマンド、デバッグ知見、Subagent 役割ノウハウ等）に使用。
+プロジェクト固有の仕様・設計判断・タスク状態は記録しない。
+
+### Layer 2: Subagent Persistent Memory
+`.claude/agent-memory/<agent-name>/` に保存。Subagent が実行中に習得したプロジェクト固有パターンを蓄積。
+
+### Layer 3: Knowledge Layer
+`/retro` Step 4 で人間が整理した知識。`docs/artifacts/knowledge/` に保存。
+
+詳細は `docs/internal/05_MCP_INTEGRATION.md` Section 6 を参照。
 
 ## Initial Instruction
 

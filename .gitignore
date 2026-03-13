@@ -34,12 +34,19 @@ memos/
 !docs/memos/
 docs/memos/*
 !docs/memos/v4-update-plan/
+!docs/memos/v4-4-1-update-plan/
 .serena/
 data/
 SESSION_STATE.md
 docs/daily/
 .claude/settings.local.json
 .claude/commands/release.md
+# LAM runtime state files
+.claude/doc-sync-flag
+.claude/last-test-result
+.claude/pre-compact-fired
+.claude/lam-loop-state.json
+.claude/test-results.xml
 
 # Reference materials
 _reference/

@@ -4,7 +4,6 @@
       "Bash(ls *)",
       "Bash(cat *)",
       "Bash(grep *)",
-      "Bash(find *)",
       "Bash(pwd)",
       "Bash(du *)",
       "Bash(file *)",
@@ -38,7 +37,11 @@
       "Bash(shutdown *)",
       "Bash(apt *)",
       "Bash(yum *)",
-      "Bash(brew *)"
+      "Bash(brew *)",
+      "Bash(find * -delete *)",
+      "Bash(find * -exec rm *)",
+      "Bash(find * -exec chmod *)",
+      "Bash(find * -exec chown *)"
     ],
     "ask": [
       "Bash(git push *)",
@@ -55,7 +58,8 @@
       "Bash(make *)",
       "Bash(mkdir *)",
       "Bash(touch *)",
-      "Bash(cp *)"
+      "Bash(cp *)",
+      "Bash(find *)"
     ]
   },
   "hooks": {

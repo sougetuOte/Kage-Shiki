@@ -7,12 +7,13 @@
 
 ## PG級（自動修正・報告不要）
 
-以下は AI が自律的に修正してよい。ユーザーへの確認・報告は不要。
+自明な修正。プロジェクトの振る舞いを変えない変更。
 
-- フォーマット修正（ruff format, prettier）
-- typo 修正（コメント・ドキュメント内）
-- lint 違反の自動修正（ruff check --fix）
-- import 整理（isort 相当）
+- フォーマット修正（ruff format, prettier 等）
+- typo 修正
+- lint 違反の自動修正（ruff check --fix 等）
+- import 整理
+- テスト失敗の自明な修正（型ミスマッチ等）
 - 不要な空白・末尾改行の除去
 
 ## SE級（修正後に報告）
@@ -20,29 +21,34 @@
 修正は許可されるが、完了後にユーザーへ報告する。
 
 - テストの追加・修正
-- 内部リファクタリング（公開 API 変更なし）
-- ドキュメント細部の更新（`docs/specs/`, `docs/adr/` 以外）
-- minor/patch レベルの依存パッケージ更新
-- ログメッセージ・コメントの変更
+- 内部リファクタリング（公開 API 不変）
+- ドキュメントの細部更新（`docs/` 配下、ただし `docs/specs/` と `docs/adr/` を除く）
+- 依存パッケージの minor/patch update
+- 内部関数の名前変更（外部インターフェース不変）
+- ログ出力の追加・修正
+- コメントの追加・修正
 
 ## PM級（判断を仰ぐ）
 
 修正前にユーザーの承認が必要。AUDITING フェーズでは指摘のみ。
 
-- 仕様変更（`docs/specs/` の内容変更）
-- アーキテクチャ変更（新モジュール追加、依存関係変更）
-- `.claude/rules/` の変更
-- 公開 API / Protocol の変更
-- major レベルの依存パッケージ更新
-- テストや機能の削除
+- 仕様変更（`docs/specs/` の変更）
+- アーキテクチャ変更（`docs/adr/` の変更）
+- `.claude/rules/` の追加・変更
+- `.claude/settings*.json` の変更
+- 公開 API の変更
+- 依存パッケージの major update
+- フェーズの巻き戻し
+- テストの削除
+- 機能の削除
 
 ## フェーズとの二軸設計
 
-| 等級 | PLANNING | BUILDING | AUDITING |
-|------|----------|----------|----------|
-| PG | — | 自動修正可 | 自動修正可 |
-| SE | — | 修正 + 報告 | 修正 + 報告 |
-| PM | 設計文書のみ | 承認後に実装 | 指摘のみ（承認ゲート） |
+| | PLANNING | BUILDING | AUDITING |
+|--|----------|----------|----------|
+| PG | - | 自動修正可 | 自動修正可 |
+| SE | - | 修正後報告 | 修正後報告 |
+| PM | 承認ゲート | 承認ゲート | 承認ゲート |
 
 ## ファイルパスベースの分類（PreToolUse hook 用）
 
@@ -65,16 +71,18 @@
 迷ったら **SE級に丸める**（安全側に倒す）。
 
 典型的な判断例:
-- 「テストを追加するだけ」→ SE級
-- 「テストを削除する」→ PM級（機能の削除に相当）
-- 「既存メソッドの内部ロジック変更」→ SE級
-- 「新しい public メソッド追加」→ SE級（Protocol 変更なら PM級）
+- 「テストの大幅な書き換え」→ SE級（公開 API は変わらない）
+- 「README の構成変更」→ SE級（仕様書ではない）
+- 「.claude/commands/ の変更」→ SE級（ルールではなくコマンド）
+- 「.gitignore の変更」→ SE級
 - 「config.toml テンプレートの変更」→ PM級（設定仕様の変更）
 - 「docs/internal/ の変更」→ PM級（SSOT）
 - 「tests/ の新規テスト追加」→ SE級
 
 ## 参照
 
+- `docs/internal/07_SECURITY_AND_AUTOMATION.md` Section 5 (Hooks-Based Permission System)
+- `docs/internal/02_DEVELOPMENT_FLOW.md` (フェーズ別の権限適用)
 - phase-rules.md: フェーズ別の修正ルール
 - core-identity.md: 権限等級サマリー
 - security-commands.md: コマンド安全基準（Layer 0）

@@ -15,22 +15,34 @@
 
 | Category               | Commands                                                      | Notes                              |
 | :--------------------- | :------------------------------------------------------------ | :--------------------------------- |
-| **File System (Read)** | `ls`, `cat`, `grep`, `find`, `pwd`, `du`, `file`              | ファイル内容の読み取り、検索。     |
+| **File System (Read)** | `ls`, `cat`, `grep`, `pwd`, `du`, `file`                      | ファイル内容の読み取り、検索。     |
 | **Git (Read)**         | `git status`, `git log`, `git diff`, `git show`, `git branch` | リポジトリ状態の確認。             |
 | **Testing (Local)**    | `pytest`, `pytest -v`, `pytest --tb=short`                    | **ローカルでの**テスト実行。       |
 | **Linting (Read)**     | `ruff check`, `ruff format --check`                           | コードスタイル確認（変更なし）。   |
 | **Package Info**       | `pip list`, `pip show`                                        | インストール済みパッケージの確認。 |
 | **Process Info**       | `ps`, `top` (batch mode)                                      | プロセス状態の確認。               |
 
-### B. Deny List (User Approval Required)
+### B-1. Deny List — 実行禁止（Layer 0: deny）
 
-以下のコマンドは、**システムに変更を加える（Write/Mutation）、または外部と通信するもの**であるため、実行前に必ずユーザーの承認を得なければならない（`SafeToAutoRun: false`）。
+以下のコマンドは **不可逆な操作** であり、AI による実行を禁止する。
+
+| Category                | Commands                                                            | Risks                                              |
+| :---------------------- | :------------------------------------------------------------------ | :------------------------------------------------- |
+| **File System (Delete)**| `rm`, `rm -rf`                                                      | 不可逆なデータ消失。                               |
+| **File System (Move)**  | `mv`                                                                | 不可逆なファイル消失・上書き。                     |
+| **Permission Change**   | `chmod`, `chown`                                                    | セキュリティ境界の破壊。                           |
+| **System Mutation**     | `apt`, `yum`, `brew`, `systemctl`, `service`, `reboot`, `shutdown`  | システム設定の変更、パッケージ導入、再起動。       |
+| **find (destructive)**  | `find -delete`, `find -exec rm`, `find -exec chmod`, `find -exec chown` | 再帰的な不可逆操作。                          |
+
+### B-2. Ask List — 承認必須（Layer 0: ask）
+
+以下のコマンドは **承認を得てから実行する**。
 
 | Category                | Commands                                                                    | Risks                                                        |
 | :---------------------- | :-------------------------------------------------------------------------- | :----------------------------------------------------------- |
-| **File System (Write)** | `rm`, `mv`, `cp`, `chmod`, `chown`, `touch`, `mkdir`                        | ファイルの削除、移動、権限変更によるシステム破壊。           |
+| **File System (Write)** | `cp`, `touch`, `mkdir`                                                      | 意図しないファイル作成・コピー。                             |
+| **File Search**         | `find`                                                                      | 通常検索（破壊的パターンは B-1 deny）。                      |
 | **Git (Remote/Write)**  | `git push`, `git pull`, `git fetch`, `git clone`, `git commit`, `git merge` | リモートリポジトリへの影響、コンフリクト発生。               |
-| **System Mutation**     | `apt`, `yum`, `brew`, `systemctl`, `service`, `reboot`, `shutdown`          | システム設定の変更、パッケージ導入、再起動。                 |
 | **Network**             | `curl`, `wget`, `ssh`, `ping`, `nc`                                         | 外部へのデータ送信、不正なスクリプトのダウンロード。         |
 | **Build/Run**           | `python main.py`, `python -m kage_shiki`                                    | アプリケーションの実行（無限ループやリソース枯渇のリスク）。 |
 | **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。v4.0.0 以降は PG級自動修正可（本ドキュメント Section 5 参照）。 |

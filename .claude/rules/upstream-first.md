@@ -1,34 +1,55 @@
-# Upstream First — プラットフォーム仕様優先原則
+# Upstream First（上流仕様優先）原則
 
-## 原則
+## 概要
 
-Claude Code のプラットフォーム機能（hooks, settings, permissions, skills, sub-agents, MCP）に関する
-実装・修正・トラブルシューティングでは、**必ず公式ドキュメントを事前確認**する。
+Claude Code の hooks、settings、permissions 等のプラットフォーム機能を実装・修正する際は、
+**実装前に最新の公式ドキュメントを確認する**こと。
 
-「以前の記憶」や「推測」で実装を進めない。Claude Code は頻繁に更新されるため、
-過去のセッションで正しかった情報が現在は古くなっている可能性がある。
+## 背景
 
-## 確認先
+Claude Code は活発に開発されており、設定書式や API が頻繁に変更される。
+過去の記憶や既存実装に基づいて書くと、旧書式で実装してしまい手戻りが発生する。
+
+## ルール
+
+### 必須: 実装前の仕様確認
+
+「以前の記憶」や「推測」で実装を進めない。
+
+### 確認先
 
 | 機能 | 公式ドキュメント |
 |------|----------------|
-| Hooks | https://docs.anthropic.com/en/docs/claude-code/hooks |
-| Settings | https://docs.anthropic.com/en/docs/claude-code/settings |
-| Permissions | https://docs.anthropic.com/en/docs/claude-code/permissions |
-| Skills | https://docs.anthropic.com/en/docs/claude-code/skills |
-| Sub-agents | https://docs.anthropic.com/en/docs/claude-code/sub-agents |
-| MCP | https://docs.anthropic.com/en/docs/claude-code/mcp |
+| Hooks | https://code.claude.com/docs/en/hooks |
+| Settings | https://code.claude.com/docs/en/settings |
+| Permissions | https://code.claude.com/docs/en/permissions |
+| Skills | https://code.claude.com/docs/en/skills |
+| Sub-agents | https://code.claude.com/docs/en/sub-agents |
 
-## 確認手順
+### 確認手順
 
-1. **context7 MCP** で最新ドキュメントを取得（利用可能な場合）
-2. context7 が利用不可の場合、**WebFetch** で公式 URL を直接取得
-3. 取得した仕様と既存実装の**差分を特定**
-4. 差分があればユーザーに報告し、対応方針を確認
-5. 承認後に実装を開始
+1. context7 MCP で該当ドキュメントを検索・取得（推奨）
+2. context7 が利用不可 or 対応外の場合は WebFetch でフォールバック（対話モードのみ）
+3. 現行実装との差分を特定
+4. 差分があれば修正方針をユーザーに報告
+5. 承認後に実装
 
-## 注意事項
+### 適用タイミング
 
-- `/full-review` 等の自動フロー内では WebFetch を使用しない（コンテキスト消費を避ける）
-- Wave 開始前に一括ですり合わせることを推奨
-- 公式ドキュメントに記載がない挙動を発見した場合、`docs/memos/` に記録する
+- Wave の開始時（新しい hook/settings を実装する前）
+- 起動時エラーが発生した時
+- プラットフォーム機能に関する変更を行う時
+
+## 権限等級
+
+本ルールファイル自体の変更: **PM級**
+
+## Wave 開始前の一括すり合わせ（推奨）
+
+Wave 開始前に、使用するプラットフォーム機能の最新仕様を一括で確認し、
+設計書・タスク定義に反映することを推奨する。
+
+### 対象範囲
+
+- **更新すべき**: 設計書のプラットフォーム API 依存箇所、タスク定義の完了条件
+- **更新不要**: 要件書（「何をやるか」であり API 書式に依存しない）、ADR（決定の記録）、ビジネスロジック部分

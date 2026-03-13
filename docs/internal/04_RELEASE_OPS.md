@@ -7,19 +7,19 @@
 
 本番環境へのデプロイは、以下の条件を全て満たした場合のみ許可される。
 
-- [ ] **All Tests Green**: 全ての自動テストが通過している。
+- [ ] **Quality Gate Passed**: 全テスト通過、lint エラーゼロ、対応可能 Issue ゼロ。
 - [ ] **No Critical Bugs**: 優先度 High 以上の既知のバグが存在しない。
-- [ ] **Performance Check**: 応答速度やリソース消費が許容範囲内である。
+- [ ] **Retrospective Done**: `/retro` による振り返りが実施済み。
 - [ ] **Documentation Updated**: 変更内容が `CHANGELOG.md` およびユーザーマニュアルに反映されている。
 
 <!-- Phase 2b 以降でパッケージング方法（PyInstaller, Nuitka 等）を確定予定 -->
 
 ## 2. Release Flow (リリースフロー)
 
-1.  **Staging Verification**: ステージング環境での動作確認。
-2.  **Backup**: DB および重要データのバックアップ取得。
-3.  **Deploy**: 本番環境への適用（Blue/Green または Canary 推奨）。
-4.  **Smoke Test**: 主要機能が動作することの簡易確認。
+1.  **Verification**: リリース対象の動作確認。プロジェクトの性質に応じた検証を実施する（例: テストスイート実行、手動確認、ステージング環境検証等）。
+2.  **Backup**: 必要に応じ、リリース前の状態を保全する（例: git tag、データバックアップ等）。
+3.  **Release**: リリースの実施。プロジェクトの配布形態に応じた手順に従う（例: パッケージ公開、デプロイ、タグ作成等）。
+4.  **Post-Release Check**: リリース後の簡易確認。
 
 ## 3. Emergency Protocols (緊急対応プロトコル)
 
@@ -34,11 +34,11 @@
 
 1.  **Rollback**: 直ちに直前の安定バージョンへ切り戻す。原因究明はその後に行う。
 2.  **Announcement**: ユーザーへ障害発生と状況を通知する。
-3.  **Post-Mortem**: 事後分析を行い、再発防止策を `docs/adr/` に記録する。
+3.  **Post-Mortem**: 事後分析を行い、再発防止策を記録する。アーキテクチャ判断は `docs/adr/` に、一般的な失敗分析は `docs/artifacts/` に保存する。
 
 ## 4. Versioning Strategy (バージョニング)
 
 - **Semantic Versioning (SemVer)** に従う。
   - `MAJOR`: 破壊的変更
   - `MINOR`: 後方互換性のある機能追加
-  - `PATCH`: 後方互換性のあるバグ修正
+  - `PATCH`: 後方互換性のあるバグ修正、ドキュメント修正、内部改善
