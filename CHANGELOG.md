@@ -1,20 +1,47 @@
 # Changelog — 影式 (Kage-Shiki)
 
 All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### LAM 4.0.1 移行 — Phase 2: コマンド/スキル/エージェント (2026-03-10)
+## [0.2.0] - 2026-03-14
 
-- **chore(agents)**: 全8エージェントに permission-level 注記追加、test-runner→Haiku、quality-auditor に仕様ドリフトチェック・R-1〜R-11 完全テーブル追加
-- **chore(commands)**: full-review 4エージェント並列構成・Green State G1-G5・自動ループ制御追加、ship doc-sync-flag 対応、/pattern-review 新規作成
-- **chore(skills)**: version:1.0.0 追加、lam-orchestrate ループ統合（lam-loop-state.json スキーマ）
-- **docs(specs)**: docs/specs/lam/ 新規作成（免疫システム要件・設計、Green State 定義、KPI、ループログスキーマ、doc-writer 仕様、v3.9.0 改善採用 — 計7ファイル）
-- **docs(adr)**: ADR-0001 免疫システムアーキテクチャ決定記録
-- **docs(internal)**: /full-review 3並列→4並列、R-1〜R-11 参照先分離、09_SUBAGENT_STRATEGY モデル整合
-- **docs**: CLAUDE.md SSOT表記修正、CHEATSHEET.md /pattern-review追加、README/README_en 技術スタック・スライド参照修正
-- **chore(rules)**: permission-levels.md ドメイン別SSOT注記、phase-rules.md Green State・AUDITING識別子追加
-- **chore(migration)**: 設計文書4件ステータス→Accepted、000-index.md Phase 2完了
+Phase 1 全機能実装 + Phase 2a 統合テスト完了 + LAM v4.4.1 フレームワーク移行。
+827 tests / 92% coverage / ruff clean。
+
+### Added (LAM v4.4.1 移行)
+
+- TDD 内省パイプライン v2（JUnit XML 方式、閾値 2 回、/retro Step 2.5）
+- Hooks 大規模化（_hook_utils、hookSpecificOutput、out-of-root 検出、secret scan）
+- ADR 0002〜0005（モデルルーティング、Stop hook、context7、Bash allow-list）
+- full-review 全ファイルスキャン必須化（差分チェックモード廃止）
+- docs/artifacts/ ディレクトリ新設（knowledge, audit-reports, tdd-patterns）
+- docs/specs/lam/ に tdd-introspection-v2.md, release-ops-revision.md 取込
+- trust-model.md v2 仕様化（TSV ログ形式、パターン照合ロジック）
+
+### Changed (LAM v4.4.1 移行)
+
+- LAM フレームワークを v4.0.1 → v4.4.1 に移行
+- コマンド再編: quick-save/load 拡張、/ship 新設
+- Release Flow を Web サービス前提からプロジェクト種別非依存に汎用化
+- 権限等級に影式固有パターン追加（docs/internal/, pyproject.toml）
+- 全 8 エージェントに permission-level フロントマター追加
+
+### Removed (LAM v4.4.1 移行)
+
+- 廃止コマンド 7 件: /daily, /focus, /full-load, /full-save, /adr-create, /impact-analysis, /security-review
+- ultimate-think スキル（lam-orchestrate に統合）
+- hook_utils.py（_hook_utils.py に置換）
+
+### LAM 4.0.1 移行 (2026-03-10)
+
+- 全8エージェントに permission-level 注記追加
+- full-review 4エージェント並列構成・Green State G1-G5・自動ループ制御追加
+- docs/specs/lam/ 新規作成（免疫システム要件・設計、Green State 定義 等 計7ファイル）
+- ADR-0001 免疫システムアーキテクチャ決定記録
+- Hooks + Automation 基盤（pre-tool-use, post-tool-use, lam-stop-hook, pre-compact）
 
 ### Phase 2a: 基盤強化
 
@@ -77,7 +104,7 @@ All notable changes to this project will be documented in this file.
 - **chore(.claude)**: `spec-sync.md` に NFR チェック追加（Phase 1 Retro Try-2）
 - **chore(.claude)**: `wave-plan.md` にタスク数上限追加
 
-### Phase 1: 基盤（MVP）— 完了
+### Phase 1: 基盤（MVP）
 
 #### ホットフィックス + 教訓反映 (2026-03-06)
 
