@@ -72,6 +72,8 @@ def _parse_junit_xml(xml_path: Path) -> dict | None:
     if not xml_path.exists():
         return None
     try:
+        # expat ベース: 外部エンティティのネットワーク取得はデフォルト無効。
+        # 入力は pytest 生成の JUnit XML に限定される。
         tree = ET.parse(xml_path)
         root = tree.getroot()
         suites = root.findall("testsuite") if root.tag == "testsuites" else [root]
@@ -132,7 +134,7 @@ def _handle_test_result(
     last_result_file.parent.mkdir(parents=True, exist_ok=True)
 
     if failures > 0:
-        summary = ", ".join(failed_names[:5])[:120].replace("\t", " ")
+        summary = ", ".join(failed_names[:5])[:120].replace("\t", " ").replace("\n", " ")
         _append_to_tdd_log(
             tdd_log,
             f'{timestamp}\tFAIL\t{test_cmd}\ttests={tests} failures={failures}\t"{summary}"',

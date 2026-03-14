@@ -13,9 +13,10 @@ import sys
 import tempfile
 import wave
 
+_MEDIA_DIR = os.path.join(os.environ.get("SYSTEMROOT", r"C:\Windows"), "Media")
 SOUNDS = {
-    "stop": r"C:\Windows\Media\tada.wav",
-    "notification": r"C:\Windows\Media\Windows Exclamation.wav",
+    "stop": os.path.join(_MEDIA_DIR, "tada.wav"),
+    "notification": os.path.join(_MEDIA_DIR, "Windows Exclamation.wav"),
 }
 GAIN = 4.0
 DEFAULT_EVENT = "stop"

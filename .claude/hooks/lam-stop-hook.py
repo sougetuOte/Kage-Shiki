@@ -57,7 +57,10 @@ _SAFE_PATTERN = re.compile(
 )
 
 # シークレットスキャン時に除外するディレクトリ
-_SCAN_EXCLUDE_DIRS = frozenset({".git", "node_modules", "__pycache__", ".venv", ".pytest_cache"})
+_SCAN_EXCLUDE_DIRS = frozenset({
+    ".git", "node_modules", "__pycache__", ".venv", ".pytest_cache",
+    "logs",  # .claude/logs/ 内のログファイルがスキャン対象に含まれることを防止
+})
 
 
 def _get_log_file(project_root: Path) -> Path:
@@ -152,6 +155,7 @@ def _run_tests(check_dir: Path, log_file: Path) -> tuple[int, int]:
     """テストを実行して (result, test_count) を返す。
 
     影式固有: sys.executable で pytest を直接実行（自動検出不使用）。
+    注: --junitxml は付与しない（TDD パターン記録は PostToolUse hook の責務）。
     """
     cmd_args = [sys.executable, "-m", "pytest", "--tb=short", "-q"]
     _log(log_file, "INFO", f"G1: running pytest: {' '.join(cmd_args)}")
@@ -227,10 +231,10 @@ def _run_security(check_dir: Path, log_file: Path) -> int:
         if not scan_file.is_file():
             continue
         try:
-            rel_parts = scan_file.relative_to(check_dir).parts
+            rel = scan_file.relative_to(check_dir)
         except ValueError:
             continue
-        if any(part in _SCAN_EXCLUDE_DIRS for part in rel_parts):
+        if any(part in _SCAN_EXCLUDE_DIRS for part in rel.parts):
             continue
         try:
             if scan_file.stat().st_size > 1_000_000:
@@ -244,10 +248,6 @@ def _run_security(check_dir: Path, log_file: Path) -> int:
             continue
         try:
             content = scan_file.read_text(encoding="utf-8", errors="replace")
-            try:
-                rel = scan_file.relative_to(check_dir)
-            except ValueError:
-                rel = scan_file.name
             for line_no, line in enumerate(content.splitlines(), 1):
                 m = _SECRET_PATTERN.search(line)
                 if m and not _SAFE_PATTERN.search(m.group(2)):
@@ -401,6 +401,8 @@ def _check_escalation(
     if log_entries:
         prev_test_count = int(log_entries[-1].get("test_count", 0))
 
+    # test_count=0 は「テスト未実行」を意味し、エスカレーション対象外。
+    # pytest はコレクション失敗時に exit!=0 を返すため G1 で FAIL 判定される。
     if prev_test_count > 0 and test_count > 0 and test_count < prev_test_count:
         _log(log_file, "WARN",
              f"ESC: test count decreased ({prev_test_count} → {test_count})")
@@ -424,7 +426,7 @@ def _evaluate_green_state(
     state_file: Path,
     project_root: Path,
     log_file: Path,
-) -> tuple[bool, bool, list[str]]:
+) -> tuple[bool, list[str]]:
     """STEP 5: Green State 条件の総合判定。"""
     fail_parts = []
     if test_result == RESULT_FAIL:
@@ -449,7 +451,8 @@ def _evaluate_green_state(
         _cleanup_state_file(state_file)
         _stop(log_file, "Green State achieved → loop converged")
 
-    return green_state, fail_parts
+    # green_state=True の場合は _stop() で到達しない
+    return False, fail_parts
 
 
 def _continue_loop(
@@ -512,7 +515,7 @@ def main() -> None:
     security_result = _run_security(check_dir, log_file)
 
     # STEP 5: Green State 総合判定
-    green_state, fail_parts = _evaluate_green_state(
+    _, fail_parts = _evaluate_green_state(  # green_state=True なら内部で _stop()
         state, test_result, lint_result, security_result,
         state_file, project_root, log_file,
     )

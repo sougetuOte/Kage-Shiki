@@ -52,7 +52,13 @@ def read_stdin_json() -> dict:
     失敗時（不正 JSON、空入力）は空 dict を返す。
     """
     try:
-        raw = sys.stdin.read(_MAX_STDIN_BYTES)
+        # バイト制限を適用（影式セキュリティ対策）
+        # sys.stdin.buffer が利用可能ならバイト単位で制限
+        if hasattr(sys.stdin, "buffer"):
+            raw_bytes = sys.stdin.buffer.read(_MAX_STDIN_BYTES)
+            raw = raw_bytes.decode("utf-8", errors="replace")
+        else:
+            raw = sys.stdin.read(_MAX_STDIN_BYTES)
         if not raw.strip():
             return {}
         return json.loads(raw)
