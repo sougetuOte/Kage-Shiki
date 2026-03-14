@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kage-shiki"
-version = "0.1.0"
+version = "0.2.0"
 description = "影式 (Kage-Shiki) — 人格を持ち、記憶を引き継ぐ Windows 常駐テキストデスクトップマスコット"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,7 +26,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "--cov=kage_shiki --cov-report=term-missing"
+addopts = "--cov=kage_shiki --cov-report=term-missing --junitxml=.claude/test-results.xml"
 markers = [
     "integration: Integration tests that use real threads/files",
 ]

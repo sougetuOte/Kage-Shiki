@@ -7,7 +7,7 @@
 | ファイル読取 | `ls`, `cat`, `grep`, `pwd`, `du`, `file` |
 | Git 読取 | `git status`, `git log`, `git diff`, `git show`, `git branch` |
 | テスト | `pytest`, `npm test`, `go test` |
-| Python | `python`, `python -m pytest`, `python -m ruff`, `python -c`, `pip`, `pyenv` |
+| Python | `python`, `python -m pytest`, `python -m ruff`, `python -c`, `pip`, `pyenv` ※1 |
 | パッケージ情報 | `npm list`, `pip list`, `pip show` |
 | プロセス情報 | `ps` |
 
@@ -50,5 +50,9 @@ v4.0.0 以降、コマンド安全基準は以下の二層で管理される:
 本ファイルの Allow/Deny List は Layer 0（憲法的プロンプティング）として引き続き有効。
 
 Layer 1 の `permissions.allow` に PG級コマンド（`ruff format`, `ruff check --fix` 等）が追加されている。
+
+> ※1 Python コマンドの allow 設定は二段構成（影式固有）:
+> - `pytest *`, `ruff *` 等の PG 級ツール → `settings.json`（Git 管理対象）に登録済み
+> - `python *`, `pip *` 等の汎用コマンド → `settings.local.json`（ローカル専用）で各開発者が有効化
 
 権限等級の詳細: `.claude/rules/permission-levels.md`
