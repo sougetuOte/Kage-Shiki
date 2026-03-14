@@ -98,8 +98,8 @@ class TestNormalizePath:
         monkeypatch.setenv("LAM_PROJECT_ROOT", str(tmp_path))
         abs_path = str(tmp_path / "src" / "main.py")
         result = utils.normalize_path(abs_path, tmp_path)
-        assert "src" in result
-        assert "main.py" in result
+        # Windows パス区切りを正規化して比較
+        assert result.replace("\\", "/") == "src/main.py"
 
     def test_absolute_outside_project(self, tmp_path, monkeypatch):
         monkeypatch.setenv("LAM_PROJECT_ROOT", str(tmp_path))
@@ -138,8 +138,9 @@ class TestAtomicWriteJson:
 
 class TestRunCommand:
     def test_echo(self):
+        import sys as _sys
         code, stdout, stderr = utils.run_command(
-            ["python", "-c", "print('hello')"], ".", timeout=10
+            [_sys.executable, "-c", "print('hello')"], ".", timeout=10
         )
         assert code == 0
         assert "hello" in stdout

@@ -94,6 +94,29 @@ class TestTddPatternRecord:
         assert not tdd_log.exists()
         assert msg is None
 
+    def test_xml_with_error_elements(self, mod, hook_project_root):
+        """JUnit XML の <error> 要素も failures としてカウントされる。"""
+        xml_file = hook_project_root / ".claude" / "test-results.xml"
+        xml_file.write_text(
+            '<?xml version="1.0" ?>\n'
+            '<testsuite tests="3" failures="0" errors="1">\n'
+            '  <testcase name="test_ok1"/>\n'
+            '  <testcase name="test_ok2"/>\n'
+            '  <testcase name="test_broken"><error message="setup error"/></testcase>\n'
+            '</testsuite>\n',
+            encoding="utf-8",
+        )
+        tdd_log = hook_project_root / ".claude" / "tdd-patterns.log"
+        last_result = hook_project_root / ".claude" / "last-test-result"
+        log_file = hook_project_root / ".claude" / "logs" / "post-tool-use.log"
+
+        mod._handle_test_result(
+            "pytest tests/", tdd_log, xml_file, last_result, log_file, "2026-03-14T00:00:00Z"
+        )
+        log = tdd_log.read_text(encoding="utf-8")
+        assert "FAIL" in log
+        assert "test_broken" in log
+
     def test_no_xml_file_warns(self, mod, hook_project_root):
         tdd_log = hook_project_root / ".claude" / "tdd-patterns.log"
         xml_path = hook_project_root / ".claude" / "test-results.xml"  # 存在しない
@@ -118,6 +141,16 @@ class TestDocSyncFlag:
                                   hook_project_root, doc_sync_flag)
         content = doc_sync_flag.read_text(encoding="utf-8")
         assert "src/kage_shiki/core/config.py" in content
+
+    def test_src_edit_absolute_path_records(self, mod, hook_project_root):
+        """絶対パスでも src/ 配下なら正しく記録される。"""
+        doc_sync_flag = hook_project_root / ".claude" / "doc-sync-flag"
+        abs_path = str(hook_project_root / "src" / "kage_shiki" / "main.py")
+        mod._handle_doc_sync_flag("Edit", abs_path,
+                                  hook_project_root, doc_sync_flag)
+        content = doc_sync_flag.read_text(encoding="utf-8")
+        assert "src" in content
+        assert "main.py" in content
 
     def test_docs_edit_not_recorded(self, mod, hook_project_root):
         doc_sync_flag = hook_project_root / ".claude" / "doc-sync-flag"

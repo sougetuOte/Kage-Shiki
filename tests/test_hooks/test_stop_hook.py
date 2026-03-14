@@ -115,9 +115,9 @@ class TestContextCheck:
         hook_project_root,
     ):
         loop_state(iteration=1)
-        from _hook_utils import now_utc_iso8601
+        utils = load_hook_module("_hook_utils.py")
         fired_file = hook_project_root / ".claude" / "pre-compact-fired"
-        fired_file.write_text(now_utc_iso8601() + "\n", encoding="utf-8")
+        fired_file.write_text(utils.now_utc_iso8601() + "\n", encoding="utf-8")
 
         data = {}
         with mock_stdin(data):

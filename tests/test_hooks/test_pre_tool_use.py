@@ -131,6 +131,14 @@ class TestDetermineLevel:
         )
         assert level == "PM"
 
+    def test_edit_settings_local_is_pm(self, mod, hook_project_root):
+        level, reason = mod._determine_level_and_reason(
+            "Edit", ".claude/settings.local.json", "",
+            hook_project_root,
+            hook_project_root / ".claude" / "current-phase.md",
+        )
+        assert level == "PM"
+
     def test_auditing_pg_command(self, mod, hook_project_root, setup_phase):
         setup_phase("AUDITING")
         level, reason = mod._determine_level_and_reason(

@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **fix(audit)**: full-review 4 イテレーション監査 — .claude/ + tests/test_hooks/ の品質 Issue 全修正
+  - hooks: 型ヒント修正、stdin バイト制限、XXE コメント是正、secret scan ログ除外、改行エスケープ
+  - agents: YAML フロントマター前の無効コメント行を削除（全 8 ファイル）
+  - commands: `# permission-level` を HTML コメント化、フロントマター追加（quick-load/save/ship）
+  - docs: CHEATSHEET stale refs 修正、building.md 閾値 3→2、wave-plan 矛盾解消
+  - specs: v4.0.0-immune-system-design 閾値 3→2、anchor-format "ultimate-think" 修正
+  - security-commands: Python allow 脚注を二段構成に修正
+  - pyproject.toml: `--junitxml` 追加 + version 0.2.0
+  - tests: +3 テスト（settings.local PM 判定、XML `<error>` 要素、絶対パス doc-sync）
+  - 830 tests / 92% coverage / ruff clean
+
 ## [0.2.0] - 2026-03-14
 
 Phase 1 全機能実装 + Phase 2a 統合テスト完了 + LAM v4.4.1 フレームワーク移行。
