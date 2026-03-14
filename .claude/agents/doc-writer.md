@@ -1,4 +1,3 @@
-# permission-level: SE
 ---
 name: doc-writer
 description: >

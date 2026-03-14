@@ -1,4 +1,3 @@
-# permission-level: SE
 ---
 name: code-reviewer
 description: >

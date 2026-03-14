@@ -2,8 +2,7 @@
 description: "TDD内省パターンの審査・承認"
 ---
 
-# permission-level: PM
-# ルール候補の承認・却下は PM 級の判断
+<!-- permission-level: PM — ルール候補の承認・却下は PM 級の判断 -->
 
 # Pattern Review（TDD 内省パターン審査）
 

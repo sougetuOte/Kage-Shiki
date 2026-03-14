@@ -4,7 +4,7 @@
 レベルに応じて不要なセクションは省略する。
 
 ```markdown
-# ultimate-think Anchor: {用途}
+# lam-orchestrate Anchor: {用途}
 
 **議題**: {元の議題}
 **レベル**: {1/2/3}

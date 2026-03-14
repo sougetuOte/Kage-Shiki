@@ -20,7 +20,7 @@ description: |
 
 - `docs/adr/` への新規ファイル作成
 - アーキテクチャ決定、技術選定の記録を求められた
-- `/adr-create` コマンドの実行時
+- `adr-template` スキルの明示的な呼び出し時
 
 ## ファイル命名規則
 
@@ -212,4 +212,4 @@ Proposed → Accepted → [Deprecated | Superseded]
 ## 参照ドキュメント
 
 - `docs/internal/06_DECISION_MAKING.md`
-- `/adr-create` コマンド
+- `adr-template` スキル（本ファイル）

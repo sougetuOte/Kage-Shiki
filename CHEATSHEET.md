@@ -36,7 +36,7 @@
 ├── agents/                # サブエージェント
 ├── skills/                # オーケストレーション・テンプレート出力
 ├── hooks/                 # PreToolUse / PostToolUse / Stop / PreCompact
-├── logs/                  # permission.log, loop-*.json
+├── logs/                  # permission.log, loop-*.txt
 ├── states/                # 機能ごとの進捗状態
 └── current-phase.md       # 現在のフェーズ
 
@@ -130,7 +130,7 @@ git commit / push は `/ship` を使用。
 | `skill-creator` | スキル作成ガイド | 「新しいスキルを作りたい」 |
 | `adr-template` | ADR作成テンプレート | ADR 作成時に自動適用 |
 | `spec-template` | 仕様書作成テンプレート | 仕様書作成時に自動適用 |
-| `frontend-design` | UI デザインガイド | UI コンポーネント作成時に使用 |
+
 
 ## ワークフローコマンド
 

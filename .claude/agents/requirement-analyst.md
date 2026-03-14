@@ -1,4 +1,3 @@
-# permission-level: PM
 ---
 name: requirement-analyst
 description: |

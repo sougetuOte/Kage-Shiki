@@ -118,7 +118,18 @@ PM 級の Issue を検出した場合:
 3. ループが自動停止（lam-stop-hook.py で収束条件に達する）
 
 ユーザー承認後:
-- `pm_pending` フラグを clear する: `python -c "import json; d=json.load(open('.claude/lam-loop-state.json')); d.pop('pm_pending',None); json.dump(d,open('.claude/lam-loop-state.json','w'))"`
+- `pm_pending` フラグを clear する:
+  ```bash
+  python -c "
+  import json, pathlib, sys
+  sys.path.insert(0, str(pathlib.Path('.claude/hooks')))
+  from _hook_utils import atomic_write_json
+  p = pathlib.Path('.claude/lam-loop-state.json')
+  d = json.loads(p.read_text(encoding='utf-8'))
+  d.pop('pm_pending', None)
+  atomic_write_json(p, d)
+  "
+  ```
 - ループを再開
 
 ### Phase 4: Green State 検証

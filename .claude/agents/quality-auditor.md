@@ -1,5 +1,3 @@
-# permission-level: SE
-# model: opus
 ---
 name: quality-auditor
 description: |

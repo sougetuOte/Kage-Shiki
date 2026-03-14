@@ -2,8 +2,7 @@
 description: "次 Wave のタスク選定と実行順序を策定"
 ---
 
-# permission-level: SE
-# タスク編成は設計判断を含むため
+<!-- permission-level: SE — タスク編成は設計判断を含むため -->
 
 # Wave Plan（Wave 計画策定）
 
@@ -102,5 +101,5 @@ description: "次 Wave のタスク選定と実行順序を策定"
 
 - Wave 計画は PLANNING フェーズの一部として実施
 - タスクの追加・変更は仕様書の存在を前提とする
-- 1 Wave が 3 タスクを超える場合は分割を検討
+- 1 Wave が 4 タスクを超える場合は分割を検討
 - Wave 完了後は `/ship` でコミット・push を実施

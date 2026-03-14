@@ -91,7 +91,7 @@ PLANNING 承認状態:
 ### Step 5.5: TDD 内省パイプライン連携（自動）
 
 テスト失敗→成功のサイクルは PostToolUse hook が自動記録する（`.claude/tdd-patterns.log`）。
-同一パターンが 3 回に到達すると `.claude/rules/auto-generated/draft-*.md` が自動生成される。
+同一パターンが 2 回に到達すると `/retro` Step 2.5 でルール候補が提案される。
 詳細: `.claude/rules/auto-generated/trust-model.md`
 
 ## 禁止事項
