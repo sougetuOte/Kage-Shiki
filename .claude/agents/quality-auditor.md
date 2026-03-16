@@ -142,22 +142,24 @@ model: sonnet
 | レイヤー違反なし | ✓/✗ | |
 | Protocol/Interface の整合性 | ✓/✗ | |
 
-### 2. TDD 品質ルール適合性（R-1〜R-13）
+### 2. TDD 品質ルール適合性（R-1〜R-13, S-1〜S-2）
 | ルール | 適合 | 備考 |
 |--------|------|------|
 | R-1: 仕様突合（phase-rules.md） | ✓/✗ | |
-| R-2: dict ディスパッチ | ✓/✗ | |
-| R-3: 定数即時接続 | ✓/✗ | |
+| R-2: dict ディスパッチ（building-checklist.md） | ✓/✗ | |
+| R-3: 定数即時接続（building-checklist.md） | ✓/✗ | |
 | R-4: テスト網羅（phase-rules.md） | ✓/✗ | |
-| R-5: 異常系テスト + カバレッジ | ✓/✗ | |
-| R-6: else デフォルト値禁止 | ✓/✗ | |
-| R-7: スレッド安全性 | ✓/✗ | |
-| R-8: 永続状態「2回目起動」 | ✓/✗ | |
-| R-9: シャットダウン経路一意性 | ✓/✗ | |
-| R-10: GUI 変更時の目視確認 | ✓/✗ | |
-| R-11: Green 直後 3 点ミニチェック | ✓/✗ | |
-| R-12: テスト名と入力値の一致（phase-rules.md） | ✓/✗ | |
-| R-13: 設計書出力ファイルからのアサーション生成（phase-rules.md） | ✓/✗ | |
+| R-5: テスト名と入力値の一致（phase-rules.md） | ✓/✗ | |
+| R-6: 設計書出力ファイルからのアサーション生成（phase-rules.md） | ✓/✗ | |
+| R-7: スレッド安全性（building-checklist.md） | ✓/✗ | |
+| R-8: 永続状態「2回目起動」（building-checklist.md） | ✓/✗ | |
+| R-9: シャットダウン経路一意性（building-checklist.md） | ✓/✗ | |
+| R-10: GUI 変更時の目視確認（building-checklist.md） | ✓/✗ | |
+| R-11: Green 直後 3 点ミニチェック（building-checklist.md） | ✓/✗ | |
+| R-12: 異常系テストの義務（building-checklist.md） | ✓/✗ | |
+| R-13: else デフォルト値禁止（building-checklist.md） | ✓/✗ | |
+| S-1: 仕様突合（phase-rules.md） | ✓/✗ | |
+| S-2: Protocol外メソッド明示（building-checklist.md） | ✓/✗ | |
 
 ### 3. スキーマ・参照・データフロー整合性
 | チェック項目 | 状態 | 備考 |

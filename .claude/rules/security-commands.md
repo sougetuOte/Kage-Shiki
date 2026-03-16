@@ -56,7 +56,7 @@ v4.0.0 以降、コマンド安全基準は以下の二層で管理される:
 Layer 1 の `permissions.allow` に PG級コマンド（`ruff format`, `ruff check --fix` 等）が追加されている。
 
 > ※1 Python コマンドの allow 設定は二段構成（影式固有）:
-> - `pytest *`, `ruff *` 等の PG 級ツール → `settings.json`（Git 管理対象）に登録済み
+> - `pytest *`, `ruff *`, `python -m pytest *`, `python -c *` 等の PG 級ツール → `settings.json`（Git 管理対象）に登録済み
 > - `python *`, `pip *` 等の汎用コマンド → `settings.local.json`（ローカル専用）で各開発者が有効化
 
 権限等級の詳細: `.claude/rules/permission-levels.md`

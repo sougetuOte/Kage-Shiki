@@ -144,7 +144,7 @@ def _read_current_phase(phase_file: Path) -> str:
             match = re.match(r"^\*\*([A-Z]+)\*\*", line)
             if match:
                 return match.group(1)
-    except Exception:
+    except (OSError, re.error):
         pass
     return ""
 

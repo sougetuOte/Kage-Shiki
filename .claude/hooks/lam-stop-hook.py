@@ -96,8 +96,8 @@ def _save_loop_log(
             )
         loop_log_file.write_text("\n".join(lines), encoding="utf-8")
         _log(log_file, "INFO", f"Loop log saved to {loop_log_file}")
-    except Exception:
-        pass
+    except Exception as e:
+        _log(log_file, "WARN", f"_save_loop_log failed: {e}")
 
 
 def _cleanup_state_file(state_file: Path) -> None:
@@ -118,9 +118,11 @@ def _check_recursion_and_state(
 
     try:
         state = json.loads(state_file.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (json.JSONDecodeError, OSError) as e:
+        # 仕様: 状態ファイル破損時は安全側に停止する（ループ継続より安全停止を優先）
+        # 根拠: 破損状態で block するとイテレーション管理が不正になるリスクがある
         _log(log_file, "ERROR", f"state file read/parse error: {type(e).__name__}: {e}")
-        _stop(log_file, "failed to read state file → normal stop")
+        _stop(log_file, "failed to read state file → normal stop (corrupted state = safe stop)")
 
     if not state.get("active"):
         _stop(log_file, "active=false → loop disabled, normal stop")

@@ -26,7 +26,10 @@ def write_pre_compact_flag(project_root: pathlib.Path, timestamp: str) -> None:
 
 
 def update_session_state(session_state: pathlib.Path, timestamp: str) -> None:
-    """SESSION_STATE.md に PreCompact 発火を記録する（冪等処理）。"""
+    """SESSION_STATE.md に PreCompact セクションを追加/更新する。
+
+    前提条件: session_state ファイルが存在すること（main() で exists() チェック済み）。
+    """
     content = session_state.read_text(encoding="utf-8")
     section_header = "## PreCompact 発火"
 
@@ -83,8 +86,8 @@ def main() -> None:
 
         backup_loop_state(project_root)
 
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"pre-compact error: {e}\n")
 
     safe_exit(0)
 

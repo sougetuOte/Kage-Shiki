@@ -131,7 +131,18 @@ class AnalyzerRegistry:
 
     def auto_discover(self, search_dir: Path) -> None:
         """search_dir 内の *_analyzer.py を探索し、
-        LanguageAnalyzer サブクラスを自動登録する。"""
+        LanguageAnalyzer サブクラスを自動登録する。
+
+        セキュリティ: search_dir が想定ディレクトリ配下であることを検証し、
+        パストラバーサル経由の任意コードロードを防止する。
+        """
+        # H-1: パストラバーサル防止 — analyzers/ 配下のみ許可
+        expected_parent = Path(__file__).resolve().parent
+        if not search_dir.resolve().is_relative_to(expected_parent):
+            raise ValueError(
+                f"auto_discover: search_dir must be under {expected_parent}, "
+                f"got {search_dir.resolve()}"
+            )
         for module_path in sorted(search_dir.glob("*_analyzer.py")):
             self._load_module(module_path)
 
