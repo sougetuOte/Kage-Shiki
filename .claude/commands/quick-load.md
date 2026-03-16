@@ -1,5 +1,5 @@
 ---
-description: "クイックロード"
+description: "セッション状態のロード（SESSION_STATE.md + 関連ドキュメント特定）"
 ---
 
 # クイックロード

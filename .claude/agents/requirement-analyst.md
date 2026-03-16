@@ -5,11 +5,10 @@ description: |
   曖昧なユーザー要望を明確な仕様に変換する。
   3 Agents Model を内蔵し、多角的な要件検証を行う。
   PLANNINGフェーズでの要件定義作業で使用推奨。
+# permission-level: PM
 tools: Read, Glob, Grep, Write, Edit, WebSearch
 model: sonnet
 ---
-
-# permission-level: PM
 
 # Requirement Analyst サブエージェント
 
@@ -108,17 +107,17 @@ So that [価値].
 ### Step 3: 3 Agents 検証
 
 ```markdown
-## 3 Agents Analysis
+## MAGI Analysis
 
-### [Affirmative] この要件のメリット
+### [MELCHIOR] この要件のメリット
 - [価値1]
 - [価値2]
 
-### [Critical] 懸念点・リスク
+### [BALTHASAR] 懸念点・リスク
 - [リスク1]
 - [リスク2]
 
-### [Mediator] 推奨事項
+### [CASPAR] 推奨事項
 - [バランスを取った提案]
 ```
 

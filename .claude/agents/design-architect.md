@@ -4,12 +4,11 @@ description: |
   設計・アーキテクチャに特化したサブエージェント。
   要件を実装可能な設計に変換する。
   データモデル、API設計、システム構成を担当。
-  大規模設計や並列設計時に委任可能。単一機能の設計はメインで直接実施する方が効率的。
+  PLANNINGフェーズでの設計作業で使用推奨。
+# permission-level: PM
 tools: Read, Glob, Grep, Write, Edit, WebSearch
 model: sonnet
 ---
-
-# permission-level: PM
 
 # Design Architect サブエージェント
 
