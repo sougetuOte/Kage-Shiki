@@ -7,10 +7,11 @@
 
 本番環境へのデプロイは、以下の条件を全て満たした場合のみ許可される。
 
-- [ ] **Quality Gate Passed**: 全テスト通過、lint エラーゼロ、対応可能 Issue ゼロ。
+- [ ] **All Tests Green**: 全ての自動テストが通過している。
 - [ ] **No Critical Bugs**: 優先度 High 以上の既知のバグが存在しない。
-- [ ] **Retrospective Done**: `/retro` による振り返りが実施済み。
+- [ ] **Quality Gate Passed**: プロジェクトが定めるリリース品質基準を満たしている（例: 監査 Green、パフォーマンス基準、セキュリティスキャン等。基準はプロジェクトごとに定義）。
 - [ ] **Documentation Updated**: 変更内容が `CHANGELOG.md` およびユーザーマニュアルに反映されている。
+- [ ] **Retrospective Done**: `/retro` による振り返りが実施済みである。
 
 <!-- Phase 2b 以降でパッケージング方法（PyInstaller, Nuitka 等）を確定予定 -->
 
@@ -34,7 +35,7 @@
 
 1.  **Rollback**: 直ちに直前の安定バージョンへ切り戻す。原因究明はその後に行う。
 2.  **Announcement**: ユーザーへ障害発生と状況を通知する。
-3.  **Post-Mortem**: 事後分析を行い、再発防止策を記録する。アーキテクチャ判断は `docs/adr/` に、一般的な失敗分析は `docs/artifacts/` に保存する。
+3.  **Post-Mortem**: 事後分析を行い、`docs/artifacts/` に記録する。アーキテクチャ判断が伴う場合は `docs/adr/` にも ADR を起票する。
 
 ## 4. Versioning Strategy (バージョニング)
 

@@ -14,7 +14,7 @@ PostToolUse hook が `.claude/test-results.xml`（JUnit XML）を読み取り、
 ## 観測と分析のフロー
 
 ```
-テスト実行 → JUnit XML 出力 (.claude/test-results.xml)
+テスト実行 → JUnit XML 出力
     ↓
 PostToolUse hook → tdd-patterns.log に FAIL/PASS 記録
     ↓

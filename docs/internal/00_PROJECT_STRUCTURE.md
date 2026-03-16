@@ -22,15 +22,22 @@
 │   ├── tasks/              # タスク管理 (Kanban/List)
 │   ├── internal/           # プロジェクト運用ルール (本フォルダ)
 │   ├── memos/              # [Input] ユーザーからの生メモ・資料
+│   ├── slides/             # 概念説明スライド
+│   ├── daily/              # /quick-save Daily 記録
 │   └── artifacts/          # 中間成果物・知見蓄積
 │       ├── knowledge/      #   /retro Step 4 の知見保存先
 │       ├── audit-reports/  #   監査レポート
 │       └── tdd-patterns/   #   TDD パターン詳細
 ├── .claude/                # Claude Code用設定・コマンド・状態管理
+│   ├── commands/           #   ワークフローコマンド（/ship, /full-review, /wave-plan 等）
+│   ├── rules/              #   ガードレール（自動ロード）
 │   ├── hooks/              #   PreToolUse / PostToolUse / Stop / PreCompact フック
-│   ├── logs/               #   権限判定ログ、ループログ
+│   ├── skills/             #   スキル定義（テンプレート、思考フレームワーク等）
+│   ├── agents/             #   カスタムサブエージェント定義
+│   ├── agent-memory/       #   Subagent Persistent Memory（エージェント別知見蓄積）
 │   ├── states/             #   フェーズ承認ゲート・タスク進捗の永続状態
-│   └── agent-memory/       #   Subagent Persistent Memory（エージェント別知見蓄積）
+│   ├── logs/               #   権限判定ログ、ループログ
+│   └── settings.json       #   権限・hooks 設定
 └── CLAUDE.md               # プロジェクト憲法
 ```
 
@@ -52,7 +59,17 @@
 - **Naming**: `docs/adr/NNNN-kebab-case-title.md`
 - **Immutable**: 一度確定した ADR は原則変更せず、変更が必要な場合は新しい ADR を作成して "Supersedes" と明記する。
 
-### D. State Management (状態管理)
+### D. Subagent Persistent Memory
+
+- **Path**: `.claude/agent-memory/<agent-name>/`
+- **用途**: サブエージェントがレビュー時に学んだプロジェクト固有知見を蓄積する領域。CLAUDE.md の指示に従いサブエージェントが自発的に書き込む。
+
+### E. TDD Patterns
+
+- **パターンログ**: `.claude/tdd-patterns.log`（PostToolUse hook が自動追記、PG級）
+- **パターン詳細**: `docs/artifacts/tdd-patterns/`（`/retro` で整理）
+
+### F. State Management (状態管理)
 
 - **SESSION_STATE.md** (プロジェクトルート): 現在のセッション状態。`/quick-save` で記録、`/quick-load` で復元。セッション間ハンドオフ用の使い捨てファイル。
 - **.claude/states/*.json**: フェーズごとの承認ゲート管理、タスク進捗の永続的な状態記録。機能開発の進行管理に使用。
@@ -64,18 +81,26 @@
 - **Files (Code)**: 言語標準に従う (Python: `snake_case.py`)
 - **Files (Docs)**: `snake_case.md` または `kebab-case.md` (プロジェクト内で統一)
 
-## SSOT 情報層アーキテクチャ
+## 4. SSOT 3層アーキテクチャ
 
-| 層 | 場所 | 読込タイミング | 変更頻度 |
-|----|------|-------------|---------|
-| **情報層 1（憲法）** | `CLAUDE.md` | 毎セッション自動 | 低（プロジェクト方針変更時のみ） |
-| **情報層 2（ルール）** | `.claude/rules/*.md`, `.claude/hooks/`, `.claude/agents/`, `.claude/skills/` | 毎セッション自動 | 中（Phase/Wave 終了時のレビュー） |
-| **情報層 3（プロセス）** | `docs/internal/*.md` | 必要時に参照 | 中（プロセス改善時） |
+> **用語注意**: 本セクションの「情報層」は SSOT の情報階層を指す。
+> `07_SECURITY_AND_AUTOMATION.md` Section 5 の「Permission Layer 0/1/2」（権限制御の多層モデル）とは別の概念である。
 
-> **Note**: 情報層 1/2/3 は SSOT の参照優先度を示す。Permission Layer 0/1/2（コマンド安全基準の三層）とは異なる概念であることに注意。
+```
+情報層 1: docs/internal/ — プロセス SSOT（What & Why）
+  |
+  v 参照・実装
+情報層 2: .claude/rules/    — ガードレール（自動ロード）
+          .claude/commands/ — ワークフロー（手動実行）
+          .claude/hooks/    — 自動化 hooks（PreToolUse/PostToolUse/Stop/PreCompact）
+          .claude/agents/   — エージェント定義
+          .claude/skills/   — スキル定義
+  |
+  v 要約
+情報層 3: CHEATSHEET.md — クイックリファレンス
+```
 
-### 層間の関係
-
-- 上位層は下位層に優先する（情報層 1 > 情報層 2 > 情報層 3）
-- 矛盾がある場合は上位層が正とし、下位層を修正する
-- hooks（`.claude/hooks/`）は情報層 2 の自動実行メカニズムとして機能する
+- 情報層 1 が最高権限。情報層 2 は情報層 1 の「実装」
+- 情報層 2 に新機能を追加したら、情報層 1 への反映を確認する
+- 情報層 3 は情報層 1-2 の要約であり、独自情報を持たない
+- `CLAUDE.md` はブートストラップ（プロジェクト憲法、参照ハブ）として機能し、情報層 1-2 への参照を提供する
