@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed (LAM v4.5.0 移行 Phase 1-2)
+### Changed (LAM v4.5.0 移行 Phase 1-3)
 
 - **refactor**: MAGI System 導入 — Three Agents Model を MELCHIOR/BALTHASAR/CASPAR に改名 + Reflection ステップ追加
   - 影響: rules/ (decision-making, phase-rules), docs/internal/ (06_DM, 01_RM, 02_DF), CHEATSHEET.md, commands/planning, agents/quality-auditor 等
@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **refactor**: R-5/R-6 リナンバリング（影式固有 R-5→R-12, R-6→R-13）+ LAM R-5/R-6 追加
 - **docs**: SCR specs 4 件 + design 1 件取込（docs/specs/lam/, docs/design/）
 - **docs**: v4.4.1 未反映 3 件対応（Memory 列、99_reference、Memory Policy 名）
+- **refactor**: lam-stop-hook.py 全面書き換え（541→226行、安全ネット化。Green State判定をfull-review Stage 5に移管）
+- **feat**: analyzers/ 13モジュール新規導入（Scalable Code Review 静的解析パイプライン基盤）
+- **security**: pre-tool-use.py に _PG_BLACKLISTED_ARGS チェック追加（10項目）
+- **feat**: PostToolUseFailure イベント対応（settings.json + post-tool-use.py）
+- **test**: stop-hook テスト書き換え（Green State→安全ネット）+ integration テスト更新（834 tests）
 
 ### Fixed
 
