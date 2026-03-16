@@ -23,7 +23,9 @@
       "Bash(npx prettier *)",
       "Bash(npx eslint --fix *)",
       "Bash(ruff check --fix *)",
-      "Bash(ruff format *)"
+      "Bash(ruff format *)",
+      "Bash(python -m pytest *)",
+      "Bash(python -c *)"
     ],
     "deny": [
       "Bash(rm *)",
@@ -74,6 +76,15 @@
     "PostToolUse": [
       {
         "matcher": "Edit|Write|Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-tool-use.py"
+        }]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
         "hooks": [{
           "type": "command",
           "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-tool-use.py"
