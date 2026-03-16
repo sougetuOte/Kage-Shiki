@@ -21,16 +21,24 @@ description: "BUILDINGフェーズを開始 - TDD実装サイクル"
    - `docs/internal/03_QUALITY_STANDARDS.md` を確認
    - 関連する `docs/specs/` の仕様書を読み込む
 
-4. **状態ファイルを更新**
+4. **影響分析（Pre-Flight）**
+   - 変更対象ファイル/モジュールの依存関係を調査
+   - 直接影響（import/require 元）と間接影響を特定
+   - 公開 API/IF の変更有無を確認
+   - 影響を受けるテストケースを特定
+   - 変更を PG/SE/PM に分類し、PM級があれば承認を求める
+   - 権限等級の詳細: `.claude/rules/permission-levels.md`
+
+5. **状態ファイルを更新**
    - `subPhase` を `implementation` に更新
    - `status.implementation` を `in_progress` に更新
 
-5. **BUILDINGルールを適用**
+6. **BUILDINGルールを適用**
    - **TDDサイクル厳守**: Red → Green → Refactor
    - 仕様書とコードの同期は絶対
    - 1サイクル完了ごとにユーザーに報告
 
-6. **作業の進め方**
+7. **作業の進め方**
    - TDD実装には `tdd-developer` サブエージェントを推奨
    - 実装前に必ず `docs/specs/` の対応仕様を確認
    - コード変更時は対応ドキュメントも同時更新（Atomic Commit）
@@ -66,19 +74,14 @@ PLANNING 承認状態:
 ### Step 2: Red (Test First)
 - 失敗するテストを先に書く
 - テストは「実行可能な仕様書」
-- **[R-4]** タスクの FR 番号をテスト docstring に転記し、各 FR に最低 1 テスト対応を確認
-- **[R-5]** 異常系・エラーパス・境界値のテストも Red で書く
 
 ### Step 3: Green (Minimal Implementation)
 - テストを通す最小限のコードを実装
 - 美しさより速さを優先
-- **[R-2]** 3 分岐以上の有限値セットは dict ディスパッチ（if-chain 禁止）
-- **[R-3]** 定数を定義したら同サイクル内で使用（未参照定数を残さない）
-- **[R-6]** else/default のデフォルト値は正当な理由がなければ `raise ValueError`
 
 ### Step 3.5: Post-Green Verification（Green 直後）
-- **[R-1]** 対応 FR/設計仕様を**再読**し、フィールド名・定数値・文言の文字単位一致を照合
-- **[R-5]** `pytest --cov` で未カバー行を確認し、テスト必要な行を追加
+- 対応 FR/設計仕様を**再読**し、フィールド名・定数値・文言の文字単位一致を照合
+- `pytest --cov` で未カバー行を確認し、テスト必要な行を追加
 
 ### Step 4: Refactor
 - Green になってから設計を改善
@@ -88,10 +91,10 @@ PLANNING 承認状態:
 - ユーザーに報告
 - `walkthrough.md` に検証結果をまとめる
 
-### Step 5.5: TDD 内省パイプライン連携（自動）
+## TDD 内省パイプライン v2
 
-テスト失敗→成功のサイクルは PostToolUse hook が自動記録する（`.claude/tdd-patterns.log`）。
-同一パターンが 2 回に到達すると `/retro` Step 2.5 でルール候補が提案される。
+BUILDING フェーズでの TDD サイクル中、テスト失敗→成功のパターンは PostToolUse hook によって `.claude/tdd-patterns.log` に自動記録される。
+閾値（2回）に達したパターンは `/pattern-review` コマンドで審査し、承認されれば `.claude/rules/auto-generated/` にルールとして昇格する。
 詳細: `.claude/rules/auto-generated/trust-model.md`
 
 ## 禁止事項
@@ -126,6 +129,7 @@ PLANNING 承認状態:
 - TDDサイクル: Red → Green → Refactor
 - ドキュメント同期: 必須
 - 報告: 1サイクルごと
+- 影響分析: 実装前に必須
 
 読み込み済み:
 - 02_DEVELOPMENT_FLOW.md (Phase 2)

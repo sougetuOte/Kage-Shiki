@@ -11,11 +11,11 @@
 
 ### A. Allow List (Auto-Run Safe)
 
-以下のコマンドは、**副作用がなく（Read-Only）、かつローカル環境で完結するもの**であるため、ユーザー承認なしで実行してよい（`SafeToAutoRun: true`）。
+以下のコマンドは、**副作用がなく（Read-Only）、かつローカル環境で完結するもの**であるため、ユーザー承認なしで実行してよい。
 
 | Category               | Commands                                                      | Notes                              |
 | :--------------------- | :------------------------------------------------------------ | :--------------------------------- |
-| **File System (Read)** | `ls`, `cat`, `grep`, `pwd`, `du`, `file`                      | ファイル内容の読み取り、検索。     |
+| **File System (Read)** | `ls`, `cat`, `grep`, `pwd`, `du`, `file`                      | ファイル内容の読み取り、検索。`find` は v4.3.1 で ask に移動。 |
 | **Git (Read)**         | `git status`, `git log`, `git diff`, `git show`, `git branch` | リポジトリ状態の確認。             |
 | **Testing (Local)**    | `pytest`, `pytest -v`, `pytest --tb=short`                    | **ローカルでの**テスト実行。       |
 | **Linting (Read)**     | `ruff check`, `ruff format --check`                           | コードスタイル確認（変更なし）。   |
@@ -43,7 +43,7 @@
 | **File System (Write)** | `cp`, `touch`, `mkdir`                                                      | 意図しないファイル作成・コピー。                             |
 | **File Search**         | `find`                                                                      | 通常検索（破壊的パターンは B-1 deny）。                      |
 | **Git (Remote/Write)**  | `git push`, `git pull`, `git fetch`, `git clone`, `git commit`, `git merge` | リモートリポジトリへの影響、コンフリクト発生。               |
-| **Network**             | `curl`, `wget`, `ssh`, `ping`, `nc`                                         | 外部へのデータ送信、不正なスクリプトのダウンロード。         |
+| **Network**             | `curl`, `wget`, `ssh`                                                       | 外部へのデータ送信、不正なスクリプトのダウンロード。         |
 | **Build/Run**           | `python main.py`, `python -m kage_shiki`                                    | アプリケーションの実行（無限ループやリソース枯渇のリスク）。 |
 | **Linting (Write)**     | `ruff check --fix`, `ruff format`                                           | ファイルを自動修正する（変更を伴う）。v4.0.0 以降は PG級自動修正可（本ドキュメント Section 5 参照）。 |
 | **Package Install**     | `pip install`, `pip uninstall`                                              | 環境への変更。                                               |
@@ -61,10 +61,13 @@
 
 ## 3. Automation Workflow
 
+> v4.0.0 以降、自動実行の判定は Section 5 の多層権限モデル（settings.json + PreToolUse hook）が担う。
+> 以下は Layer 0（プロンプトレベル）での判断指針である。
+
 1.  **Check**: 実行したいコマンドが Allow List に含まれているか確認する。
 2.  **Decide**:
-    - **Included**: `SafeToAutoRun: true` を設定し、ツールを実行する。
-    - **Excluded**: `SafeToAutoRun: false` を設定し、ユーザーに承認を求める。
+    - **Allow List に含まれる**: そのまま実行する。
+    - **含まれない**: ユーザーに承認を求める。
 3.  **Log**: 実行結果を確認し、エラーが出た場合はユーザーに報告する。
 
 ## 4. Emergency Stop
@@ -98,6 +101,7 @@ v4.0.0 で導入された hooks ベースの権限管理システム。
 
 自律ループの収束判定（Green State チェック）:
 - G1: テスト全パス、G2: lint エラーゼロ、G3: 対応可能 Issue ゼロ、G4: 仕様差分ゼロ、G5: セキュリティチェック通過
+- 詳細は `docs/specs/green-state-definition.md` を参照
 
 ### PreCompact Hook
 
@@ -105,9 +109,28 @@ v4.0.0 で導入された hooks ベースの権限管理システム。
 
 ## Section 6: Recommended Security Tools（v4.0.0）
 
+### Anthropic 公式
+
+| ツール | 用途 | 導入方法 |
+|:---|:---|:---|
+| [claude-code-security-review](https://github.com/anthropics/claude-code-security-review) | PR 単位の AI セキュリティレビュー（GitHub Action） | `.github/workflows/` に追加 |
+
+### 依存脆弱性スキャン（影式で使用するツール）
+
 | ツール | 用途 | 影式での利用 |
 |--------|------|------------|
 | `ruff` | Python linter + formatter | 導入済み（PG級自動修正可） |
 | `pip-audit` | Python 依存パッケージの脆弱性チェック | Green State G5 で使用 |
 | `safety` | Python 依存パッケージの安全性チェック | pip-audit の代替 |
 | `bandit` | Python セキュリティ静的解析 | 将来導入検討 |
+
+### CI/CD 統合
+
+GitHub Actions で `claude-code-security-review` を使用する場合の設定例:
+
+```yaml
+- uses: anthropics/claude-code-security-review@main
+  with:
+    comment-pr: true
+    claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+```

@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (LAM v4.5.0 移行 Phase 1-3)
+
+- **refactor**: MAGI System 導入 — Three Agents Model を MELCHIOR/BALTHASAR/CASPAR に改名 + Reflection ステップ追加
+  - 影響: rules/ (decision-making, phase-rules), docs/internal/ (06_DM, 01_RM, 02_DF), CHEATSHEET.md, commands/planning, agents/quality-auditor 等
+- **feat**: code-quality-guideline.md 新規追加 — Critical/Warning/Info 三層品質基準 + Green State Issue 条件
+- **feat**: planning-quality-guideline.md 新規追加 — Requirements Smells, RFC 2119, SPIDR, WBS 100%, Example Mapping
+- **feat**: /magi スキル新設 — AoT + MAGI System + Reflection による構造化意思決定
+- **feat**: /clarify スキル新設 — 文書精緻化インタビュー（曖昧さ・矛盾・欠落検出）
+- **feat**: ui-design-guide スキル新設 — UI/UX 設計チェックリスト
+- **refactor**: full-review.md を 6 Stage 体系に全面再編（Scalable Code Review 統合）
+- **refactor**: lam-orchestrate — /magi スキル統合、hooks 連携拡充、エスカレーション 6 条件化
+- **refactor**: 全エージェント — permission-level フロントマター移動、quality-auditor Sonnet 化、tdd-developer Pre-flight 追加
+- **refactor**: SSOT 3 層再構成（docs/internal/ が情報層 1、CLAUDE.md はブートストラップ）
+- **refactor**: R-5/R-6 リナンバリング（影式固有 R-5→R-12, R-6→R-13）+ LAM R-5/R-6 追加
+- **docs**: SCR specs 4 件 + design 1 件取込（docs/specs/lam/, docs/design/）
+- **docs**: v4.4.1 未反映 3 件対応（Memory 列、99_reference、Memory Policy 名）
+- **refactor**: lam-stop-hook.py 全面書き換え（541→226行、安全ネット化。Green State判定をfull-review Stage 5に移管）
+- **feat**: analyzers/ 13モジュール新規導入（Scalable Code Review 静的解析パイプライン基盤）
+- **security**: pre-tool-use.py に _PG_BLACKLISTED_ARGS チェック追加（10項目）
+- **feat**: PostToolUseFailure イベント対応（settings.json + post-tool-use.py）
+- **test**: stop-hook テスト書き換え（Green State→安全ネット）+ integration テスト更新（834 tests）
+
 ### Fixed
 
 - **fix(audit)**: full-review 4 イテレーション監査 — .claude/ + tests/test_hooks/ の品質 Issue 全修正

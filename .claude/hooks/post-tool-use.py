@@ -38,7 +38,7 @@ _MAX_TOOL_EVENTS = 500
 
 # テストコマンドの正規表現パターン
 _TEST_CMD_PATTERN = re.compile(
-    r"(^|[\s])(pytest|python\s+-m\s+pytest|npm[\s]+test|go[\s]+test)(?:[\s]|$)"
+    r"(^|[\s])(pytest|python\s+-m\s+pytest|npm[\s]+test|go[\s]+test|make[\s]+test)(?:[\s]|$)"
 )
 
 
@@ -53,6 +53,8 @@ def _get_test_cmd_label(command: str) -> str:
         return "npm test"
     if "go test" in command:
         return "go test"
+    if "make test" in command:
+        return "make test"
     return "pytest"
 
 
@@ -93,7 +95,8 @@ def _parse_junit_xml(xml_path: Path) -> dict | None:
             "failures": total_failures + total_errors,
             "failed_names": failed_names,
         }
-    except Exception:
+    except (ET.ParseError, OSError, ValueError) as e:
+        sys.stderr.write(f"_parse_junit_xml error: {e}\n")
         return None
 
 
@@ -128,7 +131,7 @@ def _handle_test_result(
     # 前回の結果を読み取る
     prev_result = ""
     if last_result_file.exists():
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(OSError, ValueError):
             prev_result = last_result_file.read_text(encoding="utf-8").splitlines()[0]
 
     last_result_file.parent.mkdir(parents=True, exist_ok=True)
@@ -164,6 +167,9 @@ def _handle_doc_sync_flag(
     doc_sync_flag: Path,
 ) -> None:
     """Edit/Write + src/ 配下のファイルを doc-sync-flag に追記する。"""
+    # Note: Claude Code executes hooks in a single-threaded context per tool invocation.
+    # Concurrent writes to doc-sync-flag do not occur in normal operation.
+    # If this assumption changes, file locking (fcntl/msvcrt) should be added.
     if tool_name not in ("Edit", "Write"):
         return
     if not file_path:
@@ -201,9 +207,12 @@ def _handle_loop_log(
 
     try:
         loop_json = json.loads(loop_state_path.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return
 
+    # Note: PostToolUseFailure イベントでもループログを記録する。
+    # ツール失敗時の状況追跡（何回失敗したか、どのツールが失敗したか）に有用。
+    # tool_events の上限は _MAX_TOOL_EVENTS=500 で肥大化を防止。
     event = {
         "timestamp": timestamp,
         "tool_name": tool_name,
@@ -264,6 +273,6 @@ if __name__ == "__main__":
         main()
     except SystemExit:
         raise
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"post-tool-use error: {e}\n")
     sys.exit(0)

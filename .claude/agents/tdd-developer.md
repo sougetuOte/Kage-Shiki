@@ -4,12 +4,11 @@ description: |
   TDD実装に特化したサブエージェント。
   Red-Green-Refactor サイクルを厳守して実装を行う。
   仕様書とタスク定義に基づいた品質の高い実装を担当。
-  大規模タスクや並列実装時に委任可能。小規模タスクはメインで直接実装する方が効率的。
+  BUILDINGフェーズでの実装作業で使用推奨。
+# permission-level: SE
 tools: Read, Glob, Grep, Write, Edit, Bash
 model: sonnet
 ---
-
-# permission-level: SE
 
 # TDD Developer サブエージェント
 

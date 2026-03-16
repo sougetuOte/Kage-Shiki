@@ -14,7 +14,7 @@
 | `tdd-developer` | TDD 実装（Red-Green-Refactor） | Sonnet | BUILDING |
 | `test-runner` | テスト実行・分析 | Haiku | BUILDING / AUDITING |
 | `code-reviewer` | コードレビュー | Sonnet | AUDITING |
-| `quality-auditor` | 品質監査・改善提案 | Opus | AUDITING |
+| `quality-auditor` | 品質監査・改善提案 | Sonnet | AUDITING |
 | `doc-writer` | ドキュメント作成・更新 | Sonnet | 全フェーズ |
 
 ### ビルトインエージェント

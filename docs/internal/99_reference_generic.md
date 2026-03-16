@@ -103,7 +103,7 @@ AI がやるのは「仕様化・実装・検証・自律ループ」。
 
 ---
 
-### Phase 4: Release/Ops
+### Phase 4: Release/Ops [RELEASE]
 
 **Input:** Green なプロダクト
 **Output:** Release + 運用ログ

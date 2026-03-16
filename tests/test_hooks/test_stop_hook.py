@@ -1,4 +1,8 @@
-"""lam-stop-hook.py のテスト."""
+"""lam-stop-hook.py のテスト（safety-net only 版）.
+
+LAM v4.5.0: Green State 判定は /full-review Stage 5（Claude 側）に移行。
+Stop hook はループ安全ネット（再帰防止、上限、コンテキスト圧、block）のみ。
+"""
 
 import json
 from io import StringIO
@@ -127,126 +131,52 @@ class TestContextCheck:
         assert buf.getvalue() == ""
 
 
-class TestGreenState:
-    """STEP 4-5: Green State 判定。"""
+class TestSafetyNetBlock:
+    """STEP 4: 安全ネット block（Green State 判定なし）。"""
 
-    def test_all_green_stops(
+    def test_active_loop_blocks(
         self, mod, mock_stdin, loop_state, capture_stdout,
     ):
+        """アクティブなループでは常に block を出力する。"""
         loop_state(iteration=1)
-
-        with patch.object(mod, "_run_tests", return_value=(mod.RESULT_PASS, 5)), \
-             patch.object(mod, "_run_lint", return_value=mod.RESULT_PASS), \
-             patch.object(mod, "_run_security", return_value=mod.RESULT_PASS):
-            data = {}
-            with mock_stdin(data):
-                patcher, buf = capture_stdout()
-                with patcher, pytest.raises(SystemExit):
-                    mod.main()
-        assert buf.getvalue() == ""
-
-    def test_test_fail_continues(
-        self, mod, mock_stdin, loop_state, capture_stdout,
-    ):
-        loop_state(iteration=1)
-
-        with patch.object(mod, "_run_tests", return_value=(mod.RESULT_FAIL, 0)), \
-             patch.object(mod, "_run_lint", return_value=mod.RESULT_PASS), \
-             patch.object(mod, "_run_security", return_value=mod.RESULT_PASS):
-            data = {}
-            with mock_stdin(data):
-                patcher, buf = capture_stdout()
-                with patcher, pytest.raises(SystemExit):
-                    mod.main()
+        data = {}
+        with mock_stdin(data):
+            patcher, buf = capture_stdout()
+            with patcher, pytest.raises(SystemExit):
+                mod.main()
         output = buf.getvalue()
-        assert output, "テスト失敗時は継続（block 出力）が必須"
+        assert output, "アクティブなループでは block 出力が必須"
         result = json.loads(output)
         assert result["decision"] == "block"
 
-    def test_lint_fail_continues(
+    def test_block_reason_contains_iteration(
         self, mod, mock_stdin, loop_state, capture_stdout,
     ):
-        loop_state(iteration=1)
-
-        with patch.object(mod, "_run_tests", return_value=(mod.RESULT_PASS, 5)), \
-             patch.object(mod, "_run_lint", return_value=mod.RESULT_FAIL), \
-             patch.object(mod, "_run_security", return_value=mod.RESULT_PASS):
-            data = {}
-            with mock_stdin(data):
-                patcher, buf = capture_stdout()
-                with patcher, pytest.raises(SystemExit):
-                    mod.main()
+        """block の reason にイテレーション番号が含まれる。"""
+        loop_state(iteration=3)
+        data = {}
+        with mock_stdin(data):
+            patcher, buf = capture_stdout()
+            with patcher, pytest.raises(SystemExit):
+                mod.main()
         output = buf.getvalue()
-        assert output
+        result = json.loads(output)
+        assert "3" in result["reason"]
+
+    def test_first_iteration_blocks(
+        self, mod, mock_stdin, loop_state, capture_stdout,
+    ):
+        """iteration=0 でも block する。"""
+        loop_state(iteration=0)
+        data = {}
+        with mock_stdin(data):
+            patcher, buf = capture_stdout()
+            with patcher, pytest.raises(SystemExit):
+                mod.main()
+        output = buf.getvalue()
+        assert output, "初回イテレーションでも block 出力が必須"
         result = json.loads(output)
         assert result["decision"] == "block"
-
-
-class TestEscalation:
-    """STEP 6: エスカレーション条件。"""
-
-    def test_test_count_decrease_stops(
-        self, mod, mock_stdin, loop_state, capture_stdout,
-    ):
-        loop_state(
-            iteration=1,
-            log=[{"iteration": 0, "test_count": 10, "issues_found": 0, "issues_fixed": 0}],
-        )
-
-        with patch.object(mod, "_run_tests", return_value=(mod.RESULT_PASS, 5)), \
-             patch.object(mod, "_run_lint", return_value=mod.RESULT_PASS), \
-             patch.object(mod, "_run_security", return_value=mod.RESULT_PASS):
-            data = {}
-            with mock_stdin(data):
-                patcher, buf = capture_stdout()
-                with patcher, pytest.raises(SystemExit):
-                    mod.main()
-        assert buf.getvalue() == ""
-
-    def test_issue_recurrence_stops(
-        self, mod, mock_stdin, loop_state, capture_stdout,
-    ):
-        loop_state(
-            iteration=2,
-            log=[
-                {"iteration": 0, "issues_found": 3, "issues_fixed": 0, "test_count": 5},
-                {"iteration": 1, "issues_found": 3, "issues_fixed": 0, "test_count": 5},
-            ],
-        )
-
-        with patch.object(mod, "_run_tests", return_value=(mod.RESULT_FAIL, 5)), \
-             patch.object(mod, "_run_lint", return_value=mod.RESULT_PASS), \
-             patch.object(mod, "_run_security", return_value=mod.RESULT_PASS):
-            data = {}
-            with mock_stdin(data):
-                patcher, buf = capture_stdout()
-                with patcher, pytest.raises(SystemExit):
-                    mod.main()
-        assert buf.getvalue() == ""
-
-
-class TestIterationIncrement:
-    """STEP 7: iteration インクリメント。"""
-
-    def test_iteration_incremented_on_continue(
-        self, mod, mock_stdin, loop_state, capture_stdout,
-        hook_project_root,
-    ):
-        state_file = loop_state(iteration=1)
-
-        with patch.object(mod, "_run_tests", return_value=(mod.RESULT_FAIL, 0)), \
-             patch.object(mod, "_run_lint", return_value=mod.RESULT_PASS), \
-             patch.object(mod, "_run_security", return_value=mod.RESULT_PASS):
-            data = {}
-            with mock_stdin(data):
-                patcher, buf = capture_stdout()
-                with patcher, pytest.raises(SystemExit):
-                    mod.main()
-
-        output = buf.getvalue()
-        assert output, "テスト失敗時は継続が必須"
-        state = json.loads(state_file.read_text(encoding="utf-8"))
-        assert state["iteration"] >= 2
 
 
 class TestMainSafety:
@@ -265,3 +195,29 @@ class TestMainSafety:
             with patcher, pytest.raises(SystemExit):
                 mod.main()
         assert buf.getvalue() == ""
+
+
+class TestRemovedFunctions:
+    """Green State 判定関数が削除されていることの確認。"""
+
+    def test_no_run_tests(self, mod):
+        assert not hasattr(mod, "_run_tests")
+
+    def test_no_run_lint(self, mod):
+        assert not hasattr(mod, "_run_lint")
+
+    def test_no_run_security(self, mod):
+        assert not hasattr(mod, "_run_security")
+
+    def test_no_result_constants(self, mod):
+        assert not hasattr(mod, "RESULT_PASS")
+        assert not hasattr(mod, "RESULT_FAIL")
+
+    def test_no_green_state_evaluator(self, mod):
+        assert not hasattr(mod, "_evaluate_green_state")
+
+    def test_no_escalation_checker(self, mod):
+        assert not hasattr(mod, "_check_escalation")
+
+    def test_no_issue_recurrence_checker(self, mod):
+        assert not hasattr(mod, "_check_issue_recurrence")

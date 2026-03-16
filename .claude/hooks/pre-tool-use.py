@@ -44,6 +44,20 @@ _AUDITING_PG_COMMANDS = (
     "ruff format",
 )
 
+# PG コマンドで禁止する引数（悪意ある設定ファイル読み込み等を防止）
+_PG_BLACKLISTED_ARGS = (
+    "--config",
+    "--settings",
+    "--ruleset",
+    "--rule-dir",
+    "--rulesdir",
+    "--plugin",
+    "--resolve-plugins-relative-to",
+    "--stdin-filename",
+    "--ignore-path",
+    "--ext",
+)
+
 # パス判定パターン（PM 級）
 _PM_PATTERNS = [
     (re.compile(r"^__out_of_root__/"), "out-of-root path"),
@@ -97,6 +111,17 @@ def _determine_level_and_reason(
         if current_phase == "AUDITING":
             for pg_prefix in _AUDITING_PG_COMMANDS:
                 if command == pg_prefix or command.startswith(pg_prefix + " "):
+                    # ブラックリスト引数チェック（単語境界で照合し誤マッチを防止）
+                    args_part = command[len(pg_prefix):]
+                    if any(
+                        re.search(
+                            r'(?:^|\s)' + re.escape(bl) + r'(?:\s|=|$)',
+                            args_part,
+                            re.IGNORECASE,
+                        )
+                        for bl in _PG_BLACKLISTED_ARGS
+                    ):
+                        return "PM", "PG command with blacklisted arg"
                     return "PG", "AUDITING phase PG allow"
 
         return "SE", "command (default SE)"
@@ -119,7 +144,7 @@ def _read_current_phase(phase_file: Path) -> str:
             match = re.match(r"^\*\*([A-Z]+)\*\*", line)
             if match:
                 return match.group(1)
-    except Exception:
+    except (OSError, re.error):
         pass
     return ""
 

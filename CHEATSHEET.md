@@ -36,11 +36,11 @@
 ├── agents/                # サブエージェント
 ├── skills/                # オーケストレーション・テンプレート出力
 ├── hooks/                 # PreToolUse / PostToolUse / Stop / PreCompact
-├── logs/                  # permission.log, loop-*.txt
+├── logs/                  # permission.log, loop-*.txt（実行時生成）
 ├── states/                # 機能ごとの進捗状態
 └── current-phase.md       # 現在のフェーズ
 
-CLAUDE.md                  # 憲法（コア原則 + 技術スタック）
+CLAUDE.md                  # 憲法（コア原則）
 CHEATSHEET.md              # このファイル（クイックリファレンス）
 docs/internal/             # プロセス SSOT
 docs/specs/                # 仕様書
@@ -67,10 +67,12 @@ v4.0.0 で導入された変更リスク分類。PreToolUse hook がファイル
 | `core-identity.md` | Living Architect 行動規範 + 権限等級サマリー |
 | `phase-rules.md` | フェーズ別ガードレール（PLANNING/BUILDING/AUDITING） |
 | `security-commands.md` | コマンド安全基準（Allow/deny/ask 三分類） |
-| `decision-making.md` | 意思決定プロトコル |
+| `decision-making.md` | 意思決定プロトコル（MAGI System） |
 | `permission-levels.md` | 権限等級分類基準（PG/SE/PM） |
 | `upstream-first.md` | プラットフォーム仕様優先原則 |
 | `test-result-output.md` | テスト結果 JUnit XML 出力ルール |
+| `code-quality-guideline.md` | コード品質基準（Critical/Warning/Info 重要度分類） |
+| `planning-quality-guideline.md` | PLANNING 品質基準（Requirements Smells, SPIDR, WBS） |
 | `building-checklist.md` | 影式 BUILDING 品質チェックリスト（R-2〜R-11, S-2）影式固有 |
 | `auto-generated/` | TDD 内省パイプライン v2 自動生成ルール |
 
@@ -95,8 +97,8 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 
 | コマンド | 用途 | コンテキスト消費 |
 |---------|------|----------------|
-| `/quick-save` | SESSION_STATE.md + Daily 記録 + ループログ | 3-4% |
-| `/quick-load` | SESSION_STATE.md 読込 + 関連ドキュメント特定 + 復帰サマリー | 2-3% |
+| `/quick-save` | SESSION_STATE.md + Daily 記録 + ループログ | 3-5% |
+| `/quick-load` | SESSION_STATE.md 読込 + 関連ドキュメント特定 + 復帰サマリー | 1-2% |
 
 git commit / push は `/ship` を使用。
 
@@ -111,25 +113,30 @@ git commit / push は `/ship` を使用。
 
 ## サブエージェント
 
-| エージェント | 呼び出し例 | フェーズ |
-|-------------|-----------|---------|
-| `requirement-analyst` | 「要件を整理して」 | PLANNING |
-| `design-architect` | 「APIを設計して」 | PLANNING |
-| `task-decomposer` | 「タスクを分割して」 | PLANNING |
-| `tdd-developer` | 「TASK-001を実装して」 | BUILDING |
-| `quality-auditor` | 「src/を監査して」 | AUDITING |
-| `doc-writer` | 「ドキュメントを更新して」「仕様を策定して」 | ALL |
-| `test-runner` | 「テストを実行して」 | BUILDING |
-| `code-reviewer` | 「コードレビューして」 | AUDITING |
+| エージェント | 呼び出し例 | フェーズ | Memory |
+|-------------|-----------|---------|:------:|
+| `requirement-analyst` | 「要件を整理して」 | PLANNING | - |
+| `design-architect` | 「APIを設計して」 | PLANNING | - |
+| `task-decomposer` | 「タスクを分割して」 | PLANNING | - |
+| `tdd-developer` | 「TASK-001を実装して」 | BUILDING | - |
+| `quality-auditor` | 「src/を監査して」 | AUDITING | - |
+| `doc-writer` | 「ドキュメントを更新して」「仕様を策定して」 | ALL | - |
+| `test-runner` | 「テストを実行して」 | BUILDING | - |
+| `code-reviewer` | 「コードレビューして」 | AUDITING | auto |
+
+Memory 列: `auto` = `.claude/agent-memory/<name>/` に知見を自発的に蓄積（CLAUDE.md 指示による）。
 
 ## スキル
 
 | スキル | 用途 | 呼び出し例 |
 |--------|------|-----------|
-| `lam-orchestrate` | タスク分解・並列実行 + 構造化思考（AoT + Three Agents） | 「lam-orchestrateで実行して」 |
+| `magi` | 構造化意思決定（AoT + MAGI System + Reflection） | `/magi <議題>` |
+| `clarify` | 文書精緻化（曖昧さ・矛盾・欠落検出） | `/clarify docs/specs/foo.md` |
+| `lam-orchestrate` | タスク分解・並列実行 + `/magi` 統合 | 「lam-orchestrateで実行して」 |
 | `skill-creator` | スキル作成ガイド | 「新しいスキルを作りたい」 |
 | `adr-template` | ADR作成テンプレート | ADR 作成時に自動適用 |
 | `spec-template` | 仕様書作成テンプレート | 仕様書作成時に自動適用 |
+| `ui-design-guide` | UI/UX設計チェックリスト | UI仕様策定時に自動適用 |
 
 
 ## ワークフローコマンド
@@ -137,9 +144,9 @@ git commit / push は `/ship` を使用。
 | コマンド | 用途 |
 |---------|------|
 | `/ship` | 論理グループ分けコミット（棚卸し → 分類 → コミット） |
-| `/full-review` | 並列監査 + 全修正 + 検証（4エージェント、一気通貫） |
-| `/wave-plan` | 次 Wave のタスク選定・実行順序策定 |
-| `/retro` | Wave/Phase 完了時の振り返り（KPT + TDD パターン分析） |
+| `/full-review <対象>` | 並列監査 + 全修正 + 検証（一気通貫） |
+| `/wave-plan [N]` | Wave 計画策定（タスク選定・依存関係・リスク評価） |
+| `/retro [wave\|phase]` | 構造化振り返り（KPT + 定量分析 + アクション抽出） |
 
 ## 補助コマンド
 
@@ -155,8 +162,8 @@ git commit / push は `/ship` を使用。
 | `.claude/current-phase.md` | 現在のフェーズ |
 | `.claude/states/<feature>.json` | 機能ごとの進捗・承認状態 |
 | `SESSION_STATE.md` | セッション間の引き継ぎ（自動生成） |
-| `docs/artifacts/knowledge/` | `/retro` Step 4 の知見保存先 |
-| `.claude/agent-memory/` | Subagent Persistent Memory |
+| `docs/artifacts/knowledge/` | プロジェクト知見の構造化蓄積（/retro 経由） |
+| `.claude/agent-memory/` | Subagent の自動学習記録 |
 
 ## 参照ドキュメント (SSOT)
 
@@ -168,30 +175,52 @@ git commit / push は `/ship` を使用。
 | `docs/internal/03_QUALITY_STANDARDS.md` | 品質基準 |
 | `docs/internal/04_RELEASE_OPS.md` | リリース・デプロイ・緊急対応 |
 | `docs/internal/05_MCP_INTEGRATION.md` | MCP 連携・MEMORY.md 運用ポリシー |
-| `docs/internal/06_DECISION_MAKING.md` | 意思決定（3 Agents + AoT） |
+| `docs/internal/06_DECISION_MAKING.md` | 意思決定（MAGI System + AoT + Reflection） |
 | `docs/internal/07_SECURITY_AND_AUTOMATION.md` | コマンド安全基準（Allow/Deny List） |
 | `docs/internal/08_SESSION_MANAGEMENT.md` | セッション管理・コンテキスト戦略 |
 | `docs/internal/09_SUBAGENT_STRATEGY.md` | Subagent 運用戦略 |
+| `docs/internal/99_reference_generic.md` | 汎用リファレンステンプレート |
 
-## AoT（Atom of Thought）クイックガイド
+## /magi（構造化意思決定）クイックガイド
 
 **いつ使う？**（いずれかに該当）
 - 判断ポイントが **2つ以上**
 - 影響レイヤー/モジュールが **3つ以上**
 - 有効な選択肢が **3つ以上**
 
+**MAGI System**（エヴァンゲリオン由来）
+```
+MELCHIOR（科学者/推進者）— Value, Speed, Innovation
+BALTHASAR（母/批判者）  — Risk, Security, Debt
+CASPAR（女/調停者）     — Synthesis, Balance, Decision
+```
+
 **Atom テーブル形式**
 
-| Atom | 内容 | 依存 | 並列可否 |
+| Atom | 内容 | 依存 | 並列可否(任意) |
 |------|------|------|---------|
 | A1 | [判断1] | なし | — |
 | A2 | [判断2] | A1 | — |
 
 **ワークフロー**
 ```
-1. Decomposition: 議題を Atom に分解
-2. Debate: 各 Atom で 3 Agents 議論
-3. Synthesis: 統合結論 → 実装
+0. Decomposition: 議題を Atom に分解
+1-3. MAGI Debate: 各 Atom で MELCHIOR/BALTHASAR/CASPAR 合議
+4. Reflection: 結論の致命的見落としを検証（1回限り）
+5. Synthesis: 統合結論 → Action Items
+```
+
+## /clarify（文書精緻化）クイックガイド
+
+**いつ使う？**
+- 仕様書・設計書のドラフト完成後
+- 「適切に」「必要に応じて」等の曖昧表現を検出したいとき
+- 複数文書間の整合性を確認したいとき
+
+**使い方**
+```
+/clarify docs/specs/foo-spec.md            # 1文書を精緻化
+/clarify docs/specs/foo.md docs/design/foo.md  # 横断チェック
 ```
 
 ## 日常ワークフロー

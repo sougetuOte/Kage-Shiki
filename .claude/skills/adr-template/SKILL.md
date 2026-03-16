@@ -20,7 +20,7 @@ description: |
 
 - `docs/adr/` への新規ファイル作成
 - アーキテクチャ決定、技術選定の記録を求められた
-- `adr-template` スキルの明示的な呼び出し時
+- ADR の作成を求められた時
 
 ## ファイル命名規則
 
@@ -88,16 +88,16 @@ docs/adr/
 ### Option C: [選択肢名]
 ...
 
-## 3 Agents Analysis
+## MAGI Analysis
 
-### [Affirmative] 推進者の視点
+### [MELCHIOR] 科学者（推進者）の視点
 > 最高の結果はどうなるか？どうすれば実現できるか？
 
 - [採用時のメリット、可能性]
 - [開発効率への貢献]
 - [ユーザー価値への貢献]
 
-### [Critical] 批判者の視点
+### [BALTHASAR] 母（批判者）の視点
 > 最悪の場合どうなるか？何が壊れるか？
 
 - [リスク、懸念点]
@@ -105,7 +105,7 @@ docs/adr/
 - [技術的負債の可能性]
 - [セキュリティ懸念]
 
-### [Mediator] 調停者の視点
+### [CASPAR] 女（調停者）の視点
 > 今、我々が取るべき最善のバランスは何か？
 
 - [両視点の統合]
@@ -176,10 +176,10 @@ Proposed → Accepted → [Deprecated | Superseded]
    - コンテキストと選択肢を整理
    - ステータス: `Proposed`
 
-2. **3 Agents 分析**
-   - Affirmative: メリットを最大化
-   - Critical: リスクを洗い出し
-   - Mediator: バランスを取る
+2. **MAGI 分析**
+   - MELCHIOR: メリットを最大化
+   - BALTHASAR: リスクを洗い出し
+   - CASPAR: バランスを取る
 
 3. **レビュー**
    - ステークホルダーからのフィードバック

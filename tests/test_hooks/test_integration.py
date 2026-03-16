@@ -21,9 +21,9 @@ class TestSettingsJson:
     def test_has_hooks_section(self):
         assert "hooks" in self.settings
 
-    def test_has_four_hook_events(self):
+    def test_has_five_hook_events(self):
         hooks = self.settings["hooks"]
-        expected = {"PreToolUse", "PostToolUse", "Stop", "PreCompact"}
+        expected = {"PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "PreCompact"}
         assert set(hooks.keys()) == expected
 
     def test_hook_commands_use_python(self):

@@ -13,6 +13,8 @@
 
 ## 実行禁止コマンド（Layer 0: deny）
 
+不可逆または致命的な影響を持つコマンド。AI による実行を禁止する。
+
 | カテゴリ | コマンド | リスク |
 |---------|---------|--------|
 | ファイル削除 | `rm`, `rm -rf` | 不可逆なデータ消失 |
@@ -22,6 +24,8 @@
 | find 破壊パターン | `find -delete`, `find -exec rm`, `find -exec chmod`, `find -exec chown` | 再帰的な不可逆操作 |
 
 ## 承認必須コマンド（Layer 0: ask）
+
+システムに変更を加える、または外部と通信するコマンド。実行前に必ずユーザーの承認を得る。
 
 | カテゴリ | コマンド | リスク |
 |---------|---------|--------|
@@ -52,7 +56,7 @@ v4.0.0 以降、コマンド安全基準は以下の二層で管理される:
 Layer 1 の `permissions.allow` に PG級コマンド（`ruff format`, `ruff check --fix` 等）が追加されている。
 
 > ※1 Python コマンドの allow 設定は二段構成（影式固有）:
-> - `pytest *`, `ruff *` 等の PG 級ツール → `settings.json`（Git 管理対象）に登録済み
+> - `pytest *`, `ruff *`, `python -m pytest *`, `python -c *` 等の PG 級ツール → `settings.json`（Git 管理対象）に登録済み
 > - `python *`, `pip *` 等の汎用コマンド → `settings.local.json`（ローカル専用）で各開発者が有効化
 
 権限等級の詳細: `.claude/rules/permission-levels.md`

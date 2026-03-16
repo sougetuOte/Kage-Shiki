@@ -80,7 +80,7 @@
 ## 7. Building Defect Prevention (実装不具合防止)
 
 Phase 1 監査で発見された不具合パターン分析に基づく防止ルール。
-ルール本体は `.claude/rules/phase-rules.md`（R-1, R-4）および `.claude/rules/building-checklist.md`（R-2, R-3, R-5〜R-11, S-2）に定義（自動ロード対象）。
+ルール本体は `.claude/rules/phase-rules.md`（R-1, R-4）および `.claude/rules/building-checklist.md`（R-2, R-3, R-7〜R-13, S-2）に定義（自動ロード対象）。
 
 | ルール | 防止する不具合パターン | 適用タイミング |
 |--------|----------------------|---------------|
@@ -88,8 +88,8 @@ Phase 1 監査で発見された不具合パターン分析に基づく防止ル
 | R-2: dict ディスパッチ | 列挙の網羅漏れ | Green（実装時） |
 | R-3: 定数→使用の即時接続 | SSOT 違反 | Red-Green サイクル内 |
 | R-4: FR チェックリスト駆動テスト | FR 実装漏れ | Red（テスト作成時） |
-| R-5: カバレッジ確認 | テストの構造的盲点 | Green 直後 |
-| R-6: else の正当性確認 | 暗黙のフォールバック | Green（実装時） |
+| R-12: カバレッジ確認 | テストの構造的盲点 | Green 直後 |
+| R-13: else の正当性確認 | 暗黙のフォールバック | Green（実装時） |
 
 根拠分析: `docs/memos/audit-report-wave3.md`, `docs/memos/audit-report-full-source.md`
 
