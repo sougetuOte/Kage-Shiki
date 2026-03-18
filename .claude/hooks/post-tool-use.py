@@ -38,7 +38,7 @@ _MAX_TOOL_EVENTS = 500
 
 # テストコマンドの正規表現パターン
 _TEST_CMD_PATTERN = re.compile(
-    r"(^|[\s])(pytest|python\s+-m\s+pytest|npm[\s]+test|go[\s]+test|make[\s]+test)(?:[\s]|$)"
+    r"(^|[\s])(pytest|python\s+-m\s+pytest|npm[\s]+test|go[\s]+test|make[\s]+test|vitest|cargo\s+nextest)(?:[\s]|$)"
 )
 
 
@@ -55,6 +55,10 @@ def _get_test_cmd_label(command: str) -> str:
         return "go test"
     if "make test" in command:
         return "make test"
+    if "vitest" in command:
+        return "vitest"
+    if "cargo" in command and "nextest" in command:
+        return "cargo nextest"
     return "pytest"
 
 

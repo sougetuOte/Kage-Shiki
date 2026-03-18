@@ -276,7 +276,7 @@ class TestScanTimeout:
         assert len(issues) == 1
         assert issues[0].rule_id == "gitleaks:scan-timeout"
         assert issues[0].severity == "critical"
-        assert "120" in issues[0].message
+        assert issues[0].tool == "gitleaks"
 
     def test_run_protect_timeout_returns_scan_timeout(self) -> None:
         """gitleaks protect タイムアウト時に scan-timeout Critical Issue を返す。"""

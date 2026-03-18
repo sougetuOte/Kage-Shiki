@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
@@ -114,7 +115,10 @@ class TestRunPhase0:
         """実行結果の summary.md パスを返すこと。"""
         (project_root / "app.py").write_text("x = 1\n")
         (project_root / "pyproject.toml").write_text("[project]\n")
-        with self._mocks()[0], self._mocks()[1], self._mocks()[2]:
+        with ExitStack() as stack:
+            for m in self._mocks():
+                stack.enter_context(m)
+
             result = run_phase0(project_root)
         assert result.summary_path.exists()
 
@@ -122,7 +126,10 @@ class TestRunPhase0:
         """review-state/ ディレクトリを作成すること。"""
         (project_root / "app.py").write_text("x = 1\n")
         (project_root / "pyproject.toml").write_text("[project]\n")
-        with self._mocks()[0], self._mocks()[1], self._mocks()[2]:
+        with ExitStack() as stack:
+            for m in self._mocks():
+                stack.enter_context(m)
+
             run_phase0(project_root)
         state_dir = project_root / ".claude" / "review-state"
         assert state_dir.is_dir()
@@ -141,8 +148,10 @@ class TestRunPhase0:
             "noqa_row": 1,
             "url": "",
         }])
-        m = self._mocks(ruff_output)
-        with m[0], m[1], m[2]:
+        with ExitStack() as stack:
+            for m in self._mocks(ruff_output):
+                stack.enter_context(m)
+
             result = run_phase0(project_root)
         issues_path = project_root / ".claude" / "review-state" / "static-issues.json"
         assert issues_path.exists()
@@ -152,7 +161,10 @@ class TestRunPhase0:
         """summary.md が NFR-4 構造に準拠すること。"""
         (project_root / "app.py").write_text("x = 1\n")
         (project_root / "pyproject.toml").write_text("[project]\n")
-        with self._mocks()[0], self._mocks()[1], self._mocks()[2]:
+        with ExitStack() as stack:
+            for m in self._mocks():
+                stack.enter_context(m)
+
             result = run_phase0(project_root)
         content = result.summary_path.read_text()
         assert "## Review Instructions" in content
@@ -163,7 +175,10 @@ class TestRunPhase0:
         """結果に行数カウントを含むこと。"""
         (project_root / "app.py").write_text("a\nb\nc\n")
         (project_root / "pyproject.toml").write_text("[project]\n")
-        with self._mocks()[0], self._mocks()[1], self._mocks()[2]:
+        with ExitStack() as stack:
+            for m in self._mocks():
+                stack.enter_context(m)
+
             result = run_phase0(project_root)
         assert result.line_count >= 3
 
@@ -171,7 +186,10 @@ class TestRunPhase0:
         """結果に検出された言語リストを含むこと。"""
         (project_root / "app.py").write_text("x = 1\n")
         (project_root / "pyproject.toml").write_text("[project]\n")
-        with self._mocks()[0], self._mocks()[1], self._mocks()[2]:
+        with ExitStack() as stack:
+            for m in self._mocks():
+                stack.enter_context(m)
+
             result = run_phase0(project_root)
         assert "python" in result.languages
 

@@ -144,6 +144,7 @@ def run_protect_staged(
         return []
 
     if not is_available():
+        logger.warning("gitleaks not installed: skipping protect scan")
         return []
 
     if project_root is not None:
@@ -210,7 +211,7 @@ def _run_gitleaks(cmd: list[str], timeout: int) -> list[Issue]:
                 severity="critical",
                 category="security",
                 tool="gitleaks",
-                message=f"gitleaks の実行に失敗しました: {exc}",
+                message="gitleaks の実行に失敗しました（詳細はログを参照）",
                 rule_id="gitleaks:scan-failed",
                 suggestion="gitleaks がインストール済みか、PATH が通っているか確認してください。",
             )
@@ -231,7 +232,33 @@ def _parse_gitleaks_json(json_path: Path) -> list[Issue]:
         data = json.loads(json_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         logger.error("gitleaks report parse failed: %s", exc)
-        return []
+        return [
+            Issue(
+                file="",
+                line=0,
+                severity="critical",
+                category="security",
+                tool="gitleaks",
+                message="gitleaks レポートの読み取りに失敗しました（詳細はログを参照）",
+                rule_id="gitleaks:scan-failed",
+                suggestion="gitleaks の出力ファイルが破損している可能性があります。",
+            )
+        ]
+
+    if not isinstance(data, list):
+        logger.error("gitleaks report is not a JSON array: %s", type(data).__name__)
+        return [
+            Issue(
+                file="",
+                line=0,
+                severity="critical",
+                category="security",
+                tool="gitleaks",
+                message="gitleaks レポートが不正な形式です（詳細はログを参照）",
+                rule_id="gitleaks:scan-failed",
+                suggestion="gitleaks のバージョンを確認してください。",
+            )
+        ]
 
     issues: list[Issue] = []
     for finding in data:
