@@ -164,7 +164,7 @@ Project root:
 
 - CLAUDE.md
   docs/internal/:
-- 00_PROJECT_STRUCTURE .. 07_SECURITY_AND_AUTOMATION
+- 00_PROJECT_STRUCTURE .. 09_SUBAGENT_STRATEGY
 - 99_reference_generic.md (this file)
 
 First prompt to AI:

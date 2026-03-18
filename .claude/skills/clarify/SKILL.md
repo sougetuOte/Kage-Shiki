@@ -1,10 +1,6 @@
 ---
 name: clarify
-description: |
-  文書の曖昧さ・矛盾・欠落をインタビュー形式で特定し精緻化するスキル。
-  spec、design、ADR、tasks 等の文書に対して構造化された質問を行い、
-  ユーザーの回答を反映して文書を更新する。
-  ユーザーにアイデアがない場合は Three Agents Model で選択肢を提案する。
+description: 文書の曖昧さ・矛盾・欠落をインタビュー形式で特定し精緻化するスキル。spec、design、ADR、tasks 等の文書に対して構造化された質問を行い、ユーザーの回答を反映して文書を更新する。ユーザーにアイデアがない場合は Three Agents Model で選択肢を提案する。
 version: 1.0.0
 ---
 

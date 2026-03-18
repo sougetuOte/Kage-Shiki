@@ -1,11 +1,7 @@
 ---
 name: spec-template
 version: 1.0.0
-description: |
-  仕様書作成を支援するテンプレートスキル。
-  docs/specs/ への仕様書作成時に自動適用され、
-  01_REQUIREMENT_MANAGEMENT.md に準拠した構造を提案する。
-  要件定義、機能仕様、API仕様の作成時に活用される。
+description: 仕様書作成を支援するテンプレートスキル。docs/specs/ への仕様書作成時に自動適用され、01_REQUIREMENT_MANAGEMENT.md に準拠した構造を提案する。要件定義、機能仕様、API仕様の作成時に活用される。
 ---
 
 # 仕様書テンプレートスキル

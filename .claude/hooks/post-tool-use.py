@@ -38,7 +38,7 @@ _MAX_TOOL_EVENTS = 500
 
 # テストコマンドの正規表現パターン
 _TEST_CMD_PATTERN = re.compile(
-    r"(^|[\s])(pytest|python\s+-m\s+pytest|npm[\s]+test|go[\s]+test|make[\s]+test)(?:[\s]|$)"
+    r"(^|[\s])(pytest|python\s+-m\s+pytest|npm[\s]+test|go[\s]+test|make[\s]+test|vitest|cargo\s+nextest)(?:[\s]|$)"
 )
 
 
@@ -55,6 +55,10 @@ def _get_test_cmd_label(command: str) -> str:
         return "go test"
     if "make test" in command:
         return "make test"
+    if "vitest" in command:
+        return "vitest"
+    if "cargo" in command and "nextest" in command:
+        return "cargo nextest"
     return "pytest"
 
 
@@ -107,8 +111,13 @@ def _handle_test_result(
     last_result_file: Path,
     log_file: Path,
     timestamp: str,
+    is_failure_event: bool = False,
 ) -> str | None:
     """テストコマンドの結果を処理し、TDD パターンを記録する。
+
+    Args:
+        is_failure_event: PostToolUseFailure イベント時は True。
+            古い XML による誤判定を防ぐため、XML 読取をスキップし直接 FAIL 記録する。
 
     Returns:
         systemMessage 文字列（FAIL→PASS 遷移時）。通知不要なら None。
@@ -117,6 +126,18 @@ def _handle_test_result(
         return None
 
     test_cmd = _get_test_cmd_label(command)
+
+    last_result_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # PostToolUseFailure: ツール実行自体が失敗（非ゼロ exit）→ 直接 FAIL 記録
+    # XML は前回実行の古い結果が残っている可能性があるため読み取らない
+    if is_failure_event:
+        _append_to_tdd_log(
+            tdd_log,
+            f'{timestamp}\tFAIL\t{test_cmd}\ttests=? failures=?\t"PostToolUseFailure event"',
+        )
+        last_result_file.write_text(f"fail {test_cmd}\n", encoding="utf-8")
+        return None
 
     result = _parse_junit_xml(test_results_xml)
     if result is None:
@@ -133,8 +154,6 @@ def _handle_test_result(
     if last_result_file.exists():
         with contextlib.suppress(OSError, ValueError):
             prev_result = last_result_file.read_text(encoding="utf-8").splitlines()[0]
-
-    last_result_file.parent.mkdir(parents=True, exist_ok=True)
 
     if failures > 0:
         summary = ", ".join(failed_names[:5])[:120].replace("\t", " ").replace("\n", " ")
@@ -248,13 +267,17 @@ def main() -> None:
     command = get_tool_input(data, "command")
     file_path = get_tool_input(data, "file_path")
 
+    hook_event_name = data.get("hook_event_name", "")
+
     timestamp = now_utc_iso8601()
 
     # 1. TDD パターン検出（JUnit XML 方式）
     system_message = None
     if tool_name == "Bash":
+        is_failure = hook_event_name == "PostToolUseFailure"
         system_message = _handle_test_result(
-            command, tdd_log, test_results_xml, last_result_file, log_file, timestamp
+            command, tdd_log, test_results_xml, last_result_file, log_file, timestamp,
+            is_failure_event=is_failure,
         )
 
     # 2. doc-sync-flag の設定

@@ -97,6 +97,14 @@ v4.0.0 で導入された hooks ベースの権限管理システム。
 2. **doc-sync-flag**: `src/` 配下のファイル変更を `.claude/doc-sync-flag` に記録
 3. **ループログ**: 自律ループ時の tool_events を `lam-loop-state.json` に追記
 
+#### PostToolUseFailure イベント
+
+`settings.json` で `PostToolUseFailure` イベントにも `post-tool-use.py` を登録している。
+ツール実行が非ゼロ exit code で終了した場合に発火する。
+
+- テストコマンドの場合: JUnit XML を読まず直接 FAIL を `tdd-patterns.log` に記録（古い XML による誤判定を防止）
+- ループログ（`tool_events`）にも記録（ツール失敗の状況追跡に有用）
+
 ### Stop Hook (lam-stop-hook)
 
 自律ループの収束判定（Green State チェック）:

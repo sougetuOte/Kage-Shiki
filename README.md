@@ -123,6 +123,7 @@ requirements → [承認] → design → [承認] → tasks → [承認] → BUI
 | [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) | AI アシスタント実行環境 | 必須 |
 | Python 3.12+ | アプリケーション本体 | 必須 |
 | Git | バージョン管理 | 必須 |
+| [gitleaks](https://github.com/gitleaks/gitleaks) | シークレット漏洩検出 | 推奨（`scoop install gitleaks`） |
 
 ## ライセンス
 

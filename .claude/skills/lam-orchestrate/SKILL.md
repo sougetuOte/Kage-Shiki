@@ -1,9 +1,6 @@
 ---
 name: lam-orchestrate
-description: >
-  LAM Coordinator - タスクを分解し、適切な Subagent で並列実行する。
-  複数ファイル/モジュールにまたがる作業の自動分解・並列実行に使用。
-  Use proactively when the user requests multi-file or multi-module operations.
+description: LAM Coordinator - タスクを分解し、適切な Subagent で並列実行する。複数ファイル/モジュールにまたがる作業の自動分解・並列実行に使用。Use proactively when the user requests multi-file or multi-module operations.
 version: 1.0.0
 ---
 

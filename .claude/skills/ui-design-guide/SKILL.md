@@ -1,12 +1,6 @@
 ---
 name: ui-design-guide
-description: |
-  UI/UX 設計チェックリストスキル。
-  PLANNING フェーズでの UI 仕様策定時に自動適用され、
-  アクセシビリティ、レスポンシブ設計、状態設計、フォーム UX の
-  設計原則レベルの注意喚起を行う。フレームワーク非依存。
-  docs/specs/ui-*.md 作成時、UI/UX 設計の議論時に活用される。
-  実装時は公式 frontend-design plugin の併用を推奨。
+description: UI/UX 設計チェックリストスキル。PLANNING フェーズでの UI 仕様策定時に自動適用され、アクセシビリティ、レスポンシブ設計、状態設計、フォーム UX の設計原則レベルの注意喚起を行う。フレームワーク非依存。docs/specs/ui-*.md 作成時、UI/UX 設計の議論時に活用される。実装時は公式 frontend-design plugin の併用を推奨。
 version: 1.0.0
 ---
 

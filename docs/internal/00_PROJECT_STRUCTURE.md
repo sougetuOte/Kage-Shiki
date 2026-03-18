@@ -37,7 +37,25 @@
 │   ├── agent-memory/       #   Subagent Persistent Memory（エージェント別知見蓄積）
 │   ├── states/             #   フェーズ承認ゲート・タスク進捗の永続状態
 │   ├── logs/               #   権限判定ログ、ループログ
-│   └── settings.json       #   権限・hooks 設定
+│   ├── settings.json       #   権限・hooks 設定（Git 管理対象）
+│   └── settings.local.json #   ローカル専用設定（.gitignore 対象）
+```
+
+### .claude/ 配下の一時ファイル・状態ファイル
+
+hooks とコマンドが生成・参照する運用ファイル群（`.gitignore` 対象）:
+
+| ファイル | 生成元 | 用途 |
+|---------|--------|------|
+| `test-results.xml` | pytest（`--junitxml`） | TDD 内省パイプラインのテスト結果入力 |
+| `tdd-patterns.log` | PostToolUse hook | FAIL/PASS 遷移の記録 |
+| `last-test-result` | PostToolUse hook | 前回テスト結果の追跡（FAIL→PASS 検出用） |
+| `doc-sync-flag` | PostToolUse hook | `src/` 配下の変更ファイルパス記録 |
+| `lam-loop-state.json` | `/full-review` | 自動ループの状態管理 |
+| `pre-compact-fired` | PreCompact hook | コンテキスト圧縮イベントのタイムスタンプ |
+| `review-state/` | analyzers パイプライン | 静的解析結果・チャンク・カードの永続化 |
+
+```
 └── CLAUDE.md               # プロジェクト憲法
 ```
 

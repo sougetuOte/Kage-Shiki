@@ -65,7 +65,13 @@ AUDITING フェーズでは指摘のみ。
 | `src/kage_shiki/` 配下 | SE | ソースコード変更（影式固有） |
 | `tests/` 配下 | SE | テストコード変更 |
 | `config/` 配下 | SE | 設定ファイル変更（影式固有） |
+| `.claude/hooks/analyzers/*_analyzer.py`（新規） | PM | 動的モジュールロード対象（`auto_discover`） |
 | その他 | SE | 安全側に倒す |
+
+> **注意**: `.claude/hooks/analyzers/` 配下の `*_analyzer.py` は `base.py` の `auto_discover()` により
+> フック起動時に動的ロード（`exec_module`）される。悪意あるコードが `*_analyzer.py` として
+> 配置された場合、Claude Code のツール呼び出し時に自動実行されるリスクがある。
+> 新規 Analyzer の追加は PM 級として承認ゲートを設ける。
 
 ## 迷った場合
 
