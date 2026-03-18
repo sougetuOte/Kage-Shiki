@@ -36,6 +36,7 @@ docs/memos/*
 !docs/memos/v4-update-plan/
 !docs/memos/v4-4-1-update-plan/
 !docs/memos/v4-5-0-update-plan/
+!docs/memos/v4-6-0-update-plan/
 .serena/
 data/
 SESSION_STATE.md

@@ -108,55 +108,64 @@
 
 ---
 
-## Phase 2: コマンド + 仕様書更新（9 タスク）
+## Phase 2: コマンド + 仕様書更新（9 タスク） — 完了 2026-03-18
 
 ### 2-1. full-review.md 更新
-- [ ] Stage 1 Step 1 に gitleaks NOTE ブロック追加（v4.6.0 の full-review.md Stage 1 参照）
-- [ ] Stage 5 G5 セキュリティチェックを gitleaks ベースに更新
-- [ ] gitleaks 未インストール時の G5 FAIL ロジック記述
-- [ ] `gitleaks:not-installed` Issue の扱い記述
+- [x] Stage 1 Step 1 に gitleaks NOTE ブロック追加（v4.6.0 の full-review.md Stage 1 参照）
+- [x] Stage 5 G5 セキュリティチェックを gitleaks ベースに更新
+- [x] gitleaks 未インストール時の G5 FAIL ロジック記述
+- [x] `gitleaks:not-installed` Issue の扱い記述
 - **等級**: PM（コマンド変更）
+- **所感**: Stage 1 に NOTE ブロック + ツール未インストール時セクションに gitleaks 固有ハンドリング + Stage 5 G5 を grep→gitleaks に置換。4箇所の編集。
 
 ### 2-2. ship.md 更新
-- [ ] Phase 1 にステップ 2 として gitleaks protect --staged を挿入
-- [ ] gitleaks 未インストール時の WARNING + インストールガイド表示
-- [ ] 検出時のユーザー判断フロー記述
-- [ ] 既存のパターンチェック（ステップ 4）はそのまま保持
+- [x] Phase 1 にステップ 4 として gitleaks protect --staged を挿入
+- [x] gitleaks 未インストール時の WARNING + インストールガイド表示
+- [x] 検出時のユーザー判断フロー記述
+- [x] 既存のパターンチェック（ステップ 5 に繰り下げ）はそのまま保持
 - **等級**: PM（コマンド変更）
+- **所感**: Step 4 として挿入し、既存の秘密情報チェックを Step 5 に繰り下げ。v4.6.0 と同等の `run_protect_staged()` 呼び出しコードを含む。
 
 ### 2-3. gitleaks 仕様書取込
-- [ ] `docs/memos/LivingArchitectModel-4.6.0/docs/specs/gitleaks-integration-spec.md` を `docs/specs/lam/` にコピー
+- [x] `docs/memos/LivingArchitectModel-4.6.0/docs/specs/gitleaks-integration-spec.md` を `docs/specs/lam/` にコピー
 - **等級**: SE
+- **所感**: 仕様参照パスを `docs/specs/lam/` 内での相対参照に調整。
 
 ### 2-4. gitleaks 設計書取込
-- [ ] `docs/memos/LivingArchitectModel-4.6.0/docs/design/gitleaks-integration-design.md` を `docs/design/` にコピー
+- [x] `docs/memos/LivingArchitectModel-4.6.0/docs/design/gitleaks-integration-design.md` を `docs/design/` にコピー
 - **等級**: SE
+- **所感**: Success Criteria のテスト数を影式の 834+ に更新。仕様参照パスを影式のパス構造に合わせて調整。
 
 ### 2-5. scalable-code-review-spec.md 更新
-- [ ] FR-7e に gitleaks 統合言及を追記
-- [ ] v4.6.0 の同ファイルとの差分を確認して適用
+- [x] FR-7e に gitleaks 統合言及を追記
+- [x] v4.6.0 の同ファイルとの差分を確認して適用
 - **等級**: PM（仕様変更）
+- **所感**: 「bandit B105/B106 等に一元化」→「gitleaks を基盤として統合済み」にテキスト置換。gitleaks-integration-spec.md への参照を追加。
 
 ### 2-6. hooks-python-migration-design.md 更新（延期 Issue E）
-- [ ] テスト方式 3（conftest sys.path）を Section 4 に追記
-- [ ] v4.6.0 の同ファイルとの差分を確認して適用
+- [x] テスト方式 3（conftest sys.path）を Section 4 に追記
+- [x] v4.6.0 の同ファイルとの差分を確認して適用
 - **等級**: SE（設計書更新）
+- **所感**: 影式には docs/design/ に本ファイルが存在しなかったため、v4.6.0 版を全体コピー。Section 4.3 conftest sys.path 方式は v4.6.0 で既に追加済み。
 
 ### 2-7. README.md 更新
-- [ ] 環境要件に gitleaks を追記
-- [ ] インストール方法（`scoop install gitleaks`）を記載
+- [x] 環境要件に gitleaks を追記
+- [x] インストール方法（`scoop install gitleaks`）を記載
 - **等級**: SE
+- **所感**: 環境要件テーブルに1行追加。必須ではなく「推奨」として記載。
 
 ### 2-8. .gitignore 確認
-- [ ] v4.6.0 の .gitignore との差分を確認
-- [ ] 必要な追加があれば適用
+- [x] v4.6.0 の .gitignore との差分を確認
+- [x] 必要な追加があれば適用
 - **等級**: SE
+- **所感**: `!docs/memos/v4-6-0-update-plan/` を追加。v4.6.0 の .gitignore にある Node.js セクションは影式に不要のため省略。`**/test-results.xml` vs `.claude/test-results.xml` の差異は影式の既存設定で問題なし。
 
 ### 2-9. Phase 2 完了確認
-- [ ] 全コマンドファイルの整合性確認
-- [ ] 仕様書・設計書の取込確認
-- [ ] README.md 更新確認
+- [x] 全コマンドファイルの整合性確認
+- [x] 仕様書・設計書の取込確認
+- [x] README.md 更新確認
 - **等級**: SE（報告）
+- **所感**: quality-auditor による14項目の整合性検証を実施。全項目 OK。
 
 ---
 
