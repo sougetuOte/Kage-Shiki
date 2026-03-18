@@ -176,8 +176,8 @@ def _check_context_pressure(
                 _cleanup_state_file(state_file)
                 _stop(log_file,
                       f"PreCompact fired {elapsed:.0f}s ago (mtime) → context pressure")
-        except Exception:
-            pass
+        except Exception as e2:
+            _log(log_file, "WARN", f"pre_compact_flag mtime fallback failed: {e2}")
 
 
 def main() -> None:

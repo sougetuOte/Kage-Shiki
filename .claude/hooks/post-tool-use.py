@@ -155,8 +155,6 @@ def _handle_test_result(
         with contextlib.suppress(OSError, ValueError):
             prev_result = last_result_file.read_text(encoding="utf-8").splitlines()[0]
 
-    last_result_file.parent.mkdir(parents=True, exist_ok=True)
-
     if failures > 0:
         summary = ", ".join(failed_names[:5])[:120].replace("\t", " ").replace("\n", " ")
         _append_to_tdd_log(

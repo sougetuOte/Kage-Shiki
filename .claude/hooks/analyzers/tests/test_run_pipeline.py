@@ -294,6 +294,8 @@ def _subprocess_side_effect(ruff_output: str = "[]"):
     def side_effect(cmd, **kwargs):
         if cmd[0] == "bandit":
             return _mock_result(0, _EMPTY_BANDIT)
-        return _mock_result(0, ruff_output)
+        if cmd[0] == "ruff":
+            return _mock_result(0, ruff_output)
+        raise ValueError(f"Unexpected command in test mock: {cmd[0]}")
 
     return side_effect

@@ -58,5 +58,11 @@ Layer 1 の `permissions.allow` に PG級コマンド（`ruff format`, `ruff che
 > ※1 Python コマンドの allow 設定は二段構成（影式固有）:
 > - `pytest *`, `ruff *`, `python -m pytest *`, `python -c *` 等の PG 級ツール → `settings.json`（Git 管理対象）に登録済み
 > - `python *`, `pip *` 等の汎用コマンド → `settings.local.json`（ローカル専用）で各開発者が有効化
+>
+> ※2 `settings.local.json` の allow は `settings.json` の ask を上書きする:
+> `settings.local.json` で `Bash(python *)` を allow にすると、本ファイルの Ask List に含まれる
+> `python main.py` や `python -m kage_shiki` 等のアプリ起動コマンドも承認なしで実行可能になる。
+> これはローカル開発の利便性のための意図的な設計であり、CI/CD 環境では `settings.local.json` を
+> 配置しないこと。
 
 権限等級の詳細: `.claude/rules/permission-levels.md`
