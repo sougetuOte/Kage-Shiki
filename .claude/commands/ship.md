@@ -18,8 +18,31 @@ description: "Ship — 変更の棚卸し・論理コミット・後処理"
 1. `git status` で全変更ファイルを取得（untracked 含む）
 2. `git diff --stat` でステージ済み・未ステージの変更量を確認
 3. 各ファイルの変更内容を簡潔に要約（1ファイル1行）
-4. 秘密情報チェック: `.env`, `credentials`, `*.key`, `settings.local.json`, `secret`, `token`, `password`, `api_key` パターンを含むファイルを除外候補に
-5. 結果を一覧表示:
+4. **gitleaks シークレットスキャン**（staged changes）:
+   ```bash
+   # Python スクリプトで実行
+   python -c "
+   import sys; sys.path.insert(0, '.claude/hooks')
+   from analyzers.gitleaks_scanner import run_protect_staged, is_available, get_install_guide
+   if not is_available():
+       print('gitleaks 未インストール: シークレットスキャンをスキップします')
+       print(get_install_guide())
+   else:
+       issues = run_protect_staged()
+       if issues:
+           for i in issues:
+               print(f'  {i.file}:{i.line} -- {i.message} ({i.rule_id})')
+       else:
+           print('シークレット検出なし')
+   "
+   ```
+   - **検出なし**: Step 5 へ
+   - **検出あり**: 検出内容を表示し、ユーザーに判断を求める
+     - 「承知の上で続行」→ Step 5 へ
+     - それ以外 → コミット中止
+   - **gitleaks 未インストール**: WARNING + インストールガイドを表示し、コミットは許可する
+5. 秘密情報チェック: `.env`, `credentials`, `*.key`, `settings.local.json`, `secret`, `token`, `password`, `api_key` パターンを含むファイルを除外候補に
+6. 結果を一覧表示:
 
 ```
 --- Ship: 棚卸し ---
