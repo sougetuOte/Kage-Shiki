@@ -30,16 +30,16 @@
 
 | ファイル | 対象領域 | タスク数 | ステータス |
 |---------|---------|:-------:|----------|
-| [tasks/02-tasks-phase1-3.md](tasks/02-tasks-phase1-3.md) | 全 Phase | 26 | 完了 |
+| [tasks/02-tasks-phase1-3.md](tasks/02-tasks-phase1-3.md) | 全 Phase | 26 | 全完了 (2026-03-18) |
 
 ---
 
 ## 移行 Phase 概要
 
 ```
-Phase 1: gitleaks コード導入（analyzers/ + テスト）
-Phase 2: コマンド + 仕様書更新（full-review, ship, README, specs/design 取込）
-Phase 3: 統合検証 + 完了（テスト全パス + ruff + gitleaks 動作確認）
+Phase 1: gitleaks コード導入（analyzers/ + テスト）          — 完了 2026-03-18
+Phase 2: コマンド + 仕様書更新（full-review, ship, README, specs/design 取込） — 完了 2026-03-18
+Phase 3: 統合検証 + 完了（テスト全パス + ruff + gitleaks 動作確認）      — 完了 2026-03-18
 ```
 
 詳細は [specs/00-diff-summary.md](specs/00-diff-summary.md) の「推奨移行順序」を参照。

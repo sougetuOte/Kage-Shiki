@@ -169,39 +169,39 @@
 
 ---
 
-## Phase 3: 統合検証 + 完了（6 タスク）
+## Phase 3: 統合検証 + 完了（6 タスク） — 完了 2026-03-18
 
 ### 3-1. 全テスト実行
-- [ ] `pytest .claude/hooks/analyzers/tests/ -v`
-- [ ] `pytest .claude/hooks/tests/ -v`
-- [ ] `pytest tests/ -v`（影式本体テスト）
-- [ ] 全件 PASS 確認
+- [x] `pytest .claude/hooks/analyzers/tests/ -v` → 71 passed
+- [x] `pytest .claude/hooks/tests/ -v` → ディレクトリなし（スキップ）
+- [x] `pytest tests/ -v`（影式本体テスト） → 834 passed（カバレッジ 92%）
+- [x] 全件 PASS 確認
 - **等級**: PG
 
 ### 3-2. ruff check 全体
-- [ ] 変更対象ファイル全体に `ruff check` 実行
-- [ ] エラーがあれば修正
+- [x] 変更対象ファイル全体に `ruff check` 実行 → All checks passed
+- [x] エラーなし
 - **等級**: PG
 
 ### 3-3. gitleaks 動作確認
-- [ ] `gitleaks version` — バージョン確認
-- [ ] `gitleaks detect --source . --no-git` — 実プロジェクトスキャン
-- [ ] 検出結果があれば対応（影式固有の除外ルール検討）
+- [x] `gitleaks version` → 8.30.0
+- [x] `gitleaks detect --source . --no-git` → no leaks found（55.10 MB スキャン）
+- [x] 検出結果なし
 - **等級**: SE
 
 ### 3-4. full-review.md 警告行の確認
-- [ ] Phase 3 完了後、full-review.md 冒頭の影式固有警告行が不要になったか判断
-- [ ] 不要なら削除提案（PM級）
-- **等級**: SE（確認）/ PM（削除時）
+- [x] 旧警告行3箇所を特定（7行目, 113行目, 139行目）
+- [x] 全て不要と判断 → 削除（PM級承認済み）
+- **等級**: PM（削除実施）
 
 ### 3-5. SESSION_STATE.md 更新
-- [ ] 移行完了を記録
-- [ ] 一時停止中の計画の復帰可能状態を明記
+- [x] 移行完了を記録
+- [x] 一時停止中の計画の復帰可能状態を明記
 - **等級**: SE
 
 ### 3-6. 000-index.md 更新
-- [ ] 全タスク完了を記録
-- [ ] 確定判断の承認日を記入
+- [x] 全タスク完了を記録
+- [x] Phase 概要に完了日を記入
 - **等級**: SE
 
 ---
@@ -211,8 +211,8 @@
 | Phase | タスク数 | PG級 | SE級 | PM級 | 状態 |
 |-------|:-------:|:----:|:----:|:----:|:----:|
 | Phase 1 | 11 | 2 | 9 | 0 | 完了 |
-| Phase 2 | 9 | 0 | 6 | 3 | 未着手 |
-| Phase 3 | 6 | 2 | 3-4 | 0-1 | 未着手 |
+| Phase 2 | 9 | 0 | 6 | 3 | 完了 |
+| Phase 3 | 6 | 2 | 3 | 1 | 完了 |
 | **合計** | **26** | **4** | **18-19** | **3-4** | |
 
 ## 依存関係
