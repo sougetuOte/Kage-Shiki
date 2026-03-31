@@ -159,12 +159,10 @@ class TrendsProposalManager:
 
         t1_result = self._check_t1_relationship(day_summaries, trends_content)
         if t1_result:
-            self.prompt_addition = t1_result
             return t1_result
 
         t2_result = self._check_t2_emotion(day_summaries, warm_days, trends_content)
         if t2_result:
-            self.prompt_addition = t2_result
             return t2_result
 
         return None

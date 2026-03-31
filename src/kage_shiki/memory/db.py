@@ -5,6 +5,7 @@
     FR-3.2: FTS5 INSERT トリガーにより全文検索インデックスを自動同期
     FR-3.3: observations テーブルへの即時書込
     FR-3.4: FTS5 全文検索（Cold Memory 取得）
+    FR-7.3: SQLite DB ロック時のリトライ + メモリバッファ
 
 対応設計:
     D-4: INSERT トリガー方式（Phase 1 は INSERT のみ）
@@ -15,9 +16,12 @@ import functools
 import logging
 import re
 import sqlite3
+import threading
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
+from kage_shiki.core.errors import format_log_message
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,13 @@ _PRAGMA_SETTINGS: dict[str, str] = {
 
 _DB_RETRY_MAX = 5
 _DB_RETRY_INTERVAL_SEC = 0.1  # 100ms
+
+# DB ロック時のメモリバッファ（FR-7.3）
+# 5回リトライ後も失敗した場合、observations をここに一時保持する。
+# _pending_lock でスレッド間の競合を防止する（save_observation_safe は
+# バックグラウンドスレッドの AgentCore から呼ばれる）。
+_pending_observations: list[tuple[str, str, float, str | None]] = []
+_pending_lock = threading.Lock()
 
 # ---------------------------------------------------------------------------
 # スキーマ定義（requirements.md Section 4.2 + D-4 Section 5.2）
@@ -214,6 +225,8 @@ def _retry_on_lock(func):
                     "DB locked, retry %d/%d",
                     attempt + 1, _DB_RETRY_MAX,
                 )
+        # for ループは必ず return or raise するため到達不能
+        raise AssertionError("unreachable: _retry_on_lock loop exhausted without return or raise")
 
     return wrapper
 
@@ -412,3 +425,73 @@ def save_day_summary(
         (date_str, summary, now),
     )
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# FR-7.3: DB ロック時メモリバッファ
+# ---------------------------------------------------------------------------
+
+
+def _flush_pending_observations(conn: sqlite3.Connection) -> None:
+    """バッファリングされた observations を DB にフラッシュする (FR-7.3).
+
+    ロックが解除されている間だけフラッシュを継続する。
+    フラッシュに成功したエントリは _pending_observations から削除する。
+    途中でロックが発生した場合、残りのエントリは次回呼び出しまで保留する。
+
+    Args:
+        conn: DB 接続。
+    """
+    with _pending_lock:
+        if not _pending_observations:
+            return
+        flushed = 0
+        while _pending_observations:
+            content, speaker, created_at, session_id = _pending_observations[0]
+            try:
+                save_observation(conn, content, speaker, created_at, session_id)
+                _pending_observations.pop(0)
+                flushed += 1
+            except sqlite3.OperationalError:
+                break  # まだロック中なら残りは次回に
+        if flushed:
+            logger.info("Flushed %d buffered observations", flushed)
+
+
+def save_observation_safe(
+    conn: sqlite3.Connection,
+    content: str,
+    speaker: str,
+    created_at: float,
+    session_id: str | None = None,
+) -> int | None:
+    """save_observation の安全ラッパー。DB ロック時はメモリバッファに一時保持する (FR-7.3).
+
+    呼び出し前に _pending_observations のフラッシュを試みる。
+    本体の保存が DB ロックで失敗した場合、エントリをバッファに追加して None を返す。
+    locked 以外の OperationalError はそのまま送出する。
+
+    Args:
+        conn: DB 接続。
+        content: 会話内容テキスト。
+        speaker: 発言者識別子（"user" or "mascot"）。
+        created_at: Unix タイムスタンプ（time.time() の戻り値）。
+        session_id: セッション ID（省略時は NULL）。
+
+    Returns:
+        挿入されたレコードの rowid。バッファリング時は None。
+    """
+    _flush_pending_observations(conn)
+
+    try:
+        return save_observation(conn, content, speaker, created_at, session_id)
+    except sqlite3.OperationalError as e:
+        if "locked" not in str(e).lower():
+            raise
+        with _pending_lock:
+            _pending_observations.append((content, speaker, created_at, session_id))
+            pending_count = len(_pending_observations)
+        logger.warning(
+            format_log_message("EM-008", N=str(pending_count)),
+        )
+        return None

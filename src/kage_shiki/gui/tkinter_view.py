@@ -284,14 +284,6 @@ class TkinterMascotView:
     # エラー表示 UI（D-6 Section 5.4）
     # ------------------------------------------------------------------
 
-    def set_character_name(self, name: str) -> None:
-        """キャラクター名ラベルを更新する.
-
-        Args:
-            name: 表示するキャラクター名。
-        """
-        self._name_var.set(name)
-
     def show_error_screen(
         self,
         message: str,

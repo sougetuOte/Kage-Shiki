@@ -27,7 +27,7 @@ from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.agent.prompt_builder import PromptBuilder  # re-export for backward compat
 from kage_shiki.agent.trends_proposal import TrendsProposalManager
 from kage_shiki.core.config import AppConfig, get_max_tokens, get_model
-from kage_shiki.memory.db import save_observation, search_observations_fts
+from kage_shiki.memory.db import save_observation_safe, search_observations_fts
 from kage_shiki.persona.persona_system import PersonaSystem
 
 logger = logging.getLogger(__name__)
@@ -323,12 +323,12 @@ class AgentCore:
         # 6. observations 即時書込 (FR-3.7)
         try:
             now_user = time.time()
-            save_observation(
+            save_observation_safe(
                 self._db_conn, user_input, "user", now_user,
                 session_id=self.session_context.session_id,
             )
             now_mascot = time.time()
-            save_observation(
+            save_observation_safe(
                 self._db_conn, response, "mascot", now_mascot,
                 session_id=self.session_context.session_id,
             )

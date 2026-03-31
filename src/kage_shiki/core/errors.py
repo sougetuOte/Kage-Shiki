@@ -10,8 +10,12 @@
     FR-4.8: ペルソナ読み込み3段階エラーハンドリング (EM-003, EM-004, EM-005)
 
 対応設計:
-    D-6: エラーメッセージ一覧（EM-001〜EM-011）
+    D-6: エラーメッセージ一覧（EM-001〜EM-010）
     D-6 Section 5.2.2: テンプレート変数フォールバック（defaultdict(str)）
+
+注: EM-011（手動編集検出）は FR-4.4 緩和（Should→May）に伴い削除済み。
+    FR-4.4 は現在「WARNING ログ出力のみ」に緩和されており、
+    ユーザー向けメッセージは不要となった。
 """
 
 from collections import defaultdict
@@ -52,7 +56,7 @@ class _ErrorDef:
 
 
 # ---------------------------------------------------------------------------
-# EM-001〜EM-011 メッセージ定義（D-6 Section 5.1 準拠、文字単位一致）
+# EM-001〜EM-010 メッセージ定義（D-6 Section 5.1 準拠、文字単位一致）
 # ---------------------------------------------------------------------------
 
 ERROR_MESSAGES: dict[str, _ErrorDef] = {
@@ -213,21 +217,6 @@ ERROR_MESSAGES: dict[str, _ErrorDef] = {
             "API call failed during wizard ({step}): {error}"
         ),
     ),
-    # ------------------------------------------------------------------
-    # EM-011: 手動編集検出（FR-4.4）
-    # ------------------------------------------------------------------
-    "EM-011": _ErrorDef(
-        severity=ErrorSeverity.INFO,
-        template=(
-            "persona_core.md が前回の凍結後に変更されています。\n"
-            "\n"
-            "変更を有効にするため、再凍結しますか？\n"
-            "（再凍結しない場合、変更された状態のまま起動します）"
-        ),
-        log_template=(
-            "persona_core.md hash mismatch, manual edit detected"
-        ),
-    ),
 }
 
 
@@ -243,7 +232,7 @@ def format_error_message(error_id: str, **kwargs: str) -> str:
     解決する。未定義変数は空文字にフォールバックする（D-6 Section 5.2.2）。
 
     Args:
-        error_id: エラーコード（EM-001〜EM-011）。
+        error_id: エラーコード（EM-001〜EM-010）。
         **kwargs: テンプレート変数。
 
     Returns:
@@ -262,7 +251,7 @@ def format_log_message(error_id: str, **kwargs: str) -> str:
     テンプレート変数のフォールバックは ``format_error_message`` と同様。
 
     Args:
-        error_id: エラーコード（EM-001〜EM-011）。
+        error_id: エラーコード（EM-001〜EM-010）。
         **kwargs: テンプレート変数。
 
     Returns:
@@ -279,7 +268,7 @@ def get_severity(error_id: str) -> ErrorSeverity:
     """エラーコードの重篤度を返す.
 
     Args:
-        error_id: エラーコード（EM-001〜EM-011）。
+        error_id: エラーコード（EM-001〜EM-010）。
 
     Returns:
         重篤度（ErrorSeverity）。

@@ -31,7 +31,7 @@ from datetime import datetime
 from pathlib import Path
 
 from kage_shiki.agent.agent_core import POKE_EVENT_PREFIX, AgentCore, PromptBuilder
-from kage_shiki.agent.llm_client import LLMClient
+from kage_shiki.agent.llm_client import AuthenticationError, LLMClient
 from kage_shiki.agent.trends_proposal import TrendsProposalManager
 from kage_shiki.core.config import load_config
 from kage_shiki.core.env import ensure_api_key, load_dotenv_file
@@ -109,6 +109,13 @@ def _run_background_loop(
         try:
             response = agent_core.process_turn(user_input)
             response_queue.put(response)
+        except AuthenticationError:
+            logger.error("API 認証エラー — ループを停止", exc_info=True)
+            response_queue.put(
+                format_error_message("EM-007", name_prefix=name_prefix),
+            )
+            shutdown_event.set()
+            return
         except Exception:
             logger.error("process_turn 失敗", exc_info=True)
             response_queue.put(
