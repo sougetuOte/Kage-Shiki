@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **feat**: Cross-Module Blame（モジュール間帰責判断）導入
+  - FR-1: code-quality-guideline.md に帰責判断フローチャート追加
+  - FR-2: orchestrator.py 帰責ガイド注入 + card_generator.py parse_blame_hint() 追加
+  - FR-3/4: full-review.md に帰責マーカー表示 + spec_ambiguity 自動修正禁止ガード
+  - Agent 定義に帰責観点追加（quality-auditor, code-reviewer）
+  - テスト 14 件追加（analyzer 85 passed / プロジェクト 836 passed）
+
 ### Changed (LAM v4.5.0 移行 Phase 1-3)
 
 - **refactor**: MAGI System 導入 — Three Agents Model を MELCHIOR/BALTHASAR/CASPAR に改名 + Reflection ステップ追加
