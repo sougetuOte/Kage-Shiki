@@ -52,6 +52,7 @@ docs/daily/
 .claude/logs/
 .claude/test-results.xml
 .claude/review-state/
+.claude/hooks/analyzers/.claude/
 
 # Reference materials
 _reference/
