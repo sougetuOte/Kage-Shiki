@@ -40,11 +40,11 @@ from kage_shiki.persona.persona_system import (
 
 
 class TestErrorMessageDefinitions:
-    """EM-001〜EM-011 の定義と API の統合テスト."""
+    """EM-001〜EM-010 の定義と API の統合テスト."""
 
     def test_all_error_ids_defined(self):
-        """EM-001〜EM-011 が全て定義されていること."""
-        expected_ids = [f"EM-{i:03d}" for i in range(1, 12)]
+        """EM-001〜EM-010 が全て定義されていること（EM-011 は FR-4.4 緩和により削除済み）."""
+        expected_ids = [f"EM-{i:03d}" for i in range(1, 11)]
         for eid in expected_ids:
             assert eid in ERROR_MESSAGES, f"{eid} が未定義"
 
@@ -76,17 +76,14 @@ class TestErrorMessageDefinitions:
         assert "APIStatusError" in log
 
     def test_severity_mapping(self):
-        """各 EM の重篤度が仕様通りであること."""
+        """各 EM の重篤度が仕様通りであること（EM-011 は FR-4.4 緩和により削除済み）."""
         critical_ids = {"EM-001", "EM-003", "EM-004", "EM-007"}
         warning_ids = {"EM-002", "EM-005", "EM-006", "EM-008", "EM-009", "EM-010"}
-        info_ids = {"EM-011"}
 
         for eid in critical_ids:
             assert get_severity(eid) == ErrorSeverity.CRITICAL, f"{eid}"
         for eid in warning_ids:
             assert get_severity(eid) == ErrorSeverity.WARNING, f"{eid}"
-        for eid in info_ids:
-            assert get_severity(eid) == ErrorSeverity.INFO, f"{eid}"
 
     def test_unknown_error_id_raises_key_error(self):
         """未定義のエラー ID で KeyError が発生すること."""
@@ -281,7 +278,7 @@ class TestAgentCoreErrorResilience:
         # save_observation をモックしてエラーを発生させる
         mock_llm_client.send_message_for_purpose.return_value = "大丈夫だよ！"
         with patch(
-            "kage_shiki.agent.agent_core.save_observation",
+            "kage_shiki.agent.agent_core.save_observation_safe",
             side_effect=Exception("DB locked"),
         ):
             response = agent.process_turn("テスト")
@@ -341,8 +338,7 @@ class TestErrorMessageIntegration:
         assert "もう一度試しますか" in msg
         assert "ANTHROPIC_API_KEY" in msg
 
-    def test_em011_manual_edit_detection_message(self):
-        """EM-011 のメッセージに再凍結の案内があること."""
-        msg = format_error_message("EM-011")
-        assert "再凍結" in msg
-        assert "変更されています" in msg
+    def test_em010_wizard_error_connection_failure(self):
+        """EM-010 のウィザードエラーメッセージに接続失敗の案内があること."""
+        msg = format_error_message("EM-010")
+        assert "接続に失敗しました" in msg

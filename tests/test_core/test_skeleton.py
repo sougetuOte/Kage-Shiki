@@ -4,8 +4,6 @@
     FR-1.4: data_dir 初期化の前提となるディレクトリ構成
 """
 
-from pathlib import Path
-
 
 def test_kage_shiki_package_importable():
     """kage_shiki パッケージがインポート可能であること."""
@@ -39,9 +37,8 @@ def test_subpackages_importable():
         assert mod is not None, f"Failed to import {pkg}"
 
 
-def test_directory_structure():
+def test_directory_structure(project_root):
     """D-1 で定義されたディレクトリ構成が存在すること."""
-    project_root = Path(__file__).parent.parent.parent
     src_root = project_root / "src" / "kage_shiki"
 
     expected_dirs = [
@@ -58,13 +55,11 @@ def test_directory_structure():
         assert (d / "__init__.py").is_file(), f"{d}/__init__.py does not exist"
 
 
-def test_pyproject_toml_exists():
+def test_pyproject_toml_exists(project_root):
     """pyproject.toml が存在すること."""
-    project_root = Path(__file__).parent.parent.parent
     assert (project_root / "pyproject.toml").is_file()
 
 
-def test_env_example_exists():
+def test_env_example_exists(project_root):
     """.env.example テンプレートが存在すること."""
-    project_root = Path(__file__).parent.parent.parent
     assert (project_root / ".env.example").is_file()

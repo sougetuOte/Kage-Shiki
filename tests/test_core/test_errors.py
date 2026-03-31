@@ -10,7 +10,8 @@
     FR-4.8: ペルソナ読み込み3段階エラーハンドリング
 
 対応設計:
-    D-6: エラーメッセージ一覧（EM-001〜EM-011）+ テンプレート変数化
+    D-6: エラーメッセージ一覧（EM-001〜EM-010）+ テンプレート変数化
+    注: EM-011 は FR-4.4 緩和（Should→May）に伴い削除済み。
 
 テスト方針:
     - 全 EM-XXX メッセージがテンプレート変数なしでもフォーマット可能 [R-5]
@@ -31,7 +32,7 @@ from kage_shiki.core.errors import (
 )
 
 # ---------------------------------------------------------------------------
-# EM-001〜EM-011 の全コード定義確認
+# EM-001〜EM-010 の全コード定義確認
 # ---------------------------------------------------------------------------
 
 ALL_EM_CODES = [
@@ -45,12 +46,11 @@ ALL_EM_CODES = [
     "EM-008",
     "EM-009",
     "EM-010",
-    "EM-011",
 ]
 
 
 class TestErrorMessageDefinitions:
-    """EM-001〜EM-011 の定義存在テスト."""
+    """EM-001〜EM-010 の定義存在テスト."""
 
     @pytest.mark.parametrize("code", ALL_EM_CODES)
     def test_all_codes_defined(self, code: str) -> None:
@@ -74,6 +74,7 @@ class TestFormatErrorMessage:
     _CODES_WITH_USER_MESSAGE = [
         c for c in ALL_EM_CODES if c not in {"EM-008", "EM-009"}
     ]
+    # EM-011 は FR-4.4 緩和により削除済み
 
     @pytest.mark.parametrize("code", _CODES_WITH_USER_MESSAGE)
     def test_format_without_variables(self, code: str) -> None:
@@ -133,12 +134,6 @@ class TestFormatErrorMessage:
         result = format_error_message("EM-010")
         assert "接続に失敗しました" in result
         assert "もう一度試しますか" in result
-
-    def test_em011_manual_edit_detection(self) -> None:
-        """EM-011 の手動編集検出メッセージが仕様通りであること."""
-        result = format_error_message("EM-011")
-        assert "persona_core.md" in result
-        assert "再凍結" in result
 
     def test_unknown_code_raises_keyerror(self) -> None:
         """未定義のエラーコードで KeyError が発生すること [R-2]."""
@@ -218,7 +213,6 @@ class TestGetSeverity:
             ("EM-008", ErrorSeverity.WARNING),
             ("EM-009", ErrorSeverity.WARNING),
             ("EM-010", ErrorSeverity.WARNING),
-            ("EM-011", ErrorSeverity.INFO),
         ],
     )
     def test_severity_mapping(

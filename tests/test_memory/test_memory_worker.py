@@ -7,7 +7,7 @@
 """
 
 import sqlite3
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 
@@ -102,9 +102,9 @@ class TestGenerateDailySummary:
             "kage_shiki.memory.memory_worker.save_day_summary",
         ) as mock_save:
             worker.generate_daily_summary("2026-03-03")
-            mock_save.assert_called_once()
-            call_args = mock_save.call_args
-            assert call_args.args[1] == "2026-03-03"
+            mock_save.assert_called_once_with(
+                ANY, "2026-03-03", ANY,
+            )
 
     def test_uses_memory_worker_purpose(
         self, worker: MemoryWorker, mock_llm: Mock,

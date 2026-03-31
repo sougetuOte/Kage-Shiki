@@ -271,15 +271,15 @@ class TestTkinterMascotViewSetBodyState:
 # ---------------------------------------------------------------------------
 
 
-class TestSetCharacterName:
-    """set_character_name のテスト (W-6)."""
+class TestSetPersonaName:
+    """set_persona_name のテスト (W-6)."""
 
     def test_updates_name_label(self, tk_root, input_queue, gui_config) -> None:
-        """set_character_name でキャラクター名ラベルが更新されること."""
+        """set_persona_name でキャラクター名ラベルが更新されること."""
         from kage_shiki.gui.tkinter_view import TkinterMascotView
 
         view = TkinterMascotView(root=tk_root, input_queue=input_queue, config=gui_config)
-        view.set_character_name("テストキャラ")
+        view.set_persona_name("テストキャラ")
 
         assert view._name_var.get() == "テストキャラ"
 

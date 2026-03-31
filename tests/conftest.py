@@ -5,6 +5,7 @@
 ローカルが優先される（pytest のフィクスチャ解決規則）。
 """
 
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -30,3 +31,16 @@ def mock_llm() -> Mock:
 def config() -> AppConfig:
     """デフォルト AppConfig."""
     return AppConfig()
+
+
+@pytest.fixture()
+def project_root() -> Path:
+    """プロジェクトルートディレクトリを返す.
+
+    tests/conftest.py は tests/ 直下にあるため、
+    その親がプロジェクトルートになる。
+
+    Returns:
+        Path: プロジェクトルートの絶対パス。
+    """
+    return Path(__file__).parent.parent

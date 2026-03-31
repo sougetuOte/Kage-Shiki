@@ -21,6 +21,7 @@ import pytest
 
 from kage_shiki.memory.db import (
     Database,
+    _pending_observations,
     _retry_on_lock,
     get_day_observations,
     get_missing_summary_dates,
@@ -28,6 +29,7 @@ from kage_shiki.memory.db import (
     initialize_db,
     save_day_summary,
     save_observation,
+    save_observation_safe,
     search_observations_fts,
 )
 
@@ -884,3 +886,113 @@ class TestRetryOnLock:
         with pytest.raises(sqlite3.OperationalError, match="no such table"):
             other_error()
         assert call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# FR-7.3: save_observation_safe — DB ロック時メモリバッファ (T-06)
+# ---------------------------------------------------------------------------
+
+
+class TestSaveObservationSafe:
+    """FR-7.3: DB ロック時のメモリバッファリング."""
+
+    def setup_method(self) -> None:
+        """各テスト前に _pending_observations をクリアする."""
+        _pending_observations.clear()
+
+    def teardown_method(self) -> None:
+        """各テスト後に _pending_observations をクリアする."""
+        _pending_observations.clear()
+
+    def test_normal_save_returns_rowid(self, db_conn: sqlite3.Connection) -> None:
+        """通常時は rowid を返すこと (FR-7.3)."""
+        rowid = save_observation_safe(db_conn, "テスト", "user", 1000.0)
+        assert rowid is not None
+        assert rowid > 0
+
+    def test_normal_save_persists_data(self, db_conn: sqlite3.Connection) -> None:
+        """通常時はデータが永続化されること."""
+        rowid = save_observation_safe(db_conn, "保存内容", "mascot", 2000.0, "s1")
+        assert rowid is not None
+        row = db_conn.execute(
+            "SELECT content, speaker FROM observations WHERE id = ?", (rowid,),
+        ).fetchone()
+        assert row["content"] == "保存内容"
+        assert row["speaker"] == "mascot"
+
+    def test_buffers_on_lock(self, db_conn: sqlite3.Connection) -> None:
+        """DB ロック時にバッファリングし None を返すこと (FR-7.3)."""
+        with patch(
+            "kage_shiki.memory.db.save_observation",
+            side_effect=sqlite3.OperationalError("database is locked"),
+        ):
+            result = save_observation_safe(db_conn, "バッファ", "user", 2000.0)
+        assert result is None
+        assert len(_pending_observations) == 1
+        assert _pending_observations[0] == ("バッファ", "user", 2000.0, None)
+
+    def test_non_lock_error_propagates(self, db_conn: sqlite3.Connection) -> None:
+        """locked 以外の OperationalError はそのまま送出されること."""
+        with patch(
+            "kage_shiki.memory.db.save_observation",
+            side_effect=sqlite3.OperationalError("no such table"),
+        ), pytest.raises(sqlite3.OperationalError, match="no such table"):
+            save_observation_safe(db_conn, "テスト", "user", 1000.0)
+
+    def test_flushes_pending_on_next_save(self, db_conn: sqlite3.Connection) -> None:
+        """次の保存時にバッファをフラッシュすること (FR-7.3)."""
+        _pending_observations.append(("バッファ内容", "user", 2000.0, None))
+        save_observation_safe(db_conn, "新規", "user", 3000.0)
+        assert len(_pending_observations) == 0
+        # 両方のレコードが DB に保存されていること
+        rows = db_conn.execute("SELECT content FROM observations ORDER BY created_at").fetchall()
+        contents = [r["content"] for r in rows]
+        assert "バッファ内容" in contents
+        assert "新規" in contents
+
+    def test_multiple_buffers_all_flushed(self, db_conn: sqlite3.Connection) -> None:
+        """複数のバッファエントリが全件フラッシュされること."""
+        for i in range(3):
+            _pending_observations.append((f"バッファ{i}", "user", float(1000 + i), None))
+        save_observation_safe(db_conn, "新規", "user", 4000.0)
+        assert len(_pending_observations) == 0
+        count = db_conn.execute("SELECT COUNT(*) FROM observations").fetchone()[0]
+        assert count == 4  # バッファ3件 + 新規1件
+
+    def test_partial_flush_when_still_locked(self, db_conn: sqlite3.Connection) -> None:
+        """フラッシュ中に再ロックが発生した場合、フラッシュ済み分は削除されること."""
+        _pending_observations.append(("先頭", "user", 1000.0, None))
+        _pending_observations.append(("後続", "user", 2000.0, None))
+
+        call_count = 0
+
+        def side_effect(conn, content, speaker, created_at, session_id=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # 最初の pending flush は成功（DB に直接保存）
+                cursor = conn.execute(
+                    "INSERT INTO observations (content, speaker, created_at, session_id) "
+                    "VALUES (?, ?, ?, ?)",
+                    (content, speaker, created_at, session_id),
+                )
+                conn.commit()
+                return cursor.lastrowid
+            if call_count == 2:
+                # 2件目の flush はロック
+                raise sqlite3.OperationalError("database is locked")
+            # 3件目（新規保存）は成功
+            cursor = conn.execute(
+                "INSERT INTO observations (content, speaker, created_at, session_id) "
+                "VALUES (?, ?, ?, ?)",
+                (content, speaker, created_at, session_id),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+        with patch("kage_shiki.memory.db.save_observation", side_effect=side_effect):
+            save_observation_safe(db_conn, "新規", "user", 3000.0)
+
+        # 2件目の flush が失敗したので「後続」は残る
+        assert len(_pending_observations) == 1
+        assert _pending_observations[0][0] == "後続"

@@ -31,6 +31,22 @@ def tk_root():
     root.destroy()
 
 
+@pytest.fixture(autouse=True)
+def _cleanup_tk_root(tk_root):
+    """各テスト後に tk_root の子ウィジェットを破棄する.
+
+    tk_root は session スコープで共有されるため、テスト間の状態漏れを防ぐ。
+    各テスト完了後にすべての子ウィジェットを破棄し、ウィンドウを非表示に戻す。
+
+    Args:
+        tk_root: session スコープの Tk インスタンス（このフィクスチャが依存）。
+    """
+    yield
+    for widget in tk_root.winfo_children():
+        widget.destroy()
+    tk_root.withdraw()
+
+
 @pytest.fixture
 def input_queue():
     """ユーザー入力用キューを提供する.

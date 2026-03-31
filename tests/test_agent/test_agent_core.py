@@ -576,7 +576,7 @@ class TestProcessTurn:
     ) -> None:
         """ユーザー入力が observations に書き込まれること (FR-3.7)."""
         agent_core.session_start_message = "やあ"
-        with patch("kage_shiki.agent.agent_core.save_observation") as mock_save:
+        with patch("kage_shiki.agent.agent_core.save_observation_safe") as mock_save:
             agent_core.process_turn("テスト入力")
             calls = [
                 c for c in mock_save.call_args_list
@@ -591,7 +591,7 @@ class TestProcessTurn:
         """マスコット応答が observations に書き込まれること (FR-3.7)."""
         agent_core.session_start_message = "やあ"
         mock_llm.send_message_for_purpose.return_value = "応答テスト"
-        with patch("kage_shiki.agent.agent_core.save_observation") as mock_save:
+        with patch("kage_shiki.agent.agent_core.save_observation_safe") as mock_save:
             agent_core.process_turn("入力")
             calls = [
                 c for c in mock_save.call_args_list
@@ -736,7 +736,7 @@ class TestPokeEvent:
         """クリックイベントでも observations に保存されること."""
         agent_core.session_start_message = "やあ"
         poke_input = f"{POKE_EVENT_PREFIX} ユーザーがウィンドウをクリック"
-        with patch("kage_shiki.agent.agent_core.save_observation") as mock_save:
+        with patch("kage_shiki.agent.agent_core.save_observation_safe") as mock_save:
             agent_core.process_turn(poke_input)
             assert mock_save.call_count == 2  # user + mascot
 
