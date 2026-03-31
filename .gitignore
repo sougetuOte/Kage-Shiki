@@ -48,6 +48,8 @@ docs/daily/
 .claude/last-test-result
 .claude/pre-compact-fired
 .claude/lam-loop-state.json
+.claude/lam-loop-state.json.bak
+.claude/logs/
 .claude/test-results.xml
 .claude/review-state/
 
@@ -56,3 +58,6 @@ _reference/
 
 # User Config
 config.toml
+
+# Local launcher
+start-claude.ps1
