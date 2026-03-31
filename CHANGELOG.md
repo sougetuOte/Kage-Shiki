@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **feat**: PostToolUseFailure イベント対応（settings.json + post-tool-use.py）
 - **test**: stop-hook テスト書き換え（Green State→安全ネット）+ integration テスト更新（834 tests）
 
+- **fix(audit)**: src/tests full-review GREEN STATE 達成 — Critical 1 + Warning 14 修正
+  - C-1: main.py AuthenticationError 捕捉追加
+  - W-2: tkinter_view set_character_name 削除、set_persona_name 統一
+  - W-3: trends_proposal 副作用削除
+  - W-4/W-12: db.py 到達不能パス削除 + メモリバッファ実装 + threading.Lock
+  - W-13/W-14: EM-011 削除 + FR-4.4 仕様緩和（PM承認済み）
+  - tests: project_root フィクスチャ化、tmp_path 化、_cleanup_tk_root 追加
+  - 836 tests / 92% coverage / ruff clean / gitleaks + bandit clean
+
 ### Fixed
 
 - **fix(audit)**: full-review 4 イテレーション監査 — .claude/ + tests/test_hooks/ の品質 Issue 全修正
