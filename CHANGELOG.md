@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **feat**: Phase 2b Wave 1 (自律性コア基盤) 実装完了
+  - **DesireWorker** (`agent/desire_worker.py`, 新規): 4 欲求 (talk/curiosity/reflect/rest) の定期更新エンジン
+    - threading.Timer ベース、`_lock` + `_start_generation` 世代カウンタによる二層並行性防御
+    - コールバック例外の Noisy Failure 化 (logger.error + exc_info=True)
+    - FR-9.1 / FR-9.2 対応
+  - **AgenticSearchEngine Protocol** (`agent/agentic_search.py`, 新規): SearchResult dataclass + typing.Protocol 定義
+    - 具象実装 (HaikuEngine) は Wave 3 (Task 3-1) 予定
+    - FR-9.10 対応
+  - **curiosity_targets CRUD** (`memory/db.py` 拡張):
+    - `create_curiosity_target` / `get_pending_targets` / `update_target_status` / `update_target_priority`
+    - `count_pending_curiosity_targets` (Wave 5 main.py 統合のためのカウンタ)
+    - `_VALID_CURIOSITY_STATUSES` frozenset による R-2 ディスパッチ + COALESCE SQL による副作用防止
+    - FR-9.11 対応
+  - **config 拡張** (`core/config.py`):
+    - `DesireConfig` / `AgenticSearchConfig` dataclass + TOML パーサー
+    - `_coerce_enum` ヘルパーで列挙値 (engine/search_api) をホワイトリスト検証
+    - `VALID_PURPOSES` に 4 purpose (`autonomous_talk`, `agentic_decompose`, `agentic_summarize`, `agentic_noise`) 追加 + 4 dict に接続 (R-3 準拠)
+  - **テスト追加**: 96 件新規 (desire_worker 35 / agentic_search 14 / curiosity_targets 35 / config Phase 2b 12)
+    - 全テスト 954 passed / カバレッジ 93% / desire_worker 100% / agentic_search 100%
+  - **full-review 6 イテレーション** で真の Green State 達成 (iter 5 で Before=0 確認)
+    - 累計修正: PG 5 / SE 42 / PM 6 / Deferred 6 件
+    - 監査レポート: `docs/artifacts/audit-reports/2026-04-15-wave1-iter0.md` および `2026-04-15-wave1-final.md`
+  - **設計書更新** (Atomic Commit):
+    - Section 3.1: `last_updated` を `time.monotonic()` 注記に
+    - Section 3.2: rest 計算式を `time.monotonic()` + 防御的ガード節テーブル追記
+    - Section 3.3: `DesireWorker.__init__` シグネチャを Callable 注入方式に追従
+    - Section 3.4: main.py 接続例を Wave 5 プレースホルダ化
+    - Section 6.1: `count_pending_curiosity_targets` + COALESCE SQL 注記
+    - Section 9.1: テスト例を Callable 注入方式に追従
+    - requirements.md Section 4.2: `last_updated` 型注記更新
+  - **Phase 2a 既存コード改善タスク** を `docs/tasks/phase2a-pending-fixes.md` に 6 件 deferred 起票
+
 - **docs**: Phase 2b (自律性) PLANNING 完了
   - 設計書作成: `docs/specs/phase2b-autonomy/design.md`（~980行）
   - full-review 3 イテレーションで GREEN STATE 達成（Critical 4 + Warning 12 修正）
