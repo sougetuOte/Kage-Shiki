@@ -53,6 +53,11 @@ docs/daily/
 .claude/test-results.xml
 .claude/review-state/
 .claude/hooks/analyzers/.claude/
+# 誤った cwd から pytest/analyzer を実行した際の副産物
+.claude/hooks/.claude/
+src/kage_shiki/.claude/
+**/.claude/review-state/
+**/.claude/test-results.xml
 
 # Reference materials
 _reference/

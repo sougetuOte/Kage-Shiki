@@ -1,8 +1,8 @@
 # Current Phase
 
-**PLANNING**
+**BUILDING**
 
-_Phase 2b: 自律性コア — 設計書作成_
+_Phase 2b: 自律性コア — Wave 1 実装_
 
 ---
 
