@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **docs**: Phase 2b (自律性) PLANNING 完了
+  - 設計書作成: `docs/specs/phase2b-autonomy/design.md`（~980行）
+  - full-review 3 イテレーションで GREEN STATE 達成（Critical 4 + Warning 12 修正）
+  - タスク分解: `docs/tasks/phase2b-autonomy-tasks.md`（5 Wave / 13 タスク / FR-9.1〜9.12 全件カバー）
+  - 要件書 Rev.1: summarize シグネチャ統一、asyncio→threading、config キー追記
+  - 全承認ゲート通過（requirements → design → tasks）
+
 - **feat**: Cross-Module Blame（モジュール間帰責判断）導入
   - FR-1: code-quality-guideline.md に帰責判断フローチャート追加
   - FR-2: orchestrator.py 帰責ガイド注入 + card_generator.py parse_blame_hint() 追加
