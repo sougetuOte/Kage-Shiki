@@ -1,8 +1,8 @@
 # Current Phase
 
-**AUDITING**
+**PLANNING**
 
-_LAM v4.6.0 移行完了後の品質監査_
+_Phase 2b: 自律性コア — 設計書作成_
 
 ---
 

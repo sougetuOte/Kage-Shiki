@@ -2,18 +2,20 @@
   "feature": "phase-2b-autonomy",
   "description": "影式 Phase 2b: 自律性コア — DesireWorker・自律発言・AgenticSearch",
   "phase": "PLANNING",
-  "subphase": "design",
+  "subphase": "tasks",
   "status": {
     "requirements": "approved",
-    "design": "in_progress",
-    "tasks": "not_started"
+    "design": "approved",
+    "tasks": "approved"
   },
   "approvals": {
-    "requirements": "2026-03-11"
+    "requirements": "2026-03-11",
+    "design": "2026-03-31",
+    "tasks": "2026-03-31"
   },
   "scope": [],
   "created_at": "2026-03-11",
-  "updated_at": "2026-03-11",
+  "updated_at": "2026-03-31",
   "previous_phase": {
     "feature": "phase-2a-foundation",
     "completed_at": "2026-03-11",
