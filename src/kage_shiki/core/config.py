@@ -33,6 +33,12 @@ _MAX_TOKENS_MEMORY_SUMMARY = 800
 _MAX_TOKENS_HUMAN_BLOCK_UPDATE = 256
 _MAX_TOKENS_POKE = 256
 
+# Phase 2b: 自律発言用の固定 max_tokens
+_MAX_TOKENS_AUTONOMOUS_TALK = 256
+_MAX_TOKENS_AGENTIC_DECOMPOSE = 256
+_MAX_TOKENS_AGENTIC_SUMMARIZE = 512
+_MAX_TOKENS_AGENTIC_NOISE = 256
+
 # 用途別 max_tokens マップ（conversation 以外の固定値）
 _MAX_TOKENS_MAP: dict[str, int] = {
     "wizard_generate": _MAX_TOKENS_WIZARD_GENERATE,
@@ -42,6 +48,11 @@ _MAX_TOKENS_MAP: dict[str, int] = {
     "memory_summary": _MAX_TOKENS_MEMORY_SUMMARY,
     "human_block_update": _MAX_TOKENS_HUMAN_BLOCK_UPDATE,
     "poke": _MAX_TOKENS_POKE,
+    # Phase 2b: 自律発言・AgenticSearch 用 purpose（design.md Section 7.3）
+    "autonomous_talk": _MAX_TOKENS_AUTONOMOUS_TALK,
+    "agentic_decompose": _MAX_TOKENS_AGENTIC_DECOMPOSE,
+    "agentic_summarize": _MAX_TOKENS_AGENTIC_SUMMARIZE,
+    "agentic_noise": _MAX_TOKENS_AGENTIC_NOISE,
 }
 
 # 用途別モデルスロットマップ
@@ -54,6 +65,11 @@ _PURPOSE_MODEL_SLOTS: dict[str, str] = {
     "memory_worker": "memory_worker",
     "memory_summary": "memory_worker",
     "human_block_update": "utility",
+    # Phase 2b: 自律発言・AgenticSearch 用 purpose（design.md Section 7.3）
+    "autonomous_talk": "conversation",
+    "agentic_decompose": "utility",
+    "agentic_summarize": "utility",
+    "agentic_noise": "utility",
 }
 
 # ---------------------------------------------------------------------------
@@ -69,6 +85,11 @@ VALID_PURPOSES: frozenset[str] = frozenset({
     "memory_summary",
     "human_block_update",
     "poke",
+    # Phase 2b: 自律発言・AgenticSearch 用 purpose（design.md Section 7.3）
+    "autonomous_talk",
+    "agentic_decompose",
+    "agentic_summarize",
+    "agentic_noise",
 })
 
 # 用途別 temperature オーバーライド（None = config.conversation.temperature を使用）
@@ -81,6 +102,11 @@ _PURPOSE_TEMPERATURES: dict[str, float | None] = {
     "memory_summary": 0.3,
     "human_block_update": 0.3,
     "poke": None,
+    # Phase 2b: 自律発言・AgenticSearch 用 purpose（design.md Section 7.3）
+    "autonomous_talk": 0.9,
+    "agentic_decompose": 0.3,
+    "agentic_summarize": 0.3,
+    "agentic_noise": 0.5,
 }
 
 
@@ -229,6 +255,63 @@ class LoggingConfig:
 
 
 @dataclass
+class DesireConfig:
+    """[desire] セクション設定 (Phase 2b).
+
+    DesireWorker の欲求計算・閾値・間隔を定義する。
+    設計書 docs/specs/phase2b-autonomy/design.md Section 7.1 に準拠。
+
+    Attributes:
+        update_interval_sec: 欲求更新間隔（秒）。
+        talk_threshold: talk 欲求の発現閾値。
+        curiosity_threshold: curiosity 欲求の発現閾値。
+        reflect_threshold: reflect 欲求の発現閾値。
+        rest_threshold: rest 欲求の発現閾値。
+        idle_minutes_for_talk: talk 閾値到達までの無入力時間（分）。
+        idle_minutes_for_curiosity: curiosity 上昇開始までの無入力時間（分）。
+        reflect_episode_threshold: reflect 発現までの observations 蓄積件数。
+        rest_hours_threshold: rest 発現までの稼働時間（時間）。
+        rest_suppress_minutes: rest 再通知抑制時間（分）。
+    """
+
+    update_interval_sec: float = 7.5
+    talk_threshold: float = 0.7
+    curiosity_threshold: float = 0.6
+    reflect_threshold: float = 0.8
+    rest_threshold: float = 0.9
+    idle_minutes_for_talk: float = 30.0
+    idle_minutes_for_curiosity: float = 15.0
+    reflect_episode_threshold: int = 20
+    rest_hours_threshold: float = 4.0
+    rest_suppress_minutes: float = 60.0
+
+
+# Phase 2b: AgenticSearch の有効値セット（R-2: frozenset ディスパッチ）
+_VALID_AGENTIC_ENGINES: frozenset[str] = frozenset({"haiku", "local"})
+_VALID_AGENTIC_SEARCH_APIS: frozenset[str] = frozenset({"duckduckgo", "brave"})
+
+
+@dataclass
+class AgenticSearchConfig:
+    """[agentic_search] セクション設定 (Phase 2b).
+
+    AgenticSearch エンジンの選択・検索 API・並列数を定義する。
+    設計書 docs/specs/phase2b-autonomy/design.md Section 7.1 に準拠。
+
+    Attributes:
+        engine: エンジン種別（"haiku" | "local"）。
+        search_api: 検索 API（"duckduckgo" | "brave"）。
+        max_subqueries: サブクエリ最大数。
+        max_concurrent_searches: 並列検索数上限。
+    """
+
+    engine: str = "haiku"
+    search_api: str = "duckduckgo"
+    max_subqueries: int = 3
+    max_concurrent_searches: int = 3
+
+
+@dataclass
 class AppConfig:
     """アプリケーション全体設定.
 
@@ -244,6 +327,8 @@ class AppConfig:
         api: [api] セクション設定。
         tray: [tray] セクション設定。
         logging: [logging] セクション設定。
+        desire: [desire] セクション設定 (Phase 2b)。
+        agentic_search: [agentic_search] セクション設定 (Phase 2b)。
     """
 
     general: GeneralConfig = field(default_factory=GeneralConfig)
@@ -255,6 +340,8 @@ class AppConfig:
     api: ApiConfig = field(default_factory=ApiConfig)
     tray: TrayConfig = field(default_factory=TrayConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    desire: DesireConfig = field(default_factory=DesireConfig)
+    agentic_search: AgenticSearchConfig = field(default_factory=AgenticSearchConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -629,6 +716,146 @@ def _parse_logging(data: dict[str, Any]) -> LoggingConfig:
     )
 
 
+def _parse_desire(data: dict[str, Any]) -> DesireConfig:
+    """[desire] セクションをパースする (Phase 2b).
+
+    Args:
+        data: [desire] セクションの生データ。
+
+    Returns:
+        検証済み DesireConfig。
+    """
+    defaults = DesireConfig()
+    return DesireConfig(
+        update_interval_sec=_coerce_field(
+            "desire", "update_interval_sec",
+            data.get("update_interval_sec", defaults.update_interval_sec),
+            float, defaults.update_interval_sec, min_value=0.1,
+        ),
+        talk_threshold=_coerce_field(
+            "desire", "talk_threshold",
+            data.get("talk_threshold", defaults.talk_threshold),
+            float, defaults.talk_threshold, min_value=0.0, max_value=1.0,
+        ),
+        curiosity_threshold=_coerce_field(
+            "desire", "curiosity_threshold",
+            data.get("curiosity_threshold", defaults.curiosity_threshold),
+            float, defaults.curiosity_threshold, min_value=0.0, max_value=1.0,
+        ),
+        reflect_threshold=_coerce_field(
+            "desire", "reflect_threshold",
+            data.get("reflect_threshold", defaults.reflect_threshold),
+            float, defaults.reflect_threshold, min_value=0.0, max_value=1.0,
+        ),
+        rest_threshold=_coerce_field(
+            "desire", "rest_threshold",
+            data.get("rest_threshold", defaults.rest_threshold),
+            float, defaults.rest_threshold, min_value=0.0, max_value=1.0,
+        ),
+        idle_minutes_for_talk=_coerce_field(
+            "desire", "idle_minutes_for_talk",
+            data.get("idle_minutes_for_talk", defaults.idle_minutes_for_talk),
+            float, defaults.idle_minutes_for_talk, min_value=0.0,
+        ),
+        idle_minutes_for_curiosity=_coerce_field(
+            "desire", "idle_minutes_for_curiosity",
+            data.get("idle_minutes_for_curiosity", defaults.idle_minutes_for_curiosity),
+            float, defaults.idle_minutes_for_curiosity, min_value=0.0,
+        ),
+        reflect_episode_threshold=_coerce_field(
+            "desire", "reflect_episode_threshold",
+            data.get("reflect_episode_threshold", defaults.reflect_episode_threshold),
+            int, defaults.reflect_episode_threshold, min_value=1,
+        ),
+        rest_hours_threshold=_coerce_field(
+            "desire", "rest_hours_threshold",
+            data.get("rest_hours_threshold", defaults.rest_hours_threshold),
+            float, defaults.rest_hours_threshold, min_value=0.0,
+        ),
+        rest_suppress_minutes=_coerce_field(
+            "desire", "rest_suppress_minutes",
+            data.get("rest_suppress_minutes", defaults.rest_suppress_minutes),
+            float, defaults.rest_suppress_minutes, min_value=0.0,
+        ),
+    )
+
+
+def _coerce_enum(
+    section_name: str,
+    field_name: str,
+    raw_value: Any,
+    valid_values: frozenset[str],
+    default_value: str,
+) -> str:
+    """列挙値フィールドを検証し、無効値ならデフォルトにフォールバックする (Phase 2b).
+
+    `_coerce_field` の str 型チェックを通過した後の追加バリデーションとして使用する。
+
+    Args:
+        section_name: TOML セクション名（ログ出力用）。
+        field_name: フィールド名（ログ出力用）。
+        raw_value: 型チェック済みの文字列値。
+        valid_values: 有効値の frozenset。
+        default_value: フォールバック値。
+
+    Returns:
+        valid_values に含まれる値、または default_value。
+    """
+    if raw_value not in valid_values:
+        logger.warning(
+            "config [%s].%s: %r is not a valid value. Valid: %s. Using default: %r",
+            section_name,
+            field_name,
+            raw_value,
+            sorted(valid_values),
+            default_value,
+        )
+        return default_value
+    return raw_value
+
+
+def _parse_agentic_search(data: dict[str, Any]) -> AgenticSearchConfig:
+    """[agentic_search] セクションをパースする (Phase 2b).
+
+    Args:
+        data: [agentic_search] セクションの生データ。
+
+    Returns:
+        検証済み AgenticSearchConfig。
+    """
+    defaults = AgenticSearchConfig()
+    engine_raw = _coerce_field(
+        "agentic_search", "engine",
+        data.get("engine", defaults.engine),
+        str, defaults.engine,
+    )
+    search_api_raw = _coerce_field(
+        "agentic_search", "search_api",
+        data.get("search_api", defaults.search_api),
+        str, defaults.search_api,
+    )
+    return AgenticSearchConfig(
+        engine=_coerce_enum(
+            "agentic_search", "engine",
+            engine_raw, _VALID_AGENTIC_ENGINES, defaults.engine,
+        ),
+        search_api=_coerce_enum(
+            "agentic_search", "search_api",
+            search_api_raw, _VALID_AGENTIC_SEARCH_APIS, defaults.search_api,
+        ),
+        max_subqueries=_coerce_field(
+            "agentic_search", "max_subqueries",
+            data.get("max_subqueries", defaults.max_subqueries),
+            int, defaults.max_subqueries, min_value=1,
+        ),
+        max_concurrent_searches=_coerce_field(
+            "agentic_search", "max_concurrent_searches",
+            data.get("max_concurrent_searches", defaults.max_concurrent_searches),
+            int, defaults.max_concurrent_searches, min_value=1,
+        ),
+    )
+
+
 def _build_app_config(raw: dict[str, Any]) -> AppConfig:
     """生の TOML 辞書から AppConfig を構築する。
 
@@ -648,6 +875,8 @@ def _build_app_config(raw: dict[str, Any]) -> AppConfig:
         api=_parse_api(raw.get("api", {})),
         tray=_parse_tray(raw.get("tray", {})),
         logging=_parse_logging(raw.get("logging", {})),
+        desire=_parse_desire(raw.get("desire", {})),
+        agentic_search=_parse_agentic_search(raw.get("agentic_search", {})),
     )
 
 
@@ -743,6 +972,37 @@ file_level = "{d.logging.file_level}"
 max_bytes = {d.logging.max_bytes}
 # ログファイルバックアップ数
 backup_count = {d.logging.backup_count}
+
+[desire]
+# Phase 2b: DesireWorker の欲求計算・閾値・間隔です。
+# 欲求更新間隔（秒）
+update_interval_sec = {d.desire.update_interval_sec}
+# 各欲求の発現閾値（0.0〜1.0）
+talk_threshold = {d.desire.talk_threshold}
+curiosity_threshold = {d.desire.curiosity_threshold}
+reflect_threshold = {d.desire.reflect_threshold}
+rest_threshold = {d.desire.rest_threshold}
+# talk 閾値到達までの無入力時間（分）
+idle_minutes_for_talk = {d.desire.idle_minutes_for_talk}
+# curiosity 上昇開始までの無入力時間（分）
+idle_minutes_for_curiosity = {d.desire.idle_minutes_for_curiosity}
+# reflect 発現までの observations 蓄積件数
+reflect_episode_threshold = {d.desire.reflect_episode_threshold}
+# rest 発現までの稼働時間（時間）
+rest_hours_threshold = {d.desire.rest_hours_threshold}
+# rest 再通知抑制時間（分）
+rest_suppress_minutes = {d.desire.rest_suppress_minutes}
+
+[agentic_search]
+# Phase 2b: AgenticSearch エンジンの設定です。
+# エンジン種別（"haiku" | "local"）
+engine = "{d.agentic_search.engine}"
+# 検索 API（"duckduckgo" | "brave"）
+search_api = "{d.agentic_search.search_api}"
+# サブクエリ最大数
+max_subqueries = {d.agentic_search.max_subqueries}
+# 並列検索数上限
+max_concurrent_searches = {d.agentic_search.max_concurrent_searches}
 """
     config_path.write_text(content, encoding="utf-8")
 

@@ -108,7 +108,7 @@ DesireState:
 DesireLevel:
     level: float       # 0.0 - 1.0
     threshold: float   # config.toml で設定
-    last_updated: float # Unix timestamp
+    last_updated: float # time.monotonic() ベース（NTP スキュー耐性、再起動をまたぐ絶対時刻計算には使用しない）
     active: bool       # 閾値超過で True、実行後 or ユーザー入力時に False
 
 欲求レベルは **永続化しない**（再起動時は初期値にリセット）。curiosity の未調査トピック残量は `curiosity_targets` テーブルに永続化されるため、再起動後も curiosity 欲求は適切に再計算される。

@@ -119,7 +119,7 @@ class DesireLevel:
     """
     level: float        # 0.0 〜 1.0
     threshold: float    # config から読み込み
-    last_updated: float # Unix timestamp（time.time()）
+    last_updated: float # monotonic 時刻（time.monotonic()、NTP スキュー耐性）
     active: bool = False  # 閾値超過中は True、リセット後 False
 
 @dataclass
@@ -175,13 +175,29 @@ level = min(1.0, unprocessed_episodes / reflect_episode_threshold)
 **rest 欲求:**
 
 ```
-uptime_hours = (time.time() - session_start_time) / 3600
+uptime_hours = (time.monotonic() - session_start_time) / 3600
 level = min(1.0, uptime_hours / rest_hours_threshold)
 ```
 
 - `rest_hours_threshold`: config `[desire].rest_hours_threshold`（デフォルト 4 時間）
+- `session_start_time` は `time.monotonic()` ベース（NTP スキュー耐性、再起動
+  またぎの絶対時刻計算には使用しない）
 - rest 欲求は閾値を超えても active=True になるだけで、AgentCore への通知頻度は
   他の欲求より低い（一度発現したら 60 分間は再通知しない抑制ロジックを実装）
+
+#### 防御的ガード節
+
+各欲求の計算関数は、パラメータ誤設定（≤ 0）に対する防御的ガードを持つ:
+
+| 関数 | ガード条件 | ガード動作 |
+|------|-----------|-----------|
+| `_calc_talk_level` | `idle_minutes_for_talk <= 0` | return 1.0 |
+| `_calc_curiosity_level` | `idle_minutes_for_curiosity <= 0` | `time_weight = 1.0` |
+| `_calc_reflect_level` | `reflect_episode_threshold <= 0` | return 1.0 |
+| `_calc_rest_level` | `rest_hours_threshold <= 0` | return 1.0 |
+
+これらのガード節はゼロ除算を防ぎ、設定ミス時も DesireWorker が正常にループを
+継続できることを保証する（2026-04-15 iter0 監査で設計書に追記）。
 
 #### 初期値
 
@@ -197,38 +213,50 @@ class DesireWorker:
     def __init__(
         self,
         config: DesireConfig,
-        db_conn: sqlite3.Connection,
+        get_pending_curiosity_count: Callable[[], int],
+        get_observation_count: Callable[[], int],
         on_threshold_exceeded: Callable[[str], None],
+        session_start_time: float | None = None,
     ) -> None:
-        # db_conn は check_same_thread=False で生成されたものを受け取る（R-7）。
-        # DesireWorker スレッドから observations 件数を COUNT するため。
-        self._lock = threading.Lock()  # update_desires / reset_all の排他制御
+        # DB 接続を直接受け取らず、件数取得をコールバック注入で受け取る。
+        # テスタビリティ向上 + SRP 明確化（R-7, R-11(a) カプセル化）。
+        # session_start_time はテスト時に rest 欲求の uptime を制御するための
+        # オプション引数。省略時は time.monotonic() を使用する。
+        self._lock = threading.Lock()  # 状態遷移の排他制御（R-7）
 
     def start(self) -> None:
         """threading.Timer による定期更新ループを開始する.
 
         Timer は一回限りのため、update_desires() 末尾で次の Timer を
-        再帰的にスケジュールする。stop() は次回 Timer をキャンセルするが、
-        実行中の update_desires() は完了を待つ。
+        再帰的にスケジュールする。_running / _timer の読み書きは _lock で保護する。
         """
 
     def stop(self) -> None:
-        """更新ループを停止し、次回タイマーをキャンセルする."""
+        """更新ループを停止し、次回タイマーをキャンセルする.
+
+        _lock を取得して _running=False と Timer.cancel() を原子的に行う。
+        `_schedule_next_locked()` との競合ウィンドウを閉じ、stop 後に古い Timer が
+        残存する可能性を排除する（W-1 修正、2026-04-15 iter0 監査）。
+        """
 
     def update_desires(self) -> None:
         """全欲求レベルを再計算し、閾値超過があれば on_threshold_exceeded を呼ぶ.
 
-        self._lock を取得して実行する。LLM 呼び出しなし（NFR-14 準拠）。
-        reflect 欲求の unprocessed_episodes は DB クエリで取得する:
-            SELECT COUNT(*) FROM observations
-            WHERE created_at > :last_reflect_time
-        last_reflect_time は内部で管理し、reflect 発現後にリセットする。
+        self._lock を取得して level 更新と active フラグ遷移を排他制御する。
+        LLM 呼び出しなし（NFR-14 準拠）。
+        reflect 欲求の unprocessed_episodes は `get_observation_count()`
+        コールバックから取得する（DB 直接依存を排除）。
+
+        コールバック呼び出し時の例外は logger.error でログ記録し、
+        Timer ループは継続する（Noisy Failure、Silent Failure 禁止）。
         """
 
     def reset_all(self) -> None:
-        """全欲求の active を False にリセットし、最終入力時刻を更新する.
+        """全欲求の active を False にリセットする（FR-9.5）.
 
-        self._lock を取得して実行する。ユーザー入力時に呼び出す（FR-9.5）。
+        self._lock を取得して実行する。
+        idle タイマー（`_last_user_input_time`）のリセットは
+        `notify_user_input()` が担当するため、両者を組み合わせて使用する。
         """
 
     def get_state(self) -> DesireState:
@@ -237,11 +265,25 @@ class DesireWorker:
     def notify_user_input(self) -> None:
         """ユーザー入力を通知し、idle タイマーをリセットする.
 
+        `_last_user_input_time` への単一代入のみを行うため、GIL 保護により
+        意図的に _lock を取得しない（高頻度呼び出し時のロック競合回避）。
+        Lock 境界の非対称性は意図的な設計判断。
+
         reset_all() と組み合わせて使用。
         注: 本メソッドは要件書 Section 5.1 の Protocol 定義外メソッドであり、
         building-checklist.md S-2 に準拠して明示する。
-        """
+    """
 ```
+
+> **設計判断 (2026-04-15 iter0 監査で事後整合)**:
+>
+> `__init__` のシグネチャは、Wave 1 実装時点で `db_conn: sqlite3.Connection` 直接
+> 依存から `get_pending_curiosity_count` / `get_observation_count` のコールバック
+> 注入方式に改善された。これにより DesireWorker は DB 層に依存せず、テストで
+> モック注入のみで全ての欲求計算を検証可能になった。また、`session_start_time`
+> 引数の追加により、rest 欲求のテストがプライベート属性への直接書き込みに依存
+> しなくなった（R-11(a) カプセル化改善）。
+
 
 #### 通知の重複抑制
 
@@ -273,7 +315,15 @@ def _on_desire_exceeded(desire_type: str) -> None:
 
 desire_worker = DesireWorker(
     config=config.desire,
-    db_conn=db_conn,
+    # curiosity 欲求: curiosity_targets の pending 件数を取得（db.py 実装済み）
+    get_pending_curiosity_count=lambda: db.count_pending_curiosity_targets(db_conn),
+    # reflect 欲求: 前回 reflect 発現以降に蓄積された observations 件数。
+    # ※ 実装は Wave 5 (Task 5-1: main.py 統合) で決定する。候補:
+    #    (a) db.py に `count_observations_since(conn, since_ts)` を新設して呼び出す
+    #    (b) AgentCore 側で last_reflect_time を保持し、reflect 発現時にリセットする
+    #    どちらを採用するかは Wave 5 着手時の AgentCore / memory_worker との
+    #    責務境界判断に依存するため、Wave 1 時点ではプレースホルダとする。
+    get_observation_count=get_observation_count,  # Wave 5 で実装
     on_threshold_exceeded=_on_desire_exceeded,
 )
 ```
@@ -654,10 +704,22 @@ def update_target_priority(
     delta: int,
 ) -> None:
     """priority を delta だけ増減する（最低値 1 を保証）."""
+
+def count_pending_curiosity_targets(conn: sqlite3.Connection) -> int:
+    """status='pending' レコード件数を返す（FR-9.11, iter 1 W-4 追加）.
+
+    `DesireWorker.get_pending_curiosity_count` コールバックから呼ばれる。
+    `get_pending_targets()` と異なり limit を取らず全件カウントするため、
+    curiosity 欲求計算の正確性を保証する。
+    """
 ```
 
 有効な status 値は `frozenset{"pending", "searching", "done", "failed"}` で管理し、
 範囲外の値は `ValueError` を送出する（building-checklist.md R-2 準拠）。
+
+`update_target_status()` の SQL は `SET result_summary=COALESCE(?, result_summary)` を
+使用し、`result_summary=None` が既存値を NULL で上書きすることを防ぐ
+（iter 0 W-6 対応）。
 
 ### 6.2 トピック照合方式（D-28）
 
@@ -817,7 +879,12 @@ response_queue → GUI 表示
 
 def test_talk_desire_increases_with_idle_time():
     """アイドル時間に応じて talk 欲求が増加することを検証."""
-    worker = DesireWorker(config=..., db_conn=..., on_threshold_exceeded=callback)
+    worker = DesireWorker(
+        config=...,
+        get_pending_curiosity_count=lambda: 0,
+        get_observation_count=lambda: 0,
+        on_threshold_exceeded=callback,
+    )
     worker.notify_user_input()  # 最終入力時刻を設定
     # 時刻をモックして経過時間を操作
     with freeze_time(now + timedelta(minutes=15)):

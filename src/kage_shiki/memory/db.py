@@ -90,18 +90,20 @@ CREATE TABLE IF NOT EXISTS day_summary (
     created_at  REAL NOT NULL
 );
 
--- 5. curiosity_targets テーブル（Phase 2 用予約）
+-- 5. curiosity_targets テーブル（Phase 2b — 自律調査タスクキュー）
 CREATE TABLE IF NOT EXISTS curiosity_targets (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     topic           TEXT NOT NULL,
-    status          TEXT DEFAULT 'pending',
-    priority        INTEGER DEFAULT 5,
-    parent_id       INTEGER REFERENCES curiosity_targets(id),
+    priority        INTEGER NOT NULL DEFAULT 5,
+    status          TEXT NOT NULL DEFAULT 'pending',
+    parent_id       INTEGER,
+    result_summary  TEXT,
     created_at      REAL NOT NULL,
-    result_summary  TEXT
+    updated_at      REAL NOT NULL,
+    FOREIGN KEY (parent_id) REFERENCES curiosity_targets(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_curiosity_status
+CREATE INDEX IF NOT EXISTS idx_curiosity_targets_status_priority
     ON curiosity_targets (status, priority);
 """
 
@@ -456,6 +458,161 @@ def _flush_pending_observations(conn: sqlite3.Connection) -> None:
                 break  # まだロック中なら残りは次回に
         if flushed:
             logger.info("Flushed %d buffered observations", flushed)
+
+
+# ---------------------------------------------------------------------------
+# curiosity_targets CRUD 操作（FR-9.11, D-28）
+# ---------------------------------------------------------------------------
+
+_VALID_CURIOSITY_STATUSES: frozenset[str] = frozenset({
+    "pending",
+    "searching",
+    "done",
+    "failed",
+})
+
+
+@_retry_on_lock
+def create_curiosity_target(
+    conn: sqlite3.Connection,
+    topic: str,
+    priority: int = 5,
+    parent_id: int | None = None,
+) -> int:
+    """curiosity_targets に pending レコードを作成し、ID を返す.
+
+    Args:
+        conn: DB 接続。
+        topic: 調査トピック文字列。
+        priority: 優先度（小さいほど高優先）。デフォルト 5。
+        parent_id: 親レコードの ID（派生テーマ登録時に使用）。
+
+    Returns:
+        挿入されたレコードの ID。
+    """
+    now = time.time()
+    cursor = conn.execute(
+        "INSERT INTO curiosity_targets "
+        "(topic, priority, status, parent_id, created_at, updated_at) "
+        "VALUES (?, ?, 'pending', ?, ?, ?)",
+        (topic, priority, parent_id, now, now),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+@_retry_on_lock
+def get_pending_targets(
+    conn: sqlite3.Connection,
+    limit: int = 1,
+) -> list[dict]:
+    """priority 昇順で pending レコードを取得する.
+
+    Args:
+        conn: DB 接続。
+        limit: 取得する最大件数。デフォルト 1。
+
+    Returns:
+        pending レコードの list[dict]。priority 昇順。件数が 0 なら空リスト。
+    """
+    rows = conn.execute(
+        "SELECT * FROM curiosity_targets "
+        "WHERE status = 'pending' "
+        "ORDER BY priority ASC "
+        "LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@_retry_on_lock
+def count_pending_curiosity_targets(conn: sqlite3.Connection) -> int:
+    """curiosity_targets の status='pending' レコード件数を返す (FR-9.11).
+
+    `DesireWorker.get_pending_curiosity_count` コールバックのバックエンドとして
+    使用される。`get_pending_targets()` と異なり limit を取らず常に全件を
+    カウントするため、curiosity 欲求計算の正確性を保証する。
+
+    Args:
+        conn: DB 接続。
+
+    Returns:
+        pending ステータスのレコード件数。
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) FROM curiosity_targets WHERE status = 'pending'"
+    ).fetchone()
+    return int(row[0]) if row is not None else 0
+
+
+@_retry_on_lock
+def update_target_status(
+    conn: sqlite3.Connection,
+    target_id: int,
+    status: str,
+    result_summary: str | None = None,
+) -> None:
+    """status を更新し、done 時は result_summary を保存する.
+
+    Args:
+        conn: DB 接続。
+        target_id: 更新対象レコードの ID。
+        status: 新しい status 値（"pending"/"searching"/"done"/"failed"）。
+        result_summary: 調査結果サマリー。status="done" 時に保存される。
+
+    Raises:
+        ValueError: 無効な status 値が指定された場合。
+        LookupError: target_id が存在しない場合。
+    """
+    if status not in _VALID_CURIOSITY_STATUSES:
+        raise ValueError(f"Unknown status: {status!r}")
+    now = time.time()
+    # result_summary が None の場合は既存値を保持する（COALESCE）。
+    # searching 等の中間状態で None 渡しによる既存値の NULL 上書きを防ぐ。
+    cur = conn.execute(
+        "UPDATE curiosity_targets "
+        "SET status=?, result_summary=COALESCE(?, result_summary), updated_at=? "
+        "WHERE id=?",
+        (status, result_summary, now, target_id),
+    )
+    conn.commit()
+    if cur.rowcount == 0:
+        raise LookupError(f"curiosity_targets: id={target_id} が存在しません")
+
+
+@_retry_on_lock
+def update_target_priority(
+    conn: sqlite3.Connection,
+    target_id: int,
+    delta: int,
+) -> None:
+    """priority を delta 分増減する（最小値 1 を保つ）.
+
+    Args:
+        conn: DB 接続。
+        target_id: 更新対象レコードの ID。
+        delta: priority の増減量（正数で増加、負数で減少）。
+
+    Raises:
+        LookupError: target_id が存在しない場合。
+    """
+    row = conn.execute(
+        "SELECT priority FROM curiosity_targets WHERE id=?", (target_id,)
+    ).fetchone()
+    if row is None:
+        raise LookupError(f"curiosity_targets: id={target_id} が存在しません")
+    new_priority = max(1, row["priority"] + delta)
+    now = time.time()
+    conn.execute(
+        "UPDATE curiosity_targets SET priority=?, updated_at=? WHERE id=?",
+        (new_priority, now, target_id),
+    )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# FR-7.3: DB ロック時メモリバッファ
+# ---------------------------------------------------------------------------
 
 
 def save_observation_safe(

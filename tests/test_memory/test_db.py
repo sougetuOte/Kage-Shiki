@@ -118,9 +118,9 @@ class TestInitializeDbTables:
         assert "curiosity_targets" in tables
 
     def test_curiosity_targets_index_exists(self, db_conn: sqlite3.Connection) -> None:
-        """idx_curiosity_status インデックスが存在すること."""
+        """status/priority 複合インデックスが存在すること（Phase 2b でインデックス名変更）."""
         indexes = _get_index_names(db_conn)
-        assert "idx_curiosity_status" in indexes
+        assert "idx_curiosity_targets_status_priority" in indexes
 
     def test_observations_columns(self, db_conn: sqlite3.Connection) -> None:
         """observations テーブルのカラムが仕様と一致すること."""
@@ -166,11 +166,11 @@ class TestInitializeDbTables:
             )
 
     def test_curiosity_targets_columns(self, db_conn: sqlite3.Connection) -> None:
-        """curiosity_targets テーブルのカラムが仕様と一致すること."""
+        """curiosity_targets テーブルのカラムが仕様と一致すること（Phase 2b 更新）."""
         columns = _get_column_info(db_conn, "curiosity_targets")
         expected_names = {
             "id", "topic", "status", "priority",
-            "parent_id", "created_at", "result_summary",
+            "parent_id", "created_at", "updated_at", "result_summary",
         }
         assert {col["name"] for col in columns} == expected_names
 

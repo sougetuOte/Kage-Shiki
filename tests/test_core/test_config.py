@@ -14,9 +14,11 @@ import pytest
 
 from kage_shiki.core.config import (
     VALID_PURPOSES,
+    AgenticSearchConfig,
     ApiConfig,
     AppConfig,
     ConversationConfig,
+    DesireConfig,
     GeneralConfig,
     GuiConfig,
     LoggingConfig,
@@ -699,11 +701,15 @@ class TestValidPurposes:
     """VALID_PURPOSES 定数の整合性を検証する。"""
 
     def test_contains_all_expected_purposes(self) -> None:
-        """8つの purpose が全て含まれること。"""
+        """Phase 2a 8 purpose + Phase 2b 4 purpose が全て含まれること。"""
         expected = {
+            # Phase 2a
             "conversation", "wizard_generate", "wizard_preview",
             "wizard_association", "memory_worker", "memory_summary",
             "human_block_update", "poke",
+            # Phase 2b (design.md Section 7.3)
+            "autonomous_talk", "agentic_decompose",
+            "agentic_summarize", "agentic_noise",
         }
         assert expected == VALID_PURPOSES
 
@@ -739,3 +745,309 @@ class TestIsValidType:
     def test_str_value_does_not_match_int_type(self) -> None:
         """str 値が int 型にマッチしないこと。"""
         assert _is_valid_type("hello", int) is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 2b: DesireConfig / AgenticSearchConfig のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestDesireConfigDefaults:
+    """DesireConfig のデフォルト値が設計書 7.1 に準拠していることを検証する。"""
+
+    def test_desire_config_defaults(self) -> None:
+        """DesireConfig のデフォルト値が設計書通りであること。"""
+        cfg = DesireConfig()
+        assert cfg.update_interval_sec == pytest.approx(7.5)
+        assert cfg.talk_threshold == pytest.approx(0.7)
+        assert cfg.curiosity_threshold == pytest.approx(0.6)
+        assert cfg.reflect_threshold == pytest.approx(0.8)
+        assert cfg.rest_threshold == pytest.approx(0.9)
+        assert cfg.idle_minutes_for_talk == pytest.approx(30.0)
+        assert cfg.idle_minutes_for_curiosity == pytest.approx(15.0)
+        assert cfg.reflect_episode_threshold == 20
+        assert cfg.rest_hours_threshold == pytest.approx(4.0)
+        assert cfg.rest_suppress_minutes == pytest.approx(60.0)
+
+
+class TestAgenticSearchConfigDefaults:
+    """AgenticSearchConfig のデフォルト値が設計書 7.1 に準拠していることを検証する。"""
+
+    def test_agentic_search_config_defaults(self) -> None:
+        """AgenticSearchConfig のデフォルト値が設計書通りであること。"""
+        cfg = AgenticSearchConfig()
+        assert cfg.engine == "haiku"
+        assert cfg.search_api == "duckduckgo"
+        assert cfg.max_subqueries == 3
+        assert cfg.max_concurrent_searches == 3
+
+
+class TestAppConfigPhase2bFields:
+    """AppConfig に Phase 2b フィールドが組み込まれていることを検証する。"""
+
+    def test_app_config_has_desire_field(self) -> None:
+        """AppConfig に desire フィールドが存在し DesireConfig 型であること。"""
+        cfg = AppConfig()
+        assert isinstance(cfg.desire, DesireConfig)
+
+    def test_app_config_has_agentic_search_field(self) -> None:
+        """AppConfig に agentic_search フィールドが存在し AgenticSearchConfig 型であること。"""
+        cfg = AppConfig()
+        assert isinstance(cfg.agentic_search, AgenticSearchConfig)
+
+    def test_app_config_desire_independence(self) -> None:
+        """各 AppConfig インスタンスの desire が独立していること（default_factory）。"""
+        cfg1 = AppConfig()
+        cfg2 = AppConfig()
+        cfg1.desire.talk_threshold = 0.5
+        assert cfg2.desire.talk_threshold == pytest.approx(0.7)
+
+
+class TestLoadConfigPhase2bSections:
+    """load_config が [desire] / [agentic_search] セクションを読み込むことを検証する。"""
+
+    def test_load_config_reads_desire_section(self, tmp_path: Path) -> None:
+        """[desire] セクションの値が DesireConfig に反映されること。"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[desire]
+update_interval_sec = 5.0
+talk_threshold = 0.5
+curiosity_threshold = 0.4
+reflect_threshold = 0.6
+rest_threshold = 0.7
+idle_minutes_for_talk = 20.0
+idle_minutes_for_curiosity = 10.0
+reflect_episode_threshold = 15
+rest_hours_threshold = 3.0
+rest_suppress_minutes = 45.0
+""",
+            encoding="utf-8",
+        )
+        cfg = load_config(config_path)
+        assert cfg.desire.update_interval_sec == pytest.approx(5.0)
+        assert cfg.desire.talk_threshold == pytest.approx(0.5)
+        assert cfg.desire.curiosity_threshold == pytest.approx(0.4)
+        assert cfg.desire.reflect_threshold == pytest.approx(0.6)
+        assert cfg.desire.rest_threshold == pytest.approx(0.7)
+        assert cfg.desire.idle_minutes_for_talk == pytest.approx(20.0)
+        assert cfg.desire.idle_minutes_for_curiosity == pytest.approx(10.0)
+        assert cfg.desire.reflect_episode_threshold == 15
+        assert cfg.desire.rest_hours_threshold == pytest.approx(3.0)
+        assert cfg.desire.rest_suppress_minutes == pytest.approx(45.0)
+
+    def test_load_config_reads_agentic_search_section(self, tmp_path: Path) -> None:
+        """[agentic_search] セクションの値が AgenticSearchConfig に反映されること。"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[agentic_search]
+engine = "local"
+search_api = "brave"
+max_subqueries = 5
+max_concurrent_searches = 4
+""",
+            encoding="utf-8",
+        )
+        cfg = load_config(config_path)
+        assert cfg.agentic_search.engine == "local"
+        assert cfg.agentic_search.search_api == "brave"
+        assert cfg.agentic_search.max_subqueries == 5
+        assert cfg.agentic_search.max_concurrent_searches == 4
+
+    def test_load_config_desire_fallback_on_invalid_type(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """[desire] の不正型値はデフォルトにフォールバックし警告ログを出すこと (W-13)."""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[desire]
+talk_threshold = "invalid"
+reflect_episode_threshold = -5
+""",
+            encoding="utf-8",
+        )
+        with caplog.at_level(logging.WARNING):
+            cfg = load_config(config_path)
+        assert cfg.desire.talk_threshold == pytest.approx(0.7)
+        assert cfg.desire.reflect_episode_threshold == 20
+        # _coerce_field のフォーマット "config [desire].<field_name>: ..." を
+        # フィールド単位で検証する（W-13: 曖昧な部分文字列マッチ禁止）。
+        assert "[desire].talk_threshold" in caplog.text
+        assert "[desire].reflect_episode_threshold" in caplog.text
+
+    def test_load_config_agentic_search_fallback_on_invalid_range(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """[agentic_search] の範囲外値はデフォルトにフォールバックすること (W-13)."""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[agentic_search]
+max_subqueries = 0
+max_concurrent_searches = 0
+""",
+            encoding="utf-8",
+        )
+        with caplog.at_level(logging.WARNING):
+            cfg = load_config(config_path)
+        assert cfg.agentic_search.max_subqueries == 3
+        assert cfg.agentic_search.max_concurrent_searches == 3
+        assert "[agentic_search].max_subqueries" in caplog.text
+        assert "[agentic_search].max_concurrent_searches" in caplog.text
+
+    def test_load_config_missing_phase2b_sections_uses_defaults(
+        self, tmp_path: Path,
+    ) -> None:
+        """[desire] / [agentic_search] セクション欠落時はデフォルト値を使用すること。"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[general]
+persona_frozen = false
+""",
+            encoding="utf-8",
+        )
+        cfg = load_config(config_path)
+        assert cfg.desire == DesireConfig()
+        assert cfg.agentic_search == AgenticSearchConfig()
+
+
+class TestGenerateDefaultConfigPhase2b:
+    """generate_default_config が Phase 2b セクションを含むことを検証する。"""
+
+    def test_generate_default_config_includes_desire_section(
+        self, tmp_path: Path,
+    ) -> None:
+        """生成されたデフォルト config.toml に [desire] セクションが含まれること。"""
+        config_path = tmp_path / "config.toml"
+        generate_default_config(config_path)
+        content = config_path.read_text(encoding="utf-8")
+        assert "[desire]" in content
+        assert "talk_threshold" in content
+        # 読み込んで往復確認
+        parsed = tomllib.loads(content)
+        assert "desire" in parsed
+        assert parsed["desire"]["talk_threshold"] == pytest.approx(0.7)
+
+    def test_generate_default_config_includes_agentic_search_section(
+        self, tmp_path: Path,
+    ) -> None:
+        """生成されたデフォルト config.toml に [agentic_search] セクションが含まれること。"""
+        config_path = tmp_path / "config.toml"
+        generate_default_config(config_path)
+        content = config_path.read_text(encoding="utf-8")
+        assert "[agentic_search]" in content
+        assert "engine" in content
+        parsed = tomllib.loads(content)
+        assert "agentic_search" in parsed
+        assert parsed["agentic_search"]["engine"] == "haiku"
+
+
+class TestPhase2bPurposeIntegration:
+    """Phase 2b で追加した 4 purpose が各 dict に接続されていることを検証する (R-3)."""
+
+    @pytest.mark.parametrize(
+        ("purpose", "expected_max_tokens"),
+        [
+            ("autonomous_talk", 256),
+            ("agentic_decompose", 256),
+            ("agentic_summarize", 512),
+            ("agentic_noise", 256),
+        ],
+    )
+    def test_phase2b_purpose_max_tokens(
+        self, purpose: str, expected_max_tokens: int,
+    ) -> None:
+        """Phase 2b purpose が _MAX_TOKENS_MAP に登録され get_max_tokens で取得可能。"""
+        cfg = AppConfig()
+        assert get_max_tokens(cfg, purpose) == expected_max_tokens
+
+    @pytest.mark.parametrize(
+        ("purpose", "expected_temperature"),
+        [
+            ("autonomous_talk", 0.9),
+            ("agentic_decompose", 0.3),
+            ("agentic_summarize", 0.3),
+            ("agentic_noise", 0.5),
+        ],
+    )
+    def test_phase2b_purpose_temperature(
+        self, purpose: str, expected_temperature: float,
+    ) -> None:
+        """Phase 2b purpose が _PURPOSE_TEMPERATURES に登録されている。"""
+        cfg = AppConfig()
+        assert get_temperature(cfg, purpose) == pytest.approx(expected_temperature)
+
+    @pytest.mark.parametrize(
+        ("purpose", "expected_slot_attr"),
+        [
+            ("autonomous_talk", "conversation"),
+            ("agentic_decompose", "utility"),
+            ("agentic_summarize", "utility"),
+            ("agentic_noise", "utility"),
+        ],
+    )
+    def test_phase2b_purpose_model_slot(
+        self, purpose: str, expected_slot_attr: str,
+    ) -> None:
+        """Phase 2b purpose が _PURPOSE_MODEL_SLOTS に登録され get_model で取得可能。"""
+        cfg = AppConfig()
+        expected_model = getattr(cfg.models, expected_slot_attr)
+        assert get_model(cfg, purpose) == expected_model
+
+
+class TestAgenticSearchEnumValidation:
+    """AgenticSearchConfig の engine/search_api 列挙値バリデーションを検証する (W-5)."""
+
+    def test_invalid_engine_falls_back_to_default(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """無効な engine 値はデフォルト 'haiku' にフォールバック + 警告ログ。"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[agentic_search]
+engine = "malicious_engine"
+""",
+            encoding="utf-8",
+        )
+        with caplog.at_level(logging.WARNING):
+            cfg = load_config(config_path)
+        assert cfg.agentic_search.engine == "haiku"
+        # フィールド単位の具体マッチ (iter 0 W-13 方針と一貫)
+        assert "[agentic_search].engine" in caplog.text
+
+    def test_invalid_search_api_falls_back_to_default(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """無効な search_api 値はデフォルト 'duckduckgo' にフォールバック。"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[agentic_search]
+search_api = "unknown_api"
+""",
+            encoding="utf-8",
+        )
+        with caplog.at_level(logging.WARNING):
+            cfg = load_config(config_path)
+        assert cfg.agentic_search.search_api == "duckduckgo"
+        assert "[agentic_search].search_api" in caplog.text
+
+    def test_valid_enum_values_accepted(self, tmp_path: Path) -> None:
+        """有効な列挙値は正常に受け入れられる。"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            """
+[agentic_search]
+engine = "local"
+search_api = "brave"
+""",
+            encoding="utf-8",
+        )
+        cfg = load_config(config_path)
+        assert cfg.agentic_search.engine == "local"
+        assert cfg.agentic_search.search_api == "brave"
