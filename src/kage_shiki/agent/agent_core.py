@@ -261,7 +261,9 @@ class AgentCore:
         # W-T25: TrendsProposalManager（セッション開始時にトリガー評価）
         self._trends_manager = trends_manager
 
-        # Phase 2b Wave 2: 自律発言用 DesireWorker 参照（active フラグ二重チェックに使用）
+        # Phase 2b Wave 2: 自律発言用 DesireWorker 参照（前後アクティブフラグチェックに使用）。
+        # main.py 統合は Wave 5 (Task 5-1) で行い、それまで handle_autonomous_turn は
+        # 呼び出し元未接続。
         self._desire_worker = desire_worker
 
     def generate_session_start_message(self) -> str:
@@ -381,6 +383,10 @@ class AgentCore:
 
     # ---------------------------------------------------------------------------
     # Phase 2b Wave 2: handle_autonomous_turn (FR-9.3, FR-9.4, FR-9.5, FR-9.9)
+    #
+    # 呼び出し元: 現状なし。Wave 5 (Task 5-1, main.py の _run_background_loop 拡張)
+    # で autonomous_queue 経由で呼び出される。それまでは単体テストでのみ実行される
+    # (デッドコードに見えるが Wave 5 で接続される予定)。
     # ---------------------------------------------------------------------------
 
     _AUTONOMOUS_TRIGGER_INPUT = "(独り言)"
@@ -390,9 +396,16 @@ class AgentCore:
     def handle_autonomous_turn(self, desire_type: str) -> str | None:
         """欲求閾値超過時に自律発言テキストを生成する (FR-9.3, FR-9.4).
 
-        既存の ReAct ループを autonomous_prompt 注入で再利用する (C-4)。
+        既存の ReAct ループ (`PromptBuilder.build_with_truncation`) を
+        `autonomous_prompt` 引数経由で再利用する (C-4)。仕様書の
+        `autonomous_turn=True` 表現は、本実装では `autonomous_prompt` を
+        SystemPrompt 末尾 (S8) に注入することで等価機能を提供する。
+
         active フラグの LLM 前後二重チェックにより、ユーザー入力 (reset_all) で
         進行中の自律行動が破棄される (FR-9.5 / design.md L466-479)。
+
+        LLM 呼び出し例外は呼び出し元 (`_run_background_loop`) に伝播させる
+        (集約エラーハンドリング前提)。
 
         Args:
             desire_type: "talk" | "curiosity" | "reflect" | "rest"
@@ -402,6 +415,9 @@ class AgentCore:
                 - desire_worker が未注入
                 - desire_type が AUTONOMOUS_PROMPTS に存在しない
                 - LLM 前または後で active=False (破棄)
+
+        Raises:
+            Exception: LLM 呼び出し例外は呼び出し元に伝播。
         """
         # ガード 1: desire_worker 未注入
         if self._desire_worker is None:
@@ -413,9 +429,13 @@ class AgentCore:
             return None
 
         # 前チェック: active フラグ
+        # AUTONOMOUS_PROMPTS のキー集合と DesireWorker.desires のキー集合は同期している
+        # (TestAutonomousPromptsDesireWorkerSync.test_keys_match_desire_worker_initialization
+        #  で不変条件を検証)。同期が破綻した場合は KeyError で早期に失敗させる方が望ましく、
+        # silent skip (.get(...) + None 返却) は「自律発言が動かない」事象のデバッグを
+        # 困難にするため避ける (R-13: else デフォルト値禁止の精神)。
         state = self._desire_worker.get_state()
-        desire_level = state.desires.get(desire_type)
-        if desire_level is None or not desire_level.active:
+        if not state.desires[desire_type].active:
             return None
 
         # reflect: day_summary を DB から取得して {day_summary} を置換 (FR-9.9)
@@ -442,9 +462,9 @@ class AgentCore:
         )
 
         # 後チェック: LLM 実行中に reset_all() が呼ばれていれば結果を破棄
+        # (前チェックと同じく直参照、KeyError は同期テストで担保)
         post_state = self._desire_worker.get_state()
-        post_level = post_state.desires.get(desire_type)
-        if post_level is None or not post_level.active:
+        if not post_state.desires[desire_type].active:
             return None
 
         return response
@@ -473,7 +493,9 @@ class AgentCore:
             summaries = get_recent_day_summaries(
                 self._db_conn, self._REFLECT_DAY_SUMMARY_LOOKBACK,
             )
-        except Exception:
+        except sqlite3.Error:
+            # DB エラー (ロック / スキーマ不整合等) のみ握り、AttributeError 等の
+            # プログラミングミスは伝播させる (Silent Failure 防止)。
             logger.warning(
                 "reflect day_summary 取得失敗、空文字列でフォールバック",
                 exc_info=True,

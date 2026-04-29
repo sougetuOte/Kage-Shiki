@@ -1303,7 +1303,13 @@ class TestHandleAutonomousTurnPromptInjection:
     def test_uses_autonomous_talk_purpose(
         self, agent_core_with_desire: AgentCore, mock_llm: Mock,
     ) -> None:
-        """LLM 呼び出し時の purpose='autonomous_talk' であること (Wave 1 で追加済)."""
+        """LLM 呼び出し時の purpose='autonomous_talk' であること.
+
+        purpose='autonomous_talk' 自体は Wave 1 Task 1-1 で VALID_PURPOSES /
+        _PURPOSE_MODEL_SLOTS / _MAX_TOKENS_MAP / _PURPOSE_TEMPERATURES に追加済。
+        本テストは Wave 2 Task 2-2 で実装した handle_autonomous_turn が
+        正しく当該 purpose を渡していることを検証する。
+        """
         agent_core_with_desire.handle_autonomous_turn("talk")
         kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
         assert kwargs["purpose"] == "autonomous_talk"
@@ -1345,10 +1351,18 @@ class TestHandleAutonomousTurnReflect:
     def test_reflect_db_error_falls_back_to_empty(
         self, agent_core_with_desire: AgentCore, mock_llm: Mock,
     ) -> None:
-        """get_recent_day_summaries が例外を投げても警告ログ + 空文字列で LLM 継続 (R-12)."""
+        """sqlite3.Error を投げても警告ログ + 空文字列で LLM 継続 (R-12).
+
+        sqlite3.OperationalError は sqlite3.Error のサブクラス。
+        実装は基底クラス sqlite3.Error で catch しているため、
+        IntegrityError / DatabaseError / OperationalError 等のサブクラス
+        すべてが同じフォールバックパスを通る。本テストでは代表として
+        OperationalError でカバーする。
+        """
+        import sqlite3
         with patch(
             "kage_shiki.agent.agent_core.get_recent_day_summaries",
-            side_effect=RuntimeError("DB unavailable"),
+            side_effect=sqlite3.OperationalError("database is locked"),
         ), patch("kage_shiki.agent.agent_core.logger") as mock_logger:
             agent_core_with_desire.handle_autonomous_turn("reflect")
 
@@ -1358,6 +1372,38 @@ class TestHandleAutonomousTurnReflect:
         assert "{day_summary}" not in kwargs["system"]
         # WARNING ログが出ていること (Noisy Failure)
         assert mock_logger.warning.called
+
+    def test_reflect_non_db_exception_propagates(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """sqlite3.Error 以外の例外 (プログラミングミス) は伝播すること (R-12, W-2 監査対応)."""
+        with patch(
+            "kage_shiki.agent.agent_core.get_recent_day_summaries",
+            side_effect=AttributeError("typo bug"),
+        ), pytest.raises(AttributeError):
+            agent_core_with_desire.handle_autonomous_turn("reflect")
+        # LLM 呼び出しは行われていないこと (例外で中断)
+        mock_llm.send_message_for_purpose.assert_not_called()
+
+    def test_reflect_with_multiple_day_summaries(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """複数件の day_summary が改行区切りで連結されること (R-12 異常系網羅)."""
+        with patch(
+            "kage_shiki.agent.agent_core.get_recent_day_summaries",
+        ) as mock_get:
+            mock_get.return_value = [
+                {"date": "2026-04-28", "summary": "昨日はテストの話。"},
+                {"date": "2026-04-29", "summary": "今日は仕様の話。"},
+            ]
+            agent_core_with_desire.handle_autonomous_turn("reflect")
+
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "昨日はテストの話。" in kwargs["system"]
+        assert "今日は仕様の話。" in kwargs["system"]
+        # 連結フォーマット (date: summary 形式) が含まれていること
+        assert "2026-04-28: 昨日はテストの話。" in kwargs["system"]
+        assert "2026-04-29: 今日は仕様の話。" in kwargs["system"]
 
 
 class TestHandleAutonomousTurnDoubleCheck:
@@ -1373,10 +1419,13 @@ class TestHandleAutonomousTurnDoubleCheck:
     ) -> None:
         """LLM 実行後に active=False になった場合、生成結果を破棄して None を返す."""
         # 1回目の get_state は active=True、2回目は active=False (reset_all 発火想定)
+        # 末尾に追加で False 状態を 1 件付加し、3 回目以降の意図しない呼び出しが
+        # StopIteration ではなく明示的な「active=False」になるよう防御する。
         worker = Mock()
         states = [
             _make_active_state(),                      # 前チェック: True
             _make_active_state(active_types=set()),    # 後チェック: False (破棄)
+            _make_active_state(active_types=set()),    # 防御: 3 回目以降の呼び出し
         ]
         worker.get_state.side_effect = states
 

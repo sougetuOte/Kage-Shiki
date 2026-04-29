@@ -11,9 +11,13 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from kage_shiki.agent.autonomous_prompt import AUTONOMOUS_PROMPTS
+from kage_shiki.agent.desire_worker import DesireWorker
+from kage_shiki.core.config import DesireConfig
 
 # ---------------------------------------------------------------------------
 # AUTONOMOUS_PROMPTS — 構造テスト
@@ -45,10 +49,11 @@ class TestAutonomousPromptsStructure:
 
     @pytest.mark.parametrize("desire_type", ["talk", "curiosity", "rest"])
     def test_non_reflect_prompts_have_no_placeholder(self, desire_type: str) -> None:
-        """reflect 以外のプロンプトには未置換プレースホルダがないこと."""
+        """reflect 以外のプロンプトには未置換プレースホルダ ({xxx}) がないこと."""
         prompt = AUTONOMOUS_PROMPTS[desire_type]
         assert "{day_summary}" not in prompt
-        assert "{" not in prompt or "}" not in prompt or "{" + "}" not in prompt
+        # {anything} 形式のプレースホルダが残っていないこと
+        assert re.search(r"\{[^}]+\}", prompt) is None
 
 
 class TestReflectPromptPlaceholder:
@@ -89,3 +94,31 @@ class TestPromptToneByDesireType:
         """rest プロンプトが「疲れ」「休息」「眠い」を示唆すること."""
         prompt = AUTONOMOUS_PROMPTS["rest"]
         assert "疲れ" in prompt or "休息" in prompt or "眠い" in prompt
+
+
+# ---------------------------------------------------------------------------
+# AUTONOMOUS_PROMPTS と DesireWorker のキー同期検証 (W-E iter 1 監査対応)
+# ---------------------------------------------------------------------------
+
+
+class TestAutonomousPromptsDesireWorkerSync:
+    """AUTONOMOUS_PROMPTS のキーと DesireWorker.desires のキーが同期していることを検証する.
+
+    `agent_core.handle_autonomous_turn` は `state.desires[desire_type].active` を
+    KeyError ガードなしで参照しているため、両者のキー集合が一致していなければ
+    KeyError が発生する。本テストはその不変条件を担保する。
+    """
+
+    def test_keys_match_desire_worker_initialization(self) -> None:
+        """AUTONOMOUS_PROMPTS のキー集合と DesireWorker 初期化後の desires キー集合が一致する."""
+        worker = DesireWorker(
+            config=DesireConfig(),
+            get_pending_curiosity_count=lambda: 0,
+            get_observation_count=lambda: 0,
+            on_threshold_exceeded=lambda _: None,
+        )
+        state = worker.get_state()
+        assert set(AUTONOMOUS_PROMPTS.keys()) == set(state.desires.keys()), (
+            "AUTONOMOUS_PROMPTS のキーと DesireWorker.desires のキーが一致していません。"
+            "両者を同時に更新してください (R-3 定数定義 → 使用の即時接続)。"
+        )
