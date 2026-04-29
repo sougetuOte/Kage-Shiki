@@ -284,6 +284,13 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 
 #### Task 2-2: AgentCore.handle_autonomous_turn() 実装
 
+> **実装状況 (2026-04-29 更新)**:
+> - **curiosity 分岐は LLM 直接呼び出しスタブ** として実装済み (Wave 2)。
+>   AgenticSearch パイプライン (decompose_query → search_parallel → summarize → extract_noise_topics) への委譲は **Wave 3 Task 3-2 で本実装に置き換える**。
+>   現状の curiosity は AUTONOMOUS_PROMPTS["curiosity"] による「調べ始める」つぶやき生成のみ。
+> - **reflect 分岐の day_summary 取得・置換** は Task 4-1 で予定されていたが Wave 2 で先行実装済み (詳細は Task 4-1 セクション参照)。
+> - **呼び出し元 (`_run_background_loop`)** の接続は Wave 5 Task 5-1 で行うため、Wave 2 単体では handle_autonomous_turn は単体テストでのみ検証されている (デッドコードに見えるが Wave 5 で接続される予定)。
+
 **対応Atom**: A2
 **対応FR**: FR-9.3, FR-9.4, FR-9.5（排他制御）
 **新規/変更ファイル**:
@@ -294,18 +301,18 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 - 生成されたテキストが response_queue に投入される（モックで検証）
 - handle_autonomous_turn("reflect") で day_summary を DB から取得する
 - reflect のシステムプロンプトに day_summary が含まれる
-- desire_type="curiosity" 時は AgenticSearch パイプラインへ委譲する（スタブ化）
+- desire_type="curiosity" 時は AgenticSearch パイプラインへ委譲する（スタブ化、Wave 3 で本実装）
 - autonomous_turn=True フラグが正しく prompt_builder に渡される
 - active フラグが False の場合、None が返される（破棄ロジック、FR-9.5）
 - LLM 実行中に reset_all() が呼ばれた場合、結果が破棄される
 
 **完了条件**:
 - [x] handle_autonomous_turn メソッドを実装
-- [x] desire_type 別の処理分岐を実装
+- [x] desire_type 別の処理分岐を実装  *(curiosity は Wave 3 Task 3-2 で本実装に置換)*
 - [x] 既存の ReAct ループを再利用（C-4）
 - [x] persona_core + style_samples がコンテキストに含まれることを確認
 - [x] テスト: 各 desire_type の処理、active フラグ制御、破棄ロジック
-- [x] 統合テスト: response_queue への投入確認
+- [x] 統合テスト: response_queue への投入確認  *(Wave 5 Task 5-1 で main.py 統合と同時)*
 
 **見積もり**: M (2〜4時間)
 
@@ -389,6 +396,16 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 
 #### Task 4-1: reflect 欲求の実装と day_summary 参照
 
+> **実装状況 (2026-04-29 更新)**: 本タスクの内容は **Wave 2 Task 2-2 で先行実装済み**。
+> - 実装: `agent_core.py` の `handle_autonomous_turn("reflect")` および `_build_autonomous_prompt()`
+> - テスト: `tests/test_agent/test_agent_core.py` `TestHandleAutonomousTurnReflect` (3 件) + DB 例外パス + 複数日サマリーケース
+> - day_summary 取得: `db.get_recent_day_summaries(conn, days=1)` 流用 (新規 API なし)
+> - DB 例外時は WARNING ログ + 空文字列フォールバック (`sqlite3.Error` のみ握る)
+>
+> Wave 4 進入時には本タスクは **スキップ可** とし、Task 4-2 (トピック照合) のみを実施する。
+> 実装が先行した経緯: Task 2-2 の TDD Red 観点 (handle_autonomous_turn の reflect 分岐)
+> に day_summary 取得が含まれていたため、reflect 分岐を完成させる方が責務分離上自然と判断した。
+
 **対応Atom**: A6
 **対応FR**: FR-9.9
 **新規/変更ファイル**:
@@ -401,13 +418,13 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 - 生成された内省テキストが response_queue に投入される
 
 **完了条件**:
-- [x] handle_autonomous_turn("reflect") の処理を実装
-- [x] day_summary 取得ロジックを実装
-- [x] autonomousプロンプトに {day_summary} を置換
-- [x] テスト: day_summary 有無の両パターン、プロンプト内容確認
-- [x] 統合テスト: response_queue への投入確認
+- [x] handle_autonomous_turn("reflect") の処理を実装  *(Wave 2 Task 2-2)*
+- [x] day_summary 取得ロジックを実装  *(Wave 2 Task 2-2)*
+- [x] autonomousプロンプトに {day_summary} を置換  *(Wave 2 Task 2-2)*
+- [x] テスト: day_summary 有無の両パターン、プロンプト内容確認  *(Wave 2 Task 2-2)*
+- [x] 統合テスト: response_queue への投入確認  *(Wave 5 で main.py 統合と同時に追加予定)*
 
-**見積もり**: S (1〜2時間)
+**見積もり**: S (1〜2時間) — Wave 2 で消化済
 
 ---
 

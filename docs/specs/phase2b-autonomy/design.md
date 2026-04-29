@@ -365,7 +365,7 @@ DesireWorker スレッドから `autonomous_queue.put()` を呼ぶのは安全�
 rest 欲求が発現した場合、AgentCore は以下のプロンプトで短いつぶやきを生成する。
 
 ```
-「今日はちょっと眠いな...」「長い時間働いた気がする」
+「今日はちょっと眠いな...」「長い時間動いてた気がする」
 のような、疲労・休息を示唆する短い独り言（50文字以内推奨）
 ```
 
@@ -384,8 +384,10 @@ Phase 2b では応答テンポ低下や短文化といった動的な変更は�
 def handle_autonomous_turn(self, desire_type: str) -> str | None:
     """欲求閾値超過時に自律発言テキストを生成する.
 
-    既存の ReAct ループを autonomous_turn=True で実行する（C-4）。
-    curiosity 欲求の場合は AgenticSearch パイプラインを起動する。
+    既存の ReAct ループを autonomous_prompt 引数経由で再利用する（C-4）。
+    PromptBuilder.build_with_truncation の autonomous_prompt 引数として
+    AUTONOMOUS_PROMPTS[desire_type] を SystemPrompt 末尾 (S8) に注入する。
+    curiosity 欲求の場合は AgenticSearch パイプラインを起動する（Wave 3 で実装）。
     reflect 欲求の場合は直近の day_summary を DB から取得し、
     AUTONOMOUS_PROMPTS["reflect"] の {day_summary} に注入する（FR-9.9）。
 
@@ -396,6 +398,16 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
         生成した自律発言テキスト。生成スキップ時は None。
     """
 ```
+
+#### 実装定数（Wave 2 で確定、設計判断）
+
+`AgentCore` クラスは以下のクラス定数を保持する：
+
+| 定数 | 値 | 根拠 |
+|------|------|------|
+| `_AUTONOMOUS_TRIGGER_INPUT` | `"(独り言)"` | Anthropic Messages API は最後の user role を要求するため、自律発言の `latest_input` として最小限のトリガー文字列を使用する。LLM は SystemPrompt 末尾の autonomous_prompt 指示に従って独り言を生成する。 |
+| `_AUTONOMOUS_PURPOSE` | `"autonomous_talk"` | Section 7.3 の Purpose 管理で定義済み。4 欲求すべてで共用する。 |
+| `_REFLECT_DAY_SUMMARY_LOOKBACK` | `1` | reflect プロンプトに注入する day_summary は直近 1 日分。複数日にすると LLM のコンテキスト消費が増え、独り言の長さも肥大化するため Phase 2b では 1 日に固定。 |
 
 ### 4.2 自律発言プロンプトテンプレート（D-23）
 
