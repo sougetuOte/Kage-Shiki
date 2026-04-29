@@ -818,7 +818,11 @@ class TestBoundaryValues:
 
 class TestRestSuppression:
     def test_rest_suppress_minutes(self) -> None:
-        """rest: 一度発現後、rest_suppress_minutes 以内は再通知しない (W-7: session 注入)."""
+        """rest: 一度発現後、rest_suppress_minutes 以内は再通知しない (W-7: session 注入).
+
+        notify_user_input() を mock スコープ内で呼ぶことで talk/curiosity の idle 計算が
+        実時刻と mock 時刻の差分で誤発火することを防ぐ (rest 単独の発現を検証する意図)。
+        """
         callback = MagicMock()
         config = _make_config(
             rest_threshold=0.9,
@@ -832,6 +836,7 @@ class TestRestSuppression:
 
         # uptime 4h: rest level=1.0 > 0.9
         with patch("time.monotonic", return_value=session_start + 4 * 3600):
+            worker.notify_user_input()  # talk/curiosity の idle 干渉を排除
             worker.update_desires()
 
         assert callback.call_count == 1
@@ -839,13 +844,17 @@ class TestRestSuppression:
         # 30分後（suppress 期間内）に reset_all + update_desires
         worker.reset_all()
         with patch("time.monotonic", return_value=session_start + 4 * 3600 + 30 * 60):
+            worker.notify_user_input()
             worker.update_desires()
 
         # 抑制されて再通知なし
         assert callback.call_count == 1
 
     def test_rest_suppress_expired_allows_callback(self) -> None:
-        """rest: rest_suppress_minutes 経過後は再通知が許可される (W-7: session 注入)."""
+        """rest: rest_suppress_minutes 経過後は再通知が許可される (W-7: session 注入).
+
+        notify_user_input() を mock スコープ内で呼んで talk/curiosity の干渉を排除する。
+        """
         callback = MagicMock()
         config = _make_config(
             rest_threshold=0.9,
@@ -859,6 +868,7 @@ class TestRestSuppression:
 
         # uptime 4h: 1回目超過
         with patch("time.monotonic", return_value=session_start + 4 * 3600):
+            worker.notify_user_input()
             worker.update_desires()
 
         assert callback.call_count == 1
@@ -866,6 +876,7 @@ class TestRestSuppression:
 
         # suppress 期間（60分）経過後
         with patch("time.monotonic", return_value=session_start + 4 * 3600 + 61 * 60):
+            worker.notify_user_input()
             worker.update_desires()
 
         assert callback.call_count == 2
