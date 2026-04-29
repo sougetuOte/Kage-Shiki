@@ -278,6 +278,65 @@ class TestPromptBuilderSystemPrompt:
         assert "C4: 人格核文" in prompt
         assert "C10: 禁忌" in prompt
 
+    # ---------------------------------------------------------------------------
+    # Phase 2b Wave 2: autonomous_prompt 注入 (FR-9.3, FR-9.4)
+    # ---------------------------------------------------------------------------
+
+    def test_autonomous_prompt_default_is_none(self) -> None:
+        """autonomous_prompt のデフォルトが None で、指定なしなら独り言指示が含まれないこと."""
+        prompt = self._make_builder().build_system_prompt()
+        # 既存の S1〜S7 のみが含まれ、独り言用の文言は出現しないこと
+        assert "独り言" not in prompt
+
+    def test_autonomous_prompt_appended_at_tail(self) -> None:
+        """autonomous_prompt 指定時、SystemPrompt 末尾に注入されること (design.md L86)."""
+        autonomous_text = "あなたは今、独り言を言う気分です。50文字以内で。"
+        prompt = self._make_builder().build_system_prompt(
+            autonomous_prompt=autonomous_text,
+        )
+        assert autonomous_text in prompt
+        # 末尾注入: S7（応答規範）より後に位置すること
+        assert prompt.index("【応答規範】") < prompt.index(autonomous_text)
+
+    def test_autonomous_prompt_preserves_persona_and_style_samples(self) -> None:
+        """autonomous_prompt 指定時も persona_core / style_samples が注入されること (FR-9.3 (3))."""
+        prompt = self._make_builder().build_system_prompt(
+            autonomous_prompt="独り言指示",
+        )
+        assert "<persona>" in prompt
+        assert "テストキャラ" in prompt
+        assert "<style_samples>" in prompt
+
+    def test_autonomous_prompt_with_consistency_check(self) -> None:
+        """autonomous_prompt と consistency_check_active が併用可能であること."""
+        prompt = self._make_builder().build_system_prompt(
+            autonomous_prompt="独り言テスト",
+            consistency_check_active=True,
+        )
+        assert "独り言テスト" in prompt
+        assert "【本ターンの自己確認】" in prompt
+
+    def test_autonomous_prompt_empty_string_is_treated_as_none(self) -> None:
+        """空文字列の autonomous_prompt は注入なしと等価であること (堅牢性)."""
+        prompt_empty = self._make_builder().build_system_prompt(autonomous_prompt="")
+        prompt_none = self._make_builder().build_system_prompt()
+        assert prompt_empty == prompt_none
+
+    def test_build_with_truncation_passes_autonomous_prompt(self) -> None:
+        """build_with_truncation 経由でも autonomous_prompt が注入されること (Wave 5 統合用)."""
+        builder = self._make_builder()
+        autonomous_text = "独り言を一言だけ言ってください。"
+        system_prompt, _ = builder.build_with_truncation(
+            session_start_message="こんにちは。",
+            turns=[],
+            latest_input="...",
+            cold_memories=None,
+            model="claude-sonnet-4-5-20250929",
+            max_tokens_for_output=1024,
+            autonomous_prompt=autonomous_text,
+        )
+        assert autonomous_text in system_prompt
+
 
 # ---------------------------------------------------------------------------
 # T-12: PromptBuilder — Messages 配列構築

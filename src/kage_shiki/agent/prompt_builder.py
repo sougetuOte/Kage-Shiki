@@ -157,15 +157,21 @@ class PromptBuilder:
         self,
         *,
         consistency_check_active: bool = False,
+        autonomous_prompt: str | None = None,
     ) -> str:
-        """SystemPrompt を構築する (D-3 Section 5.2-5.4).
+        """SystemPrompt を構築する (D-3 Section 5.2-5.4, Phase 2b D-23).
 
         S1〜S7 ブロックを順に連結する。S5（personality_trends）と
         S6（recent_memories）は内容が空の場合に省略される。
         S7 には consistency_check_active に応じて整合性チェック指示が挿入される。
 
+        Phase 2b: autonomous_prompt が指定された場合、S7 の後ろに S8 として
+        独り言指示を末尾追加する (FR-9.3, FR-9.4 / design.md L86)。
+        空文字列は注入なしと等価に扱う。
+
         Args:
             consistency_check_active: 整合性チェック指示を含めるかどうか。
+            autonomous_prompt: 自律発言用補足プロンプト (None または空文字列で注入なし)。
 
         Returns:
             組み立てられた SystemPrompt 文字列。
@@ -218,6 +224,10 @@ class PromptBuilder:
         s7 += f"\n\n{_INFO_PROTECTION_BLOCK}"
         sections.append(s7)
 
+        # S8: 自律発言指示 (Phase 2b、autonomous_prompt 指定時のみ)
+        if autonomous_prompt:
+            sections.append(autonomous_prompt)
+
         return "\n\n".join(sections)
 
     def build_messages(
@@ -269,6 +279,7 @@ class PromptBuilder:
         max_tokens_for_output: int,
         consistency_check_active: bool = False,
         *,
+        autonomous_prompt: str | None = None,
         _override_token_limit: int | None = None,
     ) -> tuple[str, list[dict[str, str]]]:
         """コンテキストウィンドウ超過時に削減しつつプロンプトを構築する (D-18, FR-8.7).
@@ -290,6 +301,8 @@ class PromptBuilder:
             model: モデル ID（コンテキストウィンドウ上限の決定に使用）。
             max_tokens_for_output: 出力に割り当てる max_tokens。
             consistency_check_active: 整合性チェック指示を含めるかどうか。
+            autonomous_prompt: 自律発言用補足プロンプト (Phase 2b)。
+                None または空文字列で注入なし。指定時は SystemPrompt 末尾に S8 として追加される。
             _override_token_limit: テスト用トークン上限オーバーライド（非公開）。
 
         Returns:
@@ -320,7 +333,10 @@ class PromptBuilder:
                 personality_trends=personality_trends_work,
                 day_summaries=warm_list,
             )
-            sys = tmp.build_system_prompt(consistency_check_active=consistency_check_active)
+            sys = tmp.build_system_prompt(
+                consistency_check_active=consistency_check_active,
+                autonomous_prompt=autonomous_prompt,
+            )
             msgs = tmp.build_messages(
                 session_start_message=session_start_message,
                 turns=turn_list,
@@ -339,7 +355,10 @@ class PromptBuilder:
                 day_summaries=warm_list,
             )
             return (
-                final.build_system_prompt(consistency_check_active=consistency_check_active),
+                final.build_system_prompt(
+                    consistency_check_active=consistency_check_active,
+                    autonomous_prompt=autonomous_prompt,
+                ),
                 final.build_messages(
                     session_start_message=session_start_message,
                     turns=turn_list,

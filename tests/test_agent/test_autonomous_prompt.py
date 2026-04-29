@@ -1,0 +1,91 @@
+"""autonomous_prompt — 自律発言プロンプトテンプレートのテスト (Phase 2b Wave 2 / D-23).
+
+対応 FR:
+    FR-9.3: 自律発言時に既存 ReAct ループを再利用する
+    FR-9.4: autonomous_turn=True 時のシステムプロンプトに独り言指示を含める
+    FR-9.9: reflect 欲求発現時に day_summary を参照した内省テキスト
+
+対応設計:
+    design.md Section 4.2: 自律発言プロンプトテンプレート
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from kage_shiki.agent.autonomous_prompt import AUTONOMOUS_PROMPTS
+
+# ---------------------------------------------------------------------------
+# AUTONOMOUS_PROMPTS — 構造テスト
+# ---------------------------------------------------------------------------
+
+
+class TestAutonomousPromptsStructure:
+    """AUTONOMOUS_PROMPTS の構造を検証する."""
+
+    def test_contains_all_four_desire_types(self) -> None:
+        """4 つの desire_type すべてが定義されていること (talk/curiosity/reflect/rest)."""
+        assert set(AUTONOMOUS_PROMPTS.keys()) == {
+            "talk",
+            "curiosity",
+            "reflect",
+            "rest",
+        }
+
+    def test_all_values_are_non_empty_strings(self) -> None:
+        """各プロンプトが非空文字列であること."""
+        for desire_type, prompt in AUTONOMOUS_PROMPTS.items():
+            assert isinstance(prompt, str), f"{desire_type} is not a str"
+            assert prompt.strip(), f"{desire_type} is empty"
+
+    @pytest.mark.parametrize("desire_type", ["talk", "curiosity", "reflect", "rest"])
+    def test_each_prompt_mentions_50_char_limit(self, desire_type: str) -> None:
+        """各プロンプトが 50 文字以内推奨を明示すること (US-15)."""
+        assert "50" in AUTONOMOUS_PROMPTS[desire_type]
+
+    @pytest.mark.parametrize("desire_type", ["talk", "curiosity", "rest"])
+    def test_non_reflect_prompts_have_no_placeholder(self, desire_type: str) -> None:
+        """reflect 以外のプロンプトには未置換プレースホルダがないこと."""
+        prompt = AUTONOMOUS_PROMPTS[desire_type]
+        assert "{day_summary}" not in prompt
+        assert "{" not in prompt or "}" not in prompt or "{" + "}" not in prompt
+
+
+class TestReflectPromptPlaceholder:
+    """reflect プロンプトの {day_summary} プレースホルダを検証する (FR-9.9)."""
+
+    def test_reflect_contains_day_summary_placeholder(self) -> None:
+        """reflect プロンプトに {day_summary} プレースホルダが含まれること."""
+        assert "{day_summary}" in AUTONOMOUS_PROMPTS["reflect"]
+
+    def test_reflect_placeholder_substitution(self) -> None:
+        """{day_summary} が str.format で正しく置換されること."""
+        formatted = AUTONOMOUS_PROMPTS["reflect"].format(
+            day_summary="今日はテストの話をした。",
+        )
+        assert "{day_summary}" not in formatted
+        assert "今日はテストの話をした。" in formatted
+
+    def test_reflect_mentions_introspection(self) -> None:
+        """reflect プロンプトが内省を示唆する語彙を含むこと."""
+        prompt = AUTONOMOUS_PROMPTS["reflect"]
+        assert "振り返" in prompt or "内省" in prompt
+
+
+class TestPromptToneByDesireType:
+    """各 desire_type のプロンプトが期待される語彙を含むことを検証する."""
+
+    def test_talk_prompt_mentions_idle_state(self) -> None:
+        """talk プロンプトが「話していない」状態を示唆すること."""
+        assert "話していない" in AUTONOMOUS_PROMPTS["talk"]
+
+    def test_curiosity_prompt_mentions_research(self) -> None:
+        """curiosity プロンプトが「調べる」「気になる」を含むこと."""
+        prompt = AUTONOMOUS_PROMPTS["curiosity"]
+        assert "調べ" in prompt
+        assert "気になっ" in prompt
+
+    def test_rest_prompt_mentions_fatigue(self) -> None:
+        """rest プロンプトが「疲れ」「休息」「眠い」を示唆すること."""
+        prompt = AUTONOMOUS_PROMPTS["rest"]
+        assert "疲れ" in prompt or "休息" in prompt or "眠い" in prompt

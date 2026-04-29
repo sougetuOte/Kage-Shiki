@@ -2,7 +2,7 @@
 
 **BUILDING**
 
-_Phase 2b: 自律性コア — Wave 1 実装_
+_Phase 2b: 自律性コア — Wave 2 実装_
 
 ---
 
