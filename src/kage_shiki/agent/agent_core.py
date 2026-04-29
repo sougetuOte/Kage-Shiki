@@ -22,12 +22,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from kage_shiki.agent.autonomous_prompt import AUTONOMOUS_PROMPTS
+from kage_shiki.agent.desire_worker import DesireWorker
 from kage_shiki.agent.human_block_updater import parse_human_block_updates, validate_update
 from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.agent.prompt_builder import PromptBuilder  # re-export for backward compat
 from kage_shiki.agent.trends_proposal import TrendsProposalManager
 from kage_shiki.core.config import AppConfig, get_max_tokens, get_model
-from kage_shiki.memory.db import save_observation_safe, search_observations_fts
+from kage_shiki.memory.db import (
+    get_recent_day_summaries,
+    save_observation_safe,
+    search_observations_fts,
+)
 from kage_shiki.persona.persona_system import PersonaSystem
 
 logger = logging.getLogger(__name__)
@@ -232,6 +238,7 @@ class AgentCore:
         *,
         data_dir: Path | None = None,
         trends_manager: TrendsProposalManager | None = None,
+        desire_worker: DesireWorker | None = None,
     ) -> None:
         self._config = config
         self._db_conn = db_conn
@@ -253,6 +260,9 @@ class AgentCore:
 
         # W-T25: TrendsProposalManager（セッション開始時にトリガー評価）
         self._trends_manager = trends_manager
+
+        # Phase 2b Wave 2: 自律発言用 DesireWorker 参照（active フラグ二重チェックに使用）
+        self._desire_worker = desire_worker
 
     def generate_session_start_message(self) -> str:
         """セッション開始メッセージを LLM で生成する.
@@ -368,6 +378,116 @@ class AgentCore:
         self._handle_trends_approval(response, user_input)
 
         return response
+
+    # ---------------------------------------------------------------------------
+    # Phase 2b Wave 2: handle_autonomous_turn (FR-9.3, FR-9.4, FR-9.5, FR-9.9)
+    # ---------------------------------------------------------------------------
+
+    _AUTONOMOUS_TRIGGER_INPUT = "(独り言)"
+    _AUTONOMOUS_PURPOSE = "autonomous_talk"
+    _REFLECT_DAY_SUMMARY_LOOKBACK = 1  # reflect 用に取得する day_summary 日数
+
+    def handle_autonomous_turn(self, desire_type: str) -> str | None:
+        """欲求閾値超過時に自律発言テキストを生成する (FR-9.3, FR-9.4).
+
+        既存の ReAct ループを autonomous_prompt 注入で再利用する (C-4)。
+        active フラグの LLM 前後二重チェックにより、ユーザー入力 (reset_all) で
+        進行中の自律行動が破棄される (FR-9.5 / design.md L466-479)。
+
+        Args:
+            desire_type: "talk" | "curiosity" | "reflect" | "rest"
+
+        Returns:
+            生成した自律発言テキスト。以下の場合は None:
+                - desire_worker が未注入
+                - desire_type が AUTONOMOUS_PROMPTS に存在しない
+                - LLM 前または後で active=False (破棄)
+        """
+        # ガード 1: desire_worker 未注入
+        if self._desire_worker is None:
+            return None
+
+        # ガード 2: 無効な desire_type
+        prompt_template = AUTONOMOUS_PROMPTS.get(desire_type)
+        if prompt_template is None:
+            return None
+
+        # 前チェック: active フラグ
+        state = self._desire_worker.get_state()
+        desire_level = state.desires.get(desire_type)
+        if desire_level is None or not desire_level.active:
+            return None
+
+        # reflect: day_summary を DB から取得して {day_summary} を置換 (FR-9.9)
+        autonomous_prompt = self._build_autonomous_prompt(
+            desire_type, prompt_template,
+        )
+
+        # LLM 呼び出し (build_with_truncation 経由、autonomous_prompt 末尾注入)
+        purpose = self._AUTONOMOUS_PURPOSE
+        system_prompt, messages = self._prompt_builder.build_with_truncation(
+            session_start_message=self.session_start_message,
+            turns=self.session_context.turns,
+            latest_input=self._AUTONOMOUS_TRIGGER_INPUT,
+            cold_memories=None,
+            model=get_model(self._config, purpose),
+            max_tokens_for_output=get_max_tokens(self._config, purpose),
+            autonomous_prompt=autonomous_prompt,
+        )
+
+        response = self._llm_client.send_message_for_purpose(
+            system=system_prompt,
+            messages=messages,
+            purpose=purpose,
+        )
+
+        # 後チェック: LLM 実行中に reset_all() が呼ばれていれば結果を破棄
+        post_state = self._desire_worker.get_state()
+        post_level = post_state.desires.get(desire_type)
+        if post_level is None or not post_level.active:
+            return None
+
+        return response
+
+    def _build_autonomous_prompt(
+        self,
+        desire_type: str,
+        prompt_template: str,
+    ) -> str:
+        """desire_type に応じた autonomous_prompt を構築する.
+
+        reflect の場合は直近の day_summary を取得し {day_summary} を置換する (FR-9.9)。
+        day_summary が存在しない場合は空文字列で置換する (LLM 呼び出しは継続)。
+
+        Args:
+            desire_type: 欲求タイプ。
+            prompt_template: AUTONOMOUS_PROMPTS から取得したテンプレート文字列。
+
+        Returns:
+            placeholder 置換済みの autonomous_prompt 文字列。
+        """
+        if desire_type != "reflect":
+            return prompt_template
+
+        try:
+            summaries = get_recent_day_summaries(
+                self._db_conn, self._REFLECT_DAY_SUMMARY_LOOKBACK,
+            )
+        except Exception:
+            logger.warning(
+                "reflect day_summary 取得失敗、空文字列でフォールバック",
+                exc_info=True,
+            )
+            summaries = []
+
+        if summaries:
+            day_summary_text = "\n".join(
+                f"{s['date']}: {s['summary']}" for s in summaries
+            )
+        else:
+            day_summary_text = ""
+
+        return prompt_template.format(day_summary=day_summary_text)
 
     def _apply_human_block_updates(self, response: str) -> None:
         """LLM 応答から human_block 更新マーカーを抽出し適用する (T-17)."""

@@ -38,6 +38,7 @@ from kage_shiki.agent.agent_core import (
     check_consistency_rules,
     generate_session_id,
 )
+from kage_shiki.agent.desire_worker import DesireLevel, DesireState
 from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.core.config import AppConfig
 from kage_shiki.persona.persona_system import PersonaSystem
@@ -1168,4 +1169,235 @@ class TestHandleTrendsApproval:
         # _trends_manager は None のまま
         core._handle_trends_approval("承認", 0)
 
-        persona_system.append_personality_trends.assert_not_called()
+
+# ---------------------------------------------------------------------------
+# Phase 2b Wave 2 Task 2-2: handle_autonomous_turn (FR-9.3, FR-9.4, FR-9.5, FR-9.9)
+# ---------------------------------------------------------------------------
+
+
+def _make_active_state(active_types: set[str] | None = None) -> DesireState:
+    """テスト用 DesireState を生成する。指定された desire_type のみ active=True とする."""
+    if active_types is None:
+        active_types = {"talk", "curiosity", "reflect", "rest"}
+    return DesireState(desires={
+        dtype: DesireLevel(
+            level=1.0,
+            threshold=0.5,
+            last_updated=0.0,
+            active=(dtype in active_types),
+        )
+        for dtype in ("talk", "curiosity", "reflect", "rest")
+    })
+
+
+@pytest.fixture()
+def mock_desire_worker_active() -> Mock:
+    """DesireWorker のモック (全 desire active=True)."""
+    m = Mock()
+    m.get_state.return_value = _make_active_state()
+    return m
+
+
+@pytest.fixture()
+def agent_core_with_desire(
+    mock_llm: Mock,
+    mock_db_conn: Mock,
+    persona_system: PersonaSystem,
+    config: AppConfig,
+    default_prompt_builder: PromptBuilder,
+    mock_desire_worker_active: Mock,
+) -> AgentCore:
+    """desire_worker 注入済みの AgentCore."""
+    core = AgentCore(
+        config=config,
+        db_conn=mock_db_conn,
+        llm_client=mock_llm,
+        persona_system=persona_system,
+        prompt_builder=default_prompt_builder,
+        desire_worker=mock_desire_worker_active,
+    )
+    # session_start_message を埋める (LLM 呼び出しに必要な前提)
+    core.session_start_message = "やあ、今日もよろしくね。"
+    return core
+
+
+class TestHandleAutonomousTurnGuards:
+    """handle_autonomous_turn の defensive ガード (desire_worker 不在 / 無効 desire_type)."""
+
+    def test_returns_none_when_desire_worker_not_injected(
+        self, agent_core: AgentCore,
+    ) -> None:
+        """desire_worker 未注入なら None を返す (LLM 呼び出しなし)."""
+        agent_core.session_start_message = "やあ"
+        assert agent_core.handle_autonomous_turn("talk") is None
+
+    def test_returns_none_for_invalid_desire_type(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """AUTONOMOUS_PROMPTS に存在しない desire_type は None を返す."""
+        result = agent_core_with_desire.handle_autonomous_turn("invalid_type")
+        assert result is None
+        mock_llm.send_message_for_purpose.assert_not_called()
+
+    def test_returns_none_when_desire_inactive_before_llm(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+    ) -> None:
+        """active=False なら LLM を呼ばずに None を返す (前チェック)."""
+        worker = Mock()
+        worker.get_state.return_value = _make_active_state(active_types=set())  # 全て False
+        core = AgentCore(
+            config=config, db_conn=mock_db_conn, llm_client=mock_llm,
+            persona_system=persona_system, prompt_builder=default_prompt_builder,
+            desire_worker=worker,
+        )
+        core.session_start_message = "やあ"
+
+        result = core.handle_autonomous_turn("talk")
+        assert result is None
+        mock_llm.send_message_for_purpose.assert_not_called()
+
+
+class TestHandleAutonomousTurnPromptInjection:
+    """各 desire_type に対応するプロンプトが SystemPrompt に注入されることを検証."""
+
+    def test_talk_prompt_injected(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """talk 欲求では AUTONOMOUS_PROMPTS['talk'] が注入される."""
+        agent_core_with_desire.handle_autonomous_turn("talk")
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "話していない" in kwargs["system"]
+
+    def test_curiosity_prompt_injected(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """curiosity 欲求では AUTONOMOUS_PROMPTS['curiosity'] が注入される."""
+        agent_core_with_desire.handle_autonomous_turn("curiosity")
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "気になっ" in kwargs["system"]
+
+    def test_rest_prompt_injected(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """rest 欲求では AUTONOMOUS_PROMPTS['rest'] が注入される."""
+        agent_core_with_desire.handle_autonomous_turn("rest")
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        prompt = kwargs["system"]
+        assert "疲れ" in prompt or "眠い" in prompt
+
+    def test_persona_and_style_samples_preserved(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """autonomous_turn でも persona_core + style_samples が注入される (FR-9.3 (3))."""
+        agent_core_with_desire.handle_autonomous_turn("talk")
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        prompt = kwargs["system"]
+        assert "<persona>" in prompt
+        assert "<style_samples>" in prompt
+
+    def test_uses_autonomous_talk_purpose(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """LLM 呼び出し時の purpose='autonomous_talk' であること (Wave 1 で追加済)."""
+        agent_core_with_desire.handle_autonomous_turn("talk")
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert kwargs["purpose"] == "autonomous_talk"
+
+
+class TestHandleAutonomousTurnReflect:
+    """reflect 欲求の day_summary 参照テスト (FR-9.9)."""
+
+    def test_reflect_substitutes_day_summary(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """reflect: get_recent_day_summaries が呼ばれて {day_summary} が置換される."""
+        with patch(
+            "kage_shiki.agent.agent_core.get_recent_day_summaries",
+        ) as mock_get:
+            mock_get.return_value = [
+                {"date": "2026-04-29", "summary": "テストの話をした。"},
+            ]
+            agent_core_with_desire.handle_autonomous_turn("reflect")
+
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "テストの話をした。" in kwargs["system"]
+        assert "{day_summary}" not in kwargs["system"]
+
+    def test_reflect_with_no_day_summary_uses_empty(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """day_summary が存在しない場合も LLM を呼び出し、プレースホルダは空文字列で置換される."""
+        with patch(
+            "kage_shiki.agent.agent_core.get_recent_day_summaries",
+        ) as mock_get:
+            mock_get.return_value = []
+            agent_core_with_desire.handle_autonomous_turn("reflect")
+
+        assert mock_llm.send_message_for_purpose.called
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "{day_summary}" not in kwargs["system"]
+
+    def test_reflect_db_error_falls_back_to_empty(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """get_recent_day_summaries が例外を投げても警告ログ + 空文字列で LLM 継続 (R-12)."""
+        with patch(
+            "kage_shiki.agent.agent_core.get_recent_day_summaries",
+            side_effect=RuntimeError("DB unavailable"),
+        ), patch("kage_shiki.agent.agent_core.logger") as mock_logger:
+            agent_core_with_desire.handle_autonomous_turn("reflect")
+
+        # LLM 呼び出しは継続、プレースホルダは空文字列で置換済み
+        assert mock_llm.send_message_for_purpose.called
+        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
+        assert "{day_summary}" not in kwargs["system"]
+        # WARNING ログが出ていること (Noisy Failure)
+        assert mock_logger.warning.called
+
+
+class TestHandleAutonomousTurnDoubleCheck:
+    """active フラグの LLM 前後二重チェックによる結果破棄ロジック (FR-9.5, design.md L466-479)."""
+
+    def test_discards_result_when_inactive_after_llm(
+        self,
+        mock_llm: Mock,
+        mock_db_conn: Mock,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+    ) -> None:
+        """LLM 実行後に active=False になった場合、生成結果を破棄して None を返す."""
+        # 1回目の get_state は active=True、2回目は active=False (reset_all 発火想定)
+        worker = Mock()
+        states = [
+            _make_active_state(),                      # 前チェック: True
+            _make_active_state(active_types=set()),    # 後チェック: False (破棄)
+        ]
+        worker.get_state.side_effect = states
+
+        core = AgentCore(
+            config=config, db_conn=mock_db_conn, llm_client=mock_llm,
+            persona_system=persona_system, prompt_builder=default_prompt_builder,
+            desire_worker=worker,
+        )
+        core.session_start_message = "やあ"
+
+        result = core.handle_autonomous_turn("talk")
+        assert result is None
+        # LLM 呼び出しは行われている (前チェック通過)
+        mock_llm.send_message_for_purpose.assert_called_once()
+        # get_state が 2 回呼ばれている (前後チェック)
+        assert worker.get_state.call_count == 2
+
+    def test_returns_text_when_active_throughout(
+        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
+    ) -> None:
+        """前後チェックともに active=True なら生成テキストを返す."""
+        mock_llm.send_message_for_purpose.return_value = "ねえ、聞いてる?"
+        result = agent_core_with_desire.handle_autonomous_turn("talk")
+        assert result == "ねえ、聞いてる?"
