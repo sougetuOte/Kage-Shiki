@@ -132,6 +132,38 @@ TDD サイクルの Refactor ステップで以下を確認:
 [Info]     命名改善案: data → parsed_records
 ```
 
+### Agent 間意見対立時の裁定（2026-04-29 Retro 由来）
+
+`/full-review` の並列監査で複数 Agent から **逆方向の指摘** がぶつかった場合、Living Architect（主）が以下のルールで裁定する。これは iter の無限増加を防ぐためのメタプロセスである。
+
+#### 発動条件
+
+- 同一 Issue（同じファイル・同じ箇所・同じ観点）について、Agent 間で **採否が逆向き** の指摘が出た場合
+- または **同一 Agent が連続 iter で同じ Issue を再提起** した場合
+
+#### 裁定ルール
+
+| ルール | 内容 |
+|------|------|
+| 終結ルール | 同一 Issue が **2 iter 連続で再提起** された場合、議論を打ち切り、コードコメントで意図を明示して **Info 格下げ** する |
+| 記録ルール | 監査レポート（`docs/artifacts/audit-reports/`）に「iter X で議論 / iter Y で再提起 / iter Z で裁定」の経緯と、採用した方向の根拠を必ず記載 |
+| 中立性 | Living Architect の裁定は感情・好みではなく、下記の優先順位に基づく |
+
+#### 裁定の方向（優先順位）
+
+1. **設計書のサンプル実装に明示があればそれに従う**（`docs/specs/*.md` の概念実装コード）
+2. **`building-checklist.md` の R-13（else デフォルト値禁止）等の明文ルール** に沿う
+3. **silent-failure-hunter の「Silent Failure 防止」観点** を上位に置く（KeyError 即時失敗 > silent skip）
+4. **test での不変条件担保がある場合** は直参照を許容する（同期テスト + R-13 の精神）
+
+#### 例（Wave 2 iter 0→1→2）
+
+`state.desires[desire_type]` 直参照 vs `get()` + None ガード:
+- iter 0: code-reviewer #1 + silent-failure-hunter → 「Dead Branch 削除すべき」
+- iter 1: code-reviewer → 「KeyError ガード復活すべき」
+- iter 2: code-reviewer → 同じ指摘の繰り返し → **裁定発動**
+- 採用: `TestAutonomousPromptsDesireWorkerSync` で同期検証 + R-13 精神 + silent-failure-hunter 観点（優先順位 4 → 2 → 3 が一致）→ **直参照 + コメント明示** で Info 格下げ
+
 ## 根拠
 
 - Google Engineering Practices: 重要度ラベル体系（Required/Nit/Optional/FYI）

@@ -86,6 +86,52 @@ AUDITING フェーズでは指摘のみ。
 - 「docs/internal/ の変更」→ PM級（SSOT）
 - 「tests/ の新規テスト追加」→ SE級
 
+## Auto mode での PM 級の扱い（2026-04-29 Retro 由来）
+
+Auto mode で `/full-review` 等を実行中、PM 級修正が必要になった場合の扱い。
+
+### 原則
+
+PM 級は人間承認必須。Auto mode でも自動実行してはならない。
+
+### 例外: 「仕様の意味を変えない PM 級補記」
+
+以下の **すべて** を満たす場合、Auto mode で自動進行可:
+
+1. **`docs/specs/` の変更** で、既存記述の修正ではなく **追記** である
+2. **実装の事後ドキュメント化** で、コードと仕様書の解離を埋める変更である
+3. **仕様の意味を変えない**: 既に実装済みの定数値・引数仕様の根拠を補記するだけ
+4. **監査レポートに明示**: `docs/artifacts/audit-reports/` のレポートに「PM 級だが Auto 進行した変更」の節を設ける
+
+### 通知義務
+
+Auto mode で例外条件に基づき PM 級補記を行った場合、最終報告時に以下の形式で **明示通知** すること:
+
+```
+⚠️ PM 級の Auto 進行: docs/specs/xxx.md に補記
+   内容: <変更要約>
+   仕様の意味は不変。ユーザーは事後確認をお願いします。
+```
+
+### 例外に該当しない PM 級（Auto 進行禁止 — 必ず一時停止）
+
+- **仕様の意味を変える修正**（受入条件・制約・閾値・FR/NFR 内容の変更等）
+- ADR（`docs/adr/`）の追加・変更
+- `.claude/rules/` の変更
+- `.claude/settings*.json` の変更
+- `pyproject.toml` の変更
+- 公開 API の変更
+- フェーズの巻き戻し
+- テストの削除
+- 機能の削除
+
+これらは Auto mode でも処理を一時停止し、ユーザーの判断を仰ぐこと。
+状態ファイル（`lam-loop-state.json` 等）に `pm_pending: true` をセットして応答終了する。
+
+### 根拠
+
+Wave 2 full-review iter 1 で W-F（design.md Section 4.1 への実装定数根拠補記）が PM 級判定だったが Auto mode で自動進行した。仕様の意味は変わらないとはいえ、明示的承認なく `docs/specs/` を変更したのは越境のリスクがあった。本セクションで「仕様の意味を変えない補記」のみ Auto 許容することで、Auto mode の進捗性と PM 級ガードレールのバランスを取る。
+
 ## 参照
 
 - `docs/internal/07_SECURITY_AND_AUTOMATION.md` Section 5 (Hooks-Based Permission System)
