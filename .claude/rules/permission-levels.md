@@ -80,7 +80,7 @@ AUDITING フェーズでは指摘のみ。
 典型的な判断例:
 - 「テストの大幅な書き換え」→ SE級（公開 API は変わらない）
 - 「README の構成変更」→ SE級（仕様書ではない）
-- 「.claude/commands/ の変更」→ SE級（ルールではなくコマンド）
+- 「.claude/skills/ のワークフロー系 SKILL.md の変更」→ SE級（ルールではなくコマンド。旧 .claude/commands/ は 2026-07-18 に skills へ移行済み）
 - 「.gitignore の変更」→ SE級
 - 「config.toml テンプレートの変更」→ PM級（設定仕様の変更）
 - 「docs/internal/ の変更」→ PM級（SSOT）

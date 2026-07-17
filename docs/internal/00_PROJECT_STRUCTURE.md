@@ -109,7 +109,7 @@ hooks とコマンドが生成・参照する運用ファイル群（`.gitignore
   |
   v 参照・実装
 情報層 2: .claude/rules/    — ガードレール（自動ロード）
-          .claude/commands/ — ワークフロー（手動実行）
+          .claude/skills/   — ワークフロー + テンプレートスキル（手動実行系は disable-model-invocation: true。旧 .claude/commands/ から 2026-07-18 移行）
           .claude/hooks/    — 自動化 hooks（PreToolUse/PostToolUse/Stop/PreCompact）
           .claude/agents/   — エージェント定義
           .claude/skills/   — スキル定義
