@@ -1,9 +1,11 @@
 # /magi スキル要件仕様書
 
-**バージョン**: 1.0
-**作成日**: 2026-03-16
+**バージョン**: 1.1
+**作成日**: 2026-03-16 / **更新日**: 2026-07-18（gabriel 統合 = MAGI 3+1 体制。Step 4 を
+gabriel adversarial probe に置換し、Reflection は gabriel 不発時の fallback に位置変更。
+本改訂は gabriel 初回発火（dry-run）が検出した仕様ドリフトの同時修正 — A-4 準拠）
 **ステータス**: draft
-**SSOT 参照**: `docs/internal/06_DECISION_MAKING.md`（AoT + MAGI System）
+**SSOT 参照**: `docs/internal/06_DECISION_MAKING.md`（AoT + MAGI System + gabriel）
 **名前の由来**: エヴァンゲリオンの MAGI システム（3 つの独立した思考体による合議意思決定）
 
 ---
@@ -11,7 +13,8 @@
 ## 1. 目的
 
 AoT（Atom of Thought）分解 + MAGI System（MELCHIOR / BALTHASAR / CASPAR）
-+ Reflection による構造化意思決定を、独立したスキル `/magi` として提供する。
++ gabriel adversarial probe（不発時 Reflection fallback）による構造化意思決定を、
+独立したスキル `/magi` として提供する。
 
 ### Problem Statement
 
@@ -30,7 +33,7 @@ Plan E の PLANNING で AoT + Three Agents を 3 回手動適用した実績が�
 - `/magi` で構造化意思決定を単独起動できる
 - `lam-orchestrate` からは `/magi` を内部参照で呼び出す（重複コードなし）
 - 適用条件に合致する場面で自動提案される
-- Reflection ステップにより結論の品質が検証される
+- gabriel（独立 adversarial verifier）により結論の品質が別コンテキストで検証される
 
 ---
 
@@ -65,10 +68,10 @@ Step 2: Debate（議論）
 Step 3: Convergence（収束）
   └─ CASPAR が議論を統合し、結論を下す
 
-Step 4: Reflection（振り返り）— 新規追加
-  └─ 全員で結論を検証する（1回限り）
-  └─ 致命的な見落としが見つかった場合のみ結論を修正
-  └─ 見つからなければ確認済みとして確定
+Step 4: gabriel adversarial probe（2026-07-18 改訂）
+  └─ 別コンテキストの独立 subagent（.claude/agents/gabriel.md）が結論を敵対検証
+  └─ 6 フィールド JSON verdict を宣言的分岐表（SKILL.md）で処理
+  └─ gabriel 不発（spawn 失敗 / 60 秒超過 / format_error）時は旧 Reflection を fallback 実施
 
 Step 5: AoT Synthesis（統合）
   └─ 各 Atom の結論を統合し、最終決定 + Action Items を導出
@@ -95,15 +98,24 @@ Step 5: AoT Synthesis（統合）
 
 条件に合致しない場合かつユーザー明示呼出しでない場合は「従来手法で十分です」と案内する（SHOULD）。
 
-### FR-M3: Reflection ステップ
+### FR-M3: gabriel adversarial probe（2026-07-18 改訂）
 
-Step 3（Convergence）完了後に Step 4（Reflection）を実行する（MUST）。
+AoT 適用モードでは Step 3（Convergence）完了後に Step 4（gabriel probe）を実行する（MUST）。
+軽量 MAGI（非 AoT）では gabriel を起動しない（MUST NOT）。
 
-Reflection のルール:
-- **修正条件**: 致命的な見落とし（セキュリティ、データ損失、仕様違反）が見つかった場合のみ結論を修正する
-- **Bikeshedding 防止**: 「もっと良い案がある」程度では覆さない（MUST NOT）
-- **回数制限**: Reflection は最大 1 回。Reflection の Reflection は禁止（MUST NOT）
-- **出力**: 見落としの有無を明示する（「致命的な見落とし: なし → 結論確定」or「致命的な見落とし: [内容] → 結論修正」）
+gabriel probe のルール:
+- **独立性**: 別コンテキストの subagent（`.claude/agents/gabriel.md` / Read・Glob・Grep のみ）が検証する
+- **出力契約**: 6 フィールド JSON（verdict / severity / affected_atoms / reasoning /
+  recommended_action / confidence）。分岐処理は `.claude/skills/magi/SKILL.md` の宣言的分岐表に従う
+- **再 MAGI 上限**: refuted+critical による再 MAGI は最大 1 回。2 回目は人間エスカレーション（MUST）
+- **opt-out**: ユーザー（人間）の明示指示 + 理由記録の 2 条件。Auto mode 中の AI 自身による opt-out は禁止
+
+Reflection fallback のルール（gabriel 不発時のみ）:
+- **発動条件**: gabriel の spawn 失敗 / 60 秒超過 / format_error（L1 手動判定）
+- **内容**: 旧 Step 4 Reflection（全員で結論を検証・1 回限り・致命的な見落としのみ修正・
+  Bikeshedding 防止・Reflection の Reflection 禁止）を代替実施する
+- **廃止条件**: 影式での gabriel 実発火の安定を確認後、Reflection 廃止を PM 級で判断する
+  （初回発火は 2026-07-18 dry-run で成功済み）
 
 ### FR-M4: 出力フォーマット
 
@@ -123,9 +135,10 @@ Reflection のルール:
 **[BALTHASAR]**: ...
 **[CASPAR]**: 結論: ...
 
-### Reflection
+### gabriel probe
 
-致命的な見落とし: なし → 結論確定
+verdict: confirmed / severity: info / recommended_action: proceed / confidence: 0.85
+（不発時: 「gabriel 不発 → Reflection fallback: 致命的な見落とし: なし → 結論確定」）
 
 ### AoT Synthesis
 
@@ -187,9 +200,9 @@ SSOT への参照（ファイルパス）のみを記述し、実行時に読み
 
 | 基準 | 計測方法 |
 |:-----|:--------|
-| `/magi <議題>` で MAGI System + Reflection が実行される | 手動テスト |
+| `/magi <議題>` で MAGI System + gabriel probe（AoT 適用時）が実行される | 手動テスト |
 | 出力に MELCHIOR/BALTHASAR/CASPAR のペルソナ名が使用される | 出力フォーマット確認 |
-| Reflection ステップが実行され、見落とし有無が明示される | 出力に「致命的な見落とし:」行が存在すること |
+| gabriel probe の 6 フィールド JSON verdict が出力に含まれる（不発時は Reflection fallback の「致命的な見落とし:」行） | 出力確認（初回発火 2026-07-18 dry-run 済） |
 | `lam-orchestrate` から `/magi` が参照される | `references/` に SKILL.md が配置されていること |
 | 他スキル（wave-plan, planning, full-review）に提案指示が記述される | 各 SKILL.md に `/magi` 提案の記述があること |
 | アンカーファイルが常に生成される | `docs/artifacts/` にファイルが存在すること |
@@ -204,6 +217,7 @@ SSOT への参照（ファイルパス）のみを記述し、実行時に読み
 - lam-orchestrate: `.claude/skills/lam-orchestrate/SKILL.md`
 - アンカーフォーマット: `.claude/skills/lam-orchestrate/references/anchor-format.md`
 - decision-making ルール: `.claude/rules/decision-making.md`
+- gabriel agent 定義: `.claude/agents/gabriel.md`（2026-07-18 追加 / 本家 LAM の MAGI v2 由来）
 - Reflection 根拠: [Multi-Agent Reflexion (MAR)](https://arxiv.org/html/2512.20845)
 - AoT 根拠: [Atom of Thoughts (NeurIPS 2025)](https://arxiv.org/html/2502.12018)
 - メモリ: `project_ultimate_think_revival.md`

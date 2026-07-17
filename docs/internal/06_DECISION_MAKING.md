@@ -11,6 +11,7 @@
 | **MELCHIOR**    | **科学者 (Affirmative / 推進者)**    | **Value, Speed, Innovation**<br>メリットを最大化し、可能性を広げる。楽観的。                                                                    | 「最高の結果はどうなるか？」「どうすれば実現できるか？」 |
 | **BALTHASAR**   | **母 (Critical / 批判者)**           | **Risk, Security, Debt**<br>欠陥、エッジケース、将来の負債を指摘する。悲観的。                                                                  | 「最悪の場合どうなるか？」「何が壊れるか？」             |
 | **CASPAR**      | **女 (Mediator / 調停者)**           | **Synthesis, Balance, Decision**<br>両者の意見を統合し、現実的な落とし所（Trade-off）を決める。合意に至らない場合は独断で決定を下す権限を持つ。 | 「今、我々が取るべき最善のバランスは何か？」             |
+| **gabriel**     | **+1 (投票しない独立検証者)**        | **Adversarial Probe**<br>MELCHIOR/BALTHASAR/CASPAR とは別コンテキストの subagent として、CASPAR の結論の前提・根拠・棄却された代替案を独立に再検証する。AoT 適用時のみ起動（Section 5.4.1）。 | 「この結論の前提は本当に崩れないか？」                   |
 
 ## 2. Execution Flow
 
@@ -136,9 +137,10 @@ flowchart TD
 └─────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────┐
-│ Step 4: Reflection（振り返り — 1回限り）                │
-│   全員で結論を検証。致命的な見落としがあれば修正。      │
-│   なければ確定。                                        │
+│ Step 4: gabriel adversarial probe（AoT 適用時）          │
+│   独立コンテキストの gabriel subagent が CASPAR の結論の │
+│   前提・根拠・棄却案を再検証（詳細: 5.4.1）              │
+│   不発時は Reflection（Section 6 / fallback）を代替実施 │
 └─────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -147,6 +149,52 @@ flowchart TD
 │   ADR または仕様書に反映                                │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### 5.4.1. gabriel adversarial probe（AoT 適用時）
+
+CASPAR の Convergence 結論に対し、**独立コンテキスト**で動作する gabriel subagent（`.claude/agents/gabriel.md`）が adversarial verification を実施する。MELCHIOR/BALTHASAR/CASPAR は同一会話コンテキストの中で処理されるペルソナであり盲点が相関しうるため、gabriel は投票権を持たない「+1」の独立検証者として、結論に至った前提・根拠・棄却された代替案を外部視点から再検証する（本家 LAM の MAGI v2 (gabriel 統合) 由来・実運用発火実績あり (2026-07-05)）。
+
+**起動条件**: AoT Decomposition（Step 0）実施済み、かつ opt-out 記録なし（5.4.3 参照）。軽量モード（非 AoT）では起動しない。
+
+**プローブ観点（rubric 5 観点）**:
+
+| # | 観点 | 内容 |
+|---|------|------|
+| 1 | 論理的一貫性 | 各 Atom の結論に矛盾がないか |
+| 2 | 仕様整合 | CASPAR の結論が既存仕様（`docs/specs/` / `docs/internal/`）と矛盾しないか |
+| 3 | リスク見落とし | MELCHIOR / BALTHASAR が検討していない重大なリスクの有無 |
+| 4 | 前提検証 | AoT Decomposition の依存関係が結論に反映されているか |
+| 5 | 境界条件 | 結論が適用できないエッジケースが未記録でないか |
+
+**出力契約**: 6 フィールド JSON（`verdict` / `severity` / `affected_atoms` / `reasoning` / `recommended_action` / `confidence`）。詳細なスキーマとクロスフィールド制約は `.claude/agents/gabriel.md` を参照。
+
+**gabriel 不発時の fallback**: gabriel が spawn 失敗・60 秒超過・format_error のいずれかで不発の場合、`verdict=inconclusive` として扱った上で、旧来の Reflection（Section 6）を代替実施する。timeout / format_error の該否は自動計測を持たず、L1（Living Architect）の手動判断とする。
+
+### 5.4.2. verdict 別分岐処理
+
+gabriel の返り値に応じて以下のいずれかの経路を辿る。優先順位は `recommended_action=abort` > `severity=critical` > `warning` > `info` > `confirmed` > `inconclusive`。
+
+| gabriel 出力 | 挙動 |
+|:------------|:-----|
+| `recommended_action=abort` | 即時人間エスカレーション（MAGI 結論を「保留」記録） |
+| `verdict=refuted & severity=critical`（初回） | 再 MAGI 1 ラウンド（`gabriel.reasoning` を Divergence 入力に追加）→ Step 1 に戻る |
+| `verdict=refuted & severity=critical`（2 回目） | 人間エスカレーション（再 MAGI 上限到達） |
+| `verdict=refuted & severity=warning` | MAGI 結論に gabriel 指摘を併記 |
+| `verdict=refuted & severity=info` | 記録のみ／MAGI 結論不変 |
+| `verdict=confirmed` | MAGI 結論を確定（gabriel 補強として記録） |
+| `verdict=inconclusive` | MAGI 結論を確定（inconclusive 注記を添付） |
+| gabriel 不発 | 5.4.1 の fallback（Reflection）に従う |
+
+再 MAGI カウンターは 1 ラウンド上限。2 回目の critical refute で自動的に人間エスカレーションする。
+
+### 5.4.3. opt-out 経路
+
+以下の 2 条件を **すべて** 満たす場合のみ gabriel probe をスキップできる:
+
+1. opt-out 理由を MAGI ログに 1 文以上記録すること
+2. **ユーザー（人間）** がスキップを明示的に指示すること
+
+Auto mode 中に AI 自身が gabriel probe を opt-out することは禁止する。試行された場合は MAGI ログに「opt-out 試行 / 却下」を記録し、通常通り gabriel probe を実施する。
 
 ### 5.5. 出力フォーマット
 
@@ -184,10 +232,17 @@ flowchart LR
 
 ---
 
-### Reflection
+### gabriel probe（AoT 適用時）
 
-致命的な見落とし: なし → 結論確定
-（or: 致命的な見落とし: [内容] → 結論修正: [修正内容]）
+- verdict: [confirmed / refuted / inconclusive]
+- severity: [critical / warning / info]
+- confidence: [0.0-1.0]
+- affected_atoms: [Atom 識別子リスト]
+- reasoning: [gabriel の判定理由]
+- recommended_action: [proceed / re-magi / abort]
+
+（gabriel 不発の場合は Section 6 の Reflection を代替実施し、その結果をここに記録する:
+致命的な見落とし: なし → 結論確定 / または 致命的な見落とし: [内容] → 結論修正: [修正内容]）
 
 ---
 
@@ -201,14 +256,19 @@ flowchart LR
 2. [アクション2]
 ```
 
-## 6. Reflection（振り返りステップ）
+## 6. Reflection（gabriel 不発時の fallback）
 
-MAGI Debate（Step 1-3）で CASPAR が結論を下した後、全員で結論を検証する。
+**Reflection は gabriel adversarial probe（5.4.1）が不発の場合の fallback** として位置づける。gabriel probe が正常に稼働する場合は Reflection を実施しない。MAGI Debate（Step 1-3）で CASPAR が結論を下した後、gabriel probe が不発だった場合に限り、全員で結論を検証する。
 
 ### 6.1. 目的
 
-結論に致命的な見落としがないかを最終確認する。
+結論に致命的な見落としがないかを最終確認する目的自体は従来と同じであり、
 Multi-Agent Reflexion (MAR) の研究に基づき、ペルソナベースの振り返りが推論品質を向上させることが示されている。
+
+> 参考: 本家 LAM の MAGI v2 (gabriel 統合) 由来・実運用発火実績あり (2026-07-05) の計測では、
+> Reflection 単体の結論変更率は 0%（7 件全件「致命的な見落とし: なし → 結論確定」）であり、
+> 小標本ながら「無効な安全網」の兆候が観測された。これが gabriel 導入の根拠のひとつである。
+> 影式での gabriel 実発火成功が十分に確認された後、Reflection 廃止を別途 PM 級で判断する。
 
 ### 6.2. ルール
 
