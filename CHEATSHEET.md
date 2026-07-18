@@ -32,9 +32,8 @@
 ```
 .claude/
 ├── rules/                 # ガードレール・行動規範（自動ロード）
-├── commands/              # スラッシュコマンド
 ├── agents/                # サブエージェント
-├── skills/                # オーケストレーション・テンプレート出力
+├── skills/                # ワークフロー（旧 commands・2026-07-18 移行）+ オーケストレーション・テンプレート
 ├── hooks/                 # PreToolUse / PostToolUse / Stop / PreCompact
 ├── logs/                  # permission.log, loop-*.txt（実行時生成）
 ├── states/                # 機能ごとの進捗状態
@@ -67,7 +66,9 @@ v4.0.0 で導入された変更リスク分類。PreToolUse hook がファイル
 | `core-identity.md` | Living Architect 行動規範 + 権限等級サマリー |
 | `phase-rules.md` | フェーズ別ガードレール（PLANNING/BUILDING/AUDITING） |
 | `security-commands.md` | コマンド安全基準（Allow/deny/ask 三分類） |
-| `decision-making.md` | 意思決定プロトコル（MAGI System） |
+| `decision-making.md` | 意思決定プロトコル（MAGI 3+1 System・gabriel 統合） |
+| `hga-summoning.md` | HGA 型 Fable 召喚規律（召喚ゲート・currency push・下調べパイプライン） |
+| `model-delegation-prompting.md` | Sonnet/Haiku 委譲プロンプト指針（tight brief・coverage 例外） |
 | `permission-levels.md` | 権限等級分類基準（PG/SE/PM） |
 | `upstream-first.md` | プラットフォーム仕様優先原則 |
 | `test-result-output.md` | テスト結果 JUnit XML 出力ルール |
@@ -115,22 +116,24 @@ git commit / push は `/ship` を使用。
 
 | エージェント | 呼び出し例 | フェーズ | Memory |
 |-------------|-----------|---------|:------:|
-| `requirement-analyst` | 「要件を整理して」 | PLANNING | - |
-| `design-architect` | 「APIを設計して」 | PLANNING | - |
-| `task-decomposer` | 「タスクを分割して」 | PLANNING | - |
-| `tdd-developer` | 「TASK-001を実装して」 | BUILDING | - |
-| `quality-auditor` | 「src/を監査して」 | AUDITING | - |
-| `doc-writer` | 「ドキュメントを更新して」「仕様を策定して」 | ALL | - |
-| `test-runner` | 「テストを実行して」 | BUILDING | - |
-| `code-reviewer` | 「コードレビューして」 | AUDITING | auto |
+| `requirement-analyst` | 「要件を整理して」 | PLANNING | project |
+| `design-architect` | 「APIを設計して」 | PLANNING | project |
+| `task-decomposer` | 「タスクを分割して」 | PLANNING | project |
+| `tdd-developer` | 「TASK-001を実装して」 | BUILDING | project |
+| `quality-auditor` | 「src/を監査して」 | AUDITING | project |
+| `doc-writer` | 「ドキュメントを更新して」「仕様を策定して」 | ALL | project |
+| `test-runner` | 「テストを実行して」 | BUILDING | project |
+| `code-reviewer` | 「コードレビューして」 | AUDITING | project |
+| `gabriel` | MAGI 合議（AoT 適用時）で自動起動 | ALL | project |
 
-Memory 列: `auto` = `.claude/agent-memory/<name>/` に知見を自発的に蓄積（CLAUDE.md 指示による）。
+Memory 列: `project` = 公式 `memory: project` フロントマター機構（2026-07-18 移行）。
+知見は `.claude/agent-memory/<name>/` に蓄積されバージョン管理で共有される。
 
 ## スキル
 
 | スキル | 用途 | 呼び出し例 |
 |--------|------|-----------|
-| `magi` | 構造化意思決定（AoT + MAGI System + Reflection） | `/magi <議題>` |
+| `magi` | 構造化意思決定（AoT + MAGI 3+1 + gabriel probe・不発時 Reflection fallback） | `/magi <議題>` |
 | `clarify` | 文書精緻化（曖昧さ・矛盾・欠落検出） | `/clarify docs/specs/foo.md` |
 | `lam-orchestrate` | タスク分解・並列実行 + `/magi` 統合 | 「lam-orchestrateで実行して」 |
 | `skill-creator` | スキル作成ガイド | 「新しいスキルを作りたい」 |

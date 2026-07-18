@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **feat**: LAM 現代化 delta 適用 (2026-07-18 休眠復帰セッション / 復帰パッケージ v1 + 本家 10 日ドリフト補正)
+  - **CLAUDE.md 改訂**: §作業体制 (3.5 層委譲モデル + 担当層判断基準 + Fable HGA 参照) / §Execution Permission Modes (AutoMode advisory) / §Context Management 絶対値閾値化 (180K/200K・1M 環境注記) / Memory Policy Layer 2 公式機構化
+  - **HGA 型 Fable 召喚規律** (`.claude/rules/hga-summoning.md`, 新規): 召喚ゲート・2 段召喚・currency push・下調べパイプライン・tight brief 5-slot。召喚ログ `docs/artifacts/hga-summon-log.md` 新設 (#K1 記録済)
+  - **モデル委譲プロンプト指針** (`.claude/rules/model-delegation-prompting.md`, 新規): Sonnet 5 挙動デルタ 7 点 + 委譲必須 7 項 + coverage 型 loose 例外
+  - **gabriel 最小移植 (MAGI 3+1 体制)**: `.claude/agents/gabriel.md` 新規 + `magi` SKILL v2 + decision-making.md / 06_DECISION_MAKING.md 同期 + magi-skill-spec.md Rev1.1。**並存 2 段階方式** (Reflection は gabriel 不発時 fallback)。初回発火 (dry-run) で実仕様ドリフトを検出し同時修正 (A-4)
+  - **全 9 agents に `memory: project`**: 公式フロントマター機構へ移行 (公式 doc 裏取り済)
+- **refactor**: commands 11 件を skills へ移行 (公式レガシー形式からの変換 / 本文バイト一致検証済 / `disable-model-invocation: true` で手動起動専用化)
+- **docs**: 復帰手順書 `docs/artifacts/revival-2026-07-18-procedure.md` (delta 判断表 + HGA 敵対レビュー C3/W13/I8 の L1 裁定 + PM 級自律実行の警告義務履行記録)
+
 - **feat**: Phase 2b Wave 1 (自律性コア基盤) 実装完了
   - **DesireWorker** (`agent/desire_worker.py`, 新規): 4 欲求 (talk/curiosity/reflect/rest) の定期更新エンジン
     - threading.Timer ベース、`_lock` + `_start_generation` 世代カウンタによる二層並行性防御
