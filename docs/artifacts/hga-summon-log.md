@@ -10,3 +10,4 @@ Fable 5 への全召喚を追記する記録簿。目的は 2 点:
 | # | 日付 | トリガ軸 | モード | ブリーフ実効入力 | 往復数 | 概算コスト | 成果参照 |
 |---|------|---------|--------|-----------------|--------|-----------|---------|
 | K1 | 2026-07-18 | 復帰 + LAM 現代化計画の adversarial review（休眠復帰 = 準 spec/design 初期 / ユーザー指示「HGA は気楽に使うこと」） | 通常（スポット召喚 / loose brief = adversarial coverage 例外） | ~4k | 0（索引 push で自己完結） | 定額枠内（2026-07-20 15:59 期限前 / 実 $ 影響なし） | `docs/artifacts/revival-2026-07-18-procedure.md` §6（Critical 3 / Warning 13 / Info 8 → N1 並存 2 段階化・D4 注記強化・警告義務履行記録） |
+| K2 | 2026-07-20 | Wave 3 = 新規ドメイン統合（既定召喚）+ MAGI 敵対テスト型のユーザー明示指示 | メインセッション Fable 常駐による充足（loose brief = adversarial coverage 例外 / 下調べは Opus-tier subagent 2 体へ委譲 = 下調べパイプライン準拠） | メイン常駐のため brief 分離なし | subagent 2 体（設計レビュー Lane B/C とは別に検証 1 体） | サブスク枠内（週間上限半分の継続サブスク / 実 $ 影響なし） | `docs/artifacts/hga-adversarial-wave3-2026-07-20.md`（Critical 3 / Warning 3 / Info 4 → design Rev.3 / requirements Rev.3 / tasks 改訂 2 に反映済み） |
