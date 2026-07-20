@@ -83,7 +83,7 @@ DesireWorker → [callback] → バックグラウンドスレッド（AgentCore
 
 | ファイル | 変更内容 |
 |---------|---------|
-| `src/kage_shiki/agent/agent_core.py` | `handle_autonomous_turn()` 追加、DesireWorker / AgenticSearchEngine 参照追加 |
+| `src/kage_shiki/agent/agent_core.py` | `handle_autonomous_turn()` 追加、DesireWorker / AgenticSearchEngine 参照追加。`__init__` に `search_engine: AgenticSearchEngine \| None = None` DI 引数を追加（Wave 3 Task 3-2 で curiosity パイプライン注入用）。`_should_abort_autonomous(desire_type)` helper と `_handle_curiosity_pipeline()` private メソッドを追加。`handle_autonomous_turn` を try/finally でラップし終端で `_desire_worker.reset(desire_type)` を呼ぶ（HGA A-3） |
 | `src/kage_shiki/agent/prompt_builder.py` | `build_system_prompt()` に `autonomous_prompt: str \| None = None` 引数追加。autonomous_turn=True 時に独り言プロンプトを SystemPrompt 末尾に注入する |
 | `src/kage_shiki/memory/db.py` | `curiosity_targets` CRUD 操作追加（FR-9.11） |
 | `src/kage_shiki/core/config.py` | `DesireConfig` / `AgenticSearchConfig` dataclass 追加、`AppConfig` に組み込み。`_PURPOSE_MODEL_SLOTS`, `_MAX_TOKENS_MAP`, `_PURPOSE_TEMPERATURES` に新 purpose 4件を同時追加（R-3 準拠） |
@@ -474,6 +474,28 @@ AUTONOMOUS_PROMPTS: dict[str, str] = {
 軽い疲労・休息を示す独り言を一言だけ言ってください。
 50文字以内の短い独り言を1文だけ出力してください。""",
 }
+```
+
+**curiosity 完了つぶやき用テンプレ (Wave 3 Task 3-2 追加、HGA A-7 対応):**
+
+`AUTONOMOUS_PROMPTS` とは別に、curiosity パイプライン成功時の完了つぶやき用テンプレを
+`CURIOSITY_COMPLETION_PROMPT` として定義する。starting tweet (`AUTONOMOUS_PROMPTS["curiosity"]`)
+と completion tweet の 2 段構成を分離することで、ユーザーに「調査が終わった」ことを認知させる
+（HGA A-7: 完了つぶやき必須）。`{summary}` プレースホルダには `HaikuEngine.summarize()` の
+要約テキストが str.format で注入される。
+
+```python
+# autonomous_prompt.py（Wave 3 追加定数）
+
+CURIOSITY_COMPLETION_PROMPT: str = """\
+あなたは今、気になっていたトピックの調査を終えたところです。
+以下が調査で分かったことの要約です:
+{summary}
+
+上記を踏まえて、「〜だったよ」「〜が分かった」「なるほど、〜みたい」のような
+調査結果を軽く共有する独り言を1文だけ出力してください。
+50文字以内の短い独り言にしてください。
+"""
 ```
 
 ### 4.3 ユーザー入力と自律行動の排他制御（D-27）
