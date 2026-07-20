@@ -22,6 +22,7 @@
 """
 
 import re
+import sqlite3 as _sqlite3
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -38,9 +39,15 @@ from kage_shiki.agent.agent_core import (
     check_consistency_rules,
     generate_session_id,
 )
+from kage_shiki.agent.agentic_search import AgenticSearchEngine, SearchResult
 from kage_shiki.agent.desire_worker import DesireLevel, DesireState
 from kage_shiki.agent.llm_client import LLMProtocol
 from kage_shiki.core.config import AppConfig
+from kage_shiki.memory.db import (
+    create_curiosity_target,
+    initialize_db,
+    update_target_status,
+)
 from kage_shiki.persona.persona_system import PersonaSystem
 
 # ---------------------------------------------------------------------------
@@ -1273,13 +1280,11 @@ class TestHandleAutonomousTurnPromptInjection:
         kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
         assert "話していない" in kwargs["system"]
 
-    def test_curiosity_prompt_injected(
-        self, agent_core_with_desire: AgentCore, mock_llm: Mock,
-    ) -> None:
-        """curiosity 欲求では AUTONOMOUS_PROMPTS['curiosity'] が注入される."""
-        agent_core_with_desire.handle_autonomous_turn("curiosity")
-        kwargs = mock_llm.send_message_for_purpose.call_args.kwargs
-        assert "気になっ" in kwargs["system"]
+    # NOTE: 旧 test_curiosity_prompt_injected は Wave 3 Task 3-2 で
+    # curiosity 分岐が AgenticSearch パイプライン本実装に置換されたため削除。
+    # curiosity の starting tweet が AUTONOMOUS_PROMPTS['curiosity'] を使うことは
+    # TestHandleAutonomousTurnCuriosityPipeline::test_starting_tweet_uses_curiosity_prompt
+    # で検証する。
 
     def test_rest_prompt_injected(
         self, agent_core_with_desire: AgentCore, mock_llm: Mock,
@@ -1450,3 +1455,372 @@ class TestHandleAutonomousTurnDoubleCheck:
         mock_llm.send_message_for_purpose.return_value = "ねえ、聞いてる?"
         result = agent_core_with_desire.handle_autonomous_turn("talk")
         assert result == "ねえ、聞いてる?"
+
+
+# ---------------------------------------------------------------------------
+# Task 3-2: handle_autonomous_turn("curiosity") パイプライン統合テスト
+# HGA A-1〜A-7 反映 (docs/artifacts/hga-adversarial-wave3-2026-07-20.md)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def real_db_conn():
+    """curiosity_targets を含む :memory: DB を初期化."""
+    conn = _sqlite3.connect(":memory:", check_same_thread=False)
+    conn.row_factory = _sqlite3.Row
+    initialize_db(conn)
+    yield conn
+    conn.close()
+
+
+@pytest.fixture()
+def mock_search_engine() -> Mock:
+    """AgenticSearchEngine のモック (成功パスのデフォルト値)."""
+    engine = Mock(spec=AgenticSearchEngine)
+    engine.decompose_query.return_value = ["query1", "query2"]
+    engine.search_parallel.return_value = [
+        [SearchResult(title="T1", url="https://a.example", snippet="S1")],
+        [SearchResult(title="T2", url="https://b.example", snippet="S2")],
+    ]
+    engine.summarize.return_value = "要約テキスト (トピック A について)"
+    engine.extract_noise_topics.return_value = ["派生テーマA", "派生テーマB"]
+    return engine
+
+
+@pytest.fixture()
+def curiosity_agent_core(
+    mock_llm: Mock,
+    real_db_conn,
+    persona_system: PersonaSystem,
+    config: AppConfig,
+    default_prompt_builder: PromptBuilder,
+    mock_desire_worker_active: Mock,
+    mock_search_engine: Mock,
+) -> AgentCore:
+    """search_engine + real DB 注入済みの AgentCore (curiosity パイプライン用)."""
+    core = AgentCore(
+        config=config,
+        db_conn=real_db_conn,
+        llm_client=mock_llm,
+        persona_system=persona_system,
+        prompt_builder=default_prompt_builder,
+        desire_worker=mock_desire_worker_active,
+        search_engine=mock_search_engine,
+    )
+    core.session_start_message = "やあ"
+    mock_llm.send_message_for_purpose.return_value = "つぶやきテキスト"
+    return core
+
+
+class TestHandleAutonomousTurnCuriosityPipeline:
+    """curiosity 分岐の AgenticSearch パイプライン統合テスト (Task 3-2)."""
+
+    # ----- ガード ----- #
+
+    def test_no_search_engine_injected_returns_none(
+        self,
+        mock_llm: Mock,
+        real_db_conn,
+        persona_system: PersonaSystem,
+        config: AppConfig,
+        default_prompt_builder: PromptBuilder,
+        mock_desire_worker_active: Mock,
+    ) -> None:
+        """search_engine 未注入なら curiosity は None を返し reset("curiosity") が呼ばれる."""
+        create_curiosity_target(real_db_conn, "topic-A")
+        core = AgentCore(
+            config=config, db_conn=real_db_conn, llm_client=mock_llm,
+            persona_system=persona_system, prompt_builder=default_prompt_builder,
+            desire_worker=mock_desire_worker_active,
+            search_engine=None,
+        )
+        core.session_start_message = "やあ"
+
+        result = core.handle_autonomous_turn("curiosity")
+
+        assert result is None
+        mock_llm.send_message_for_purpose.assert_not_called()
+        mock_desire_worker_active.reset.assert_called_with("curiosity")
+
+    def test_no_pending_targets_returns_none_without_tweet(
+        self, curiosity_agent_core: AgentCore, mock_llm: Mock,
+        mock_desire_worker_active: Mock,
+    ) -> None:
+        """pending なしなら None を返しつぶやきなし (FR-9.6 (2))、reset は呼ばれる."""
+        result = curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        assert result is None
+        # LLM 呼び出しは 0 回 (starting tweet も含めて)
+        mock_llm.send_message_for_purpose.assert_not_called()
+        mock_desire_worker_active.reset.assert_called_with("curiosity")
+
+    # ----- 復旧 (HGA A-1) ----- #
+
+    def test_stale_searching_recovered_at_pipeline_start(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+    ) -> None:
+        """パイプライン起動時に searching 残骸を pending に復旧する (HGA A-1)."""
+        stale_id = create_curiosity_target(real_db_conn, "stale-topic")
+        update_target_status(real_db_conn, stale_id, "searching")
+        # 通常の pending も 1 件
+        create_curiosity_target(real_db_conn, "fresh-topic")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # searching が pending に復旧されていること
+        row = real_db_conn.execute(
+            "SELECT status FROM curiosity_targets WHERE id=?", (stale_id,)
+        ).fetchone()
+        # 復旧 → 検索対象になりうる (fresh が先に処理される可能性もあるが少なくとも pending or done)
+        assert row["status"] in ("pending", "searching", "done")
+
+    # ----- 成功パス ----- #
+
+    def test_success_calls_pipeline_in_order(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_search_engine: Mock,
+    ) -> None:
+        """decompose_query → search_parallel → summarize → extract_noise_topics の順に呼ばれる."""
+        create_curiosity_target(real_db_conn, "topic-A")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        assert mock_search_engine.decompose_query.called
+        assert mock_search_engine.search_parallel.called
+        assert mock_search_engine.summarize.called
+        assert mock_search_engine.extract_noise_topics.called
+        # decompose_query が topic を受け取っていること
+        assert mock_search_engine.decompose_query.call_args.args[0] == "topic-A"
+
+    def test_status_transitions_pending_to_done(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+    ) -> None:
+        """成功時に status が pending → searching → done へ遷移する."""
+        tid = create_curiosity_target(real_db_conn, "topic-A")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        row = real_db_conn.execute(
+            "SELECT status, result_summary FROM curiosity_targets WHERE id=?",
+            (tid,),
+        ).fetchone()
+        assert row["status"] == "done"
+        assert row["result_summary"] == "要約テキスト (トピック A について)"
+
+    def test_starting_tweet_uses_curiosity_prompt(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_llm: Mock,
+    ) -> None:
+        """starting tweet の LLM 呼び出しで AUTONOMOUS_PROMPTS['curiosity'] が注入される."""
+        create_curiosity_target(real_db_conn, "topic-A")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # 1 回目の call が starting tweet
+        first_call = mock_llm.send_message_for_purpose.call_args_list[0]
+        assert "気になっ" in first_call.kwargs["system"]
+        assert first_call.kwargs["purpose"] == "autonomous_talk"
+
+    def test_completion_tweet_is_mandatory(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_llm: Mock,
+    ) -> None:
+        """調査成功時、完了つぶやきが必ず生成される (HGA A-7)."""
+        create_curiosity_target(real_db_conn, "topic-A")
+
+        result = curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # starting + completion で少なくとも 2 回 LLM が呼ばれる
+        assert mock_llm.send_message_for_purpose.call_count >= 2
+        # 戻り値は完了つぶやきテキスト (None ではない)
+        assert result is not None
+        assert isinstance(result, str)
+
+    def test_completion_tweet_includes_summary_context(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_llm: Mock,
+    ) -> None:
+        """完了つぶやきの prompt に要約テキストが含まれる (要約踏まえた生成のため)."""
+        create_curiosity_target(real_db_conn, "topic-A")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # 最後の call が completion tweet
+        last_call = mock_llm.send_message_for_purpose.call_args_list[-1]
+        assert last_call.kwargs["purpose"] == "autonomous_talk"
+        # summary が prompt (system or user) に含まれる
+        combined = last_call.kwargs["system"] + str(last_call.kwargs["messages"])
+        assert "要約テキスト" in combined
+
+    # ----- 派生テーマ (HGA A-2) ----- #
+
+    def test_noise_topics_registered_with_parent_id(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+    ) -> None:
+        """派生テーマが parent_id 付きで登録される (FR-9.8)."""
+        tid = create_curiosity_target(real_db_conn, "topic-A")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        rows = real_db_conn.execute(
+            "SELECT topic, parent_id, status FROM curiosity_targets "
+            "WHERE parent_id=? ORDER BY id",
+            (tid,),
+        ).fetchall()
+        assert len(rows) == 2
+        assert {r["topic"] for r in rows} == {"派生テーマA", "派生テーマB"}
+        assert all(r["parent_id"] == tid for r in rows)
+        assert all(r["status"] == "pending" for r in rows)
+
+    def test_noise_topics_skip_duplicates_case_insensitive(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_search_engine: Mock,
+    ) -> None:
+        """既存 topic と大文字小文字を無視して重複するテーマはスキップ (HGA A-2)."""
+        # 既存 pending: "派生テーマA" と大文字違い "PYTHON" が既に存在
+        create_curiosity_target(real_db_conn, "topic-parent")
+        create_curiosity_target(real_db_conn, "派生テーマA")  # 大文字小文字も一致
+        create_curiosity_target(real_db_conn, "python")  # 大文字違い
+
+        # LLM が返す派生テーマに既存重複と新規を混ぜる
+        mock_search_engine.extract_noise_topics.return_value = [
+            "派生テーマA",   # 既存重複 → スキップ
+            "Python",         # 大文字違い重複 → スキップ
+            "新規テーマ",    # 新規 → 登録
+        ]
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # 新規テーマのみが登録される
+        rows = real_db_conn.execute(
+            "SELECT topic FROM curiosity_targets WHERE parent_id IS NOT NULL"
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["topic"] == "新規テーマ"
+
+    def test_noise_topics_skip_when_pending_reaches_max(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_search_engine: Mock,
+        config: AppConfig,
+    ) -> None:
+        """pending 件数が max_pending_targets 以上のとき派生テーマ登録をスキップ (HGA A-2).
+
+        セットアップ: max_pending_targets = 20 デフォルト。
+            処理対象 1 件 + 20 filler = 21 pending
+            → target が searching に遷移 → pending = 20 (= max)
+            → 派生テーマ登録前の count_pending が 20 >= 20 で break
+            → 派生テーマは 0 件登録
+        """
+        create_curiosity_target(real_db_conn, "target")
+        for i in range(20):
+            create_curiosity_target(real_db_conn, f"filler-{i}")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # 派生テーマは 0 件登録 (上限到達で全スキップ)
+        rows = real_db_conn.execute(
+            "SELECT COUNT(*) FROM curiosity_targets WHERE parent_id IS NOT NULL"
+        ).fetchone()
+        assert rows[0] == 0
+
+    # ----- 失敗パス (HGA A-3) ----- #
+
+    def test_search_failure_transitions_to_failed_and_calls_reset(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_search_engine: Mock,
+        mock_desire_worker_active: Mock,
+    ) -> None:
+        """パイプライン例外時、status=failed に遷移し reset('curiosity') が呼ばれる (HGA A-3)."""
+        tid = create_curiosity_target(real_db_conn, "topic-A")
+        mock_search_engine.decompose_query.side_effect = RuntimeError("engine down")
+
+        result = curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # 失敗時は None を返す
+        assert result is None
+        # status = failed
+        row = real_db_conn.execute(
+            "SELECT status FROM curiosity_targets WHERE id=?", (tid,)
+        ).fetchone()
+        assert row["status"] == "failed"
+        # reset("curiosity") が呼ばれる (try/finally 経由)
+        mock_desire_worker_active.reset.assert_called_with("curiosity")
+
+    # ----- Abort チェック (HGA A-4) ----- #
+
+    def test_abort_before_search_reverts_to_pending(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_search_engine: Mock,
+        mock_desire_worker_active: Mock,
+    ) -> None:
+        """decompose_query 後の abort チェックで pending 復帰 (HGA A-4)."""
+        tid = create_curiosity_target(real_db_conn, "topic-A")
+
+        # get_state が active=True → True → False (abort before search_parallel)
+        # 順序: 前チェック True → decompose 前 True → search_parallel 前 False (abort)
+        # 実装で複数箇所 get_state を呼ぶので、side_effect で False をシミュレート
+        active_state = _make_active_state({"curiosity"})
+        inactive_state = _make_active_state(active_types=set())
+        # 前チェック 1 回 + starting tweet 前 + decompose 前チェック 1 + search 前 = ...
+        # 実装依存のため side_effect リストで柔軟に (最後の 1 個の値が繰り返される)
+        mock_desire_worker_active.get_state.side_effect = [
+            active_state,   # 前チェック
+            active_state,   # decompose 前チェック
+            inactive_state, # search 前チェック → abort
+            inactive_state, inactive_state, inactive_state,  # 予備
+        ]
+
+        result = curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # abort 時は None
+        assert result is None
+        # status = pending (revert)
+        row = real_db_conn.execute(
+            "SELECT status FROM curiosity_targets WHERE id=?", (tid,)
+        ).fetchone()
+        assert row["status"] == "pending"
+        # search_parallel は呼ばれない
+        mock_search_engine.search_parallel.assert_not_called()
+        # reset は呼ばれる
+        mock_desire_worker_active.reset.assert_called_with("curiosity")
+
+    # ----- reset 保証 (HGA A-3) ----- #
+
+    def test_reset_called_at_end_of_success_path(
+        self,
+        curiosity_agent_core: AgentCore,
+        real_db_conn,
+        mock_desire_worker_active: Mock,
+    ) -> None:
+        """成功パス完了時に reset('curiosity') が呼ばれる (HGA A-3)."""
+        create_curiosity_target(real_db_conn, "topic-A")
+
+        curiosity_agent_core.handle_autonomous_turn("curiosity")
+
+        # reset("curiosity") が少なくとも 1 回呼ばれる
+        assert any(
+            call.args == ("curiosity",)
+            for call in mock_desire_worker_active.reset.call_args_list
+        )

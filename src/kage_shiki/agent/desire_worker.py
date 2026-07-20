@@ -436,6 +436,24 @@ class DesireWorker:
             for desire in self._desires.values():
                 desire.active = False
 
+    def reset(self, desire_type: str) -> None:
+        """単一欲求の active を False にリセットする (2026-07-20 HGA A-3 追加).
+
+        要件書 Section 4.2「active: 実行後 or ユーザー入力時に False」の
+        「実行後」経路を実現する。`AgentCore.handle_autonomous_turn` の終端
+        （成功・破棄・失敗の全経路）から呼ばれる。
+
+        Args:
+            desire_type: リセット対象の欲求タイプ ("talk"/"curiosity"/"reflect"/"rest")。
+
+        Raises:
+            KeyError: 未知の desire_type が指定された場合 (R-13 準拠、
+                silent skip は自律発言の debug を困難にするため即時失敗)。
+        """
+        with self._lock:
+            # 直参照で KeyError を意図的に発生させる (R-13 / 直参照裁定)
+            self._desires[desire_type].active = False
+
     def notify_user_input(self) -> None:
         """ユーザー入力を通知し、idle タイマーをリセットする.
 

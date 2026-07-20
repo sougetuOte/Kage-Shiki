@@ -41,6 +41,8 @@ import pytest
 from kage_shiki.agent.desire_worker import DesireLevel, DesireState, DesireWorker
 from kage_shiki.core.config import DesireConfig
 
+_KNOWN_DESIRE_TYPES = ("talk", "curiosity", "reflect", "rest")
+
 # ---------------------------------------------------------------------------
 # ヘルパー・フィクスチャ
 # ---------------------------------------------------------------------------
@@ -972,3 +974,97 @@ class TestCallbackLockSafety:
             assert worker._timer is not None  # type: ignore[attr-defined]
         finally:
             worker.stop()
+
+
+# ---------------------------------------------------------------------------
+# reset(desire_type) — 単一欲求リセット (HGA A-3, Task 3-2)
+# ---------------------------------------------------------------------------
+
+
+class TestResetSingleDesire:
+    """DesireWorker.reset(desire_type) の単一欲求リセットを検証 (HGA A-3)."""
+
+    def _worker(
+        self,
+        callback: Callable[[str], None] | None = None,
+    ) -> DesireWorker:
+        """テスト用 DesireWorker を生成."""
+        return DesireWorker(
+            config=_make_config(),
+            get_pending_curiosity_count=lambda: 0,
+            get_observation_count=lambda: 0,
+            on_threshold_exceeded=callback or (lambda _t: None),
+        )
+
+    def test_reset_single_desire_only_affects_target(self) -> None:
+        """reset("talk") が talk のみ active=False にし、他 3 欲求は影響しない."""
+        worker = self._worker()
+        for dt in _KNOWN_DESIRE_TYPES:
+            worker._desires[dt].active = True  # type: ignore[attr-defined]
+
+        worker.reset("talk")
+
+        assert worker._desires["talk"].active is False  # type: ignore[attr-defined]
+        assert worker._desires["curiosity"].active is True  # type: ignore[attr-defined]
+        assert worker._desires["reflect"].active is True  # type: ignore[attr-defined]
+        assert worker._desires["rest"].active is True  # type: ignore[attr-defined]
+
+    def test_reset_curiosity_leaves_others(self) -> None:
+        """reset("curiosity") が curiosity のみに作用する."""
+        worker = self._worker()
+        for dt in _KNOWN_DESIRE_TYPES:
+            worker._desires[dt].active = True  # type: ignore[attr-defined]
+
+        worker.reset("curiosity")
+
+        assert worker._desires["curiosity"].active is False  # type: ignore[attr-defined]
+        for dt in ("talk", "reflect", "rest"):
+            assert worker._desires[dt].active is True  # type: ignore[attr-defined]
+
+    def test_reset_unknown_type_raises_key_error(self) -> None:
+        """未知の desire_type は KeyError で即時失敗 (R-13 / 直参照裁定と整合)."""
+        worker = self._worker()
+
+        with pytest.raises(KeyError):
+            worker.reset("unknown_desire")
+
+    def test_reset_already_inactive_is_noop(self) -> None:
+        """active=False の欲求への reset は冪等 (エラー無しで False のまま)."""
+        worker = self._worker()
+        worker._desires["talk"].active = False  # type: ignore[attr-defined]
+
+        worker.reset("talk")
+
+        assert worker._desires["talk"].active is False  # type: ignore[attr-defined]
+
+    def test_reset_uses_lock(self) -> None:
+        """reset は _lock を取得する (Lock を patched してカウント検証)."""
+        worker = self._worker()
+        worker._desires["talk"].active = True  # type: ignore[attr-defined]
+
+        original_lock = worker._lock  # type: ignore[attr-defined]
+        acquire_count = [0]
+
+        class _CountingLock:
+            def __enter__(self_inner) -> None:
+                acquire_count[0] += 1
+                original_lock.__enter__()
+
+            def __exit__(self_inner, *args) -> None:
+                original_lock.__exit__(*args)
+
+        worker._lock = _CountingLock()  # type: ignore[attr-defined,assignment]
+
+        worker.reset("talk")
+
+        assert acquire_count[0] == 1
+        assert worker._desires["talk"].active is False  # type: ignore[attr-defined]
+
+    def test_reset_all_four_desire_types(self) -> None:
+        """全 4 欲求 (_KNOWN_DESIRE_TYPES) に対して reset が動く."""
+        worker = self._worker()
+
+        for dt in _KNOWN_DESIRE_TYPES:
+            worker._desires[dt].active = True  # type: ignore[attr-defined]
+            worker.reset(dt)
+            assert worker._desires[dt].active is False  # type: ignore[attr-defined]

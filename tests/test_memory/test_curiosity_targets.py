@@ -17,8 +17,10 @@ from kage_shiki.memory.db import (
     Database,
     count_pending_curiosity_targets,
     create_curiosity_target,
+    curiosity_topic_exists,  # noqa: F401 — HGA A-2 追加 (Task 3-2 実装対象)
     get_pending_targets,
     initialize_db,
+    recover_stale_searching_targets,  # noqa: F401 — HGA A-1 追加 (Task 3-2 実装対象)
     update_target_priority,
     update_target_status,
 )
@@ -504,3 +506,152 @@ class TestPersistenceAcrossConnections:
         assert len(results) == 3
         result_ids = {r["id"] for r in results}
         assert set(ids) == result_ids
+
+
+# ---------------------------------------------------------------------------
+# recover_stale_searching_targets (HGA A-1, Task 3-2)
+# ---------------------------------------------------------------------------
+
+
+class TestRecoverStaleSearchingTargets:
+    """パイプライン中断で取り残された searching レコードの復旧を検証."""
+
+    def test_no_searching_returns_zero(self, mem_conn: sqlite3.Connection) -> None:
+        """searching が 0 件なら 0 を返し、他 status に影響しない."""
+        create_curiosity_target(mem_conn, "topic-pending")
+        done_id = create_curiosity_target(mem_conn, "topic-done")
+        update_target_status(mem_conn, done_id, "done", result_summary="x")
+
+        count = recover_stale_searching_targets(mem_conn)
+
+        assert count == 0
+        # pending / done の件数不変
+        assert count_pending_curiosity_targets(mem_conn) == 1
+        row = mem_conn.execute(
+            "SELECT status FROM curiosity_targets WHERE id=?", (done_id,)
+        ).fetchone()
+        assert row["status"] == "done"
+
+    def test_recovers_all_searching_records(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """searching 3 件を全て pending に復旧し件数 3 を返す."""
+        ids = []
+        for i in range(3):
+            tid = create_curiosity_target(mem_conn, f"topic-{i}")
+            update_target_status(mem_conn, tid, "searching")
+            ids.append(tid)
+
+        count = recover_stale_searching_targets(mem_conn)
+
+        assert count == 3
+        for tid in ids:
+            row = mem_conn.execute(
+                "SELECT status FROM curiosity_targets WHERE id=?", (tid,)
+            ).fetchone()
+            assert row["status"] == "pending"
+        # pending 総数 = 3
+        assert count_pending_curiosity_targets(mem_conn) == 3
+
+    def test_does_not_touch_done_or_failed(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """done / failed レコードは影響を受けない."""
+        stale_id = create_curiosity_target(mem_conn, "topic-stale")
+        update_target_status(mem_conn, stale_id, "searching")
+        done_id = create_curiosity_target(mem_conn, "topic-done")
+        update_target_status(mem_conn, done_id, "done", result_summary="x")
+        failed_id = create_curiosity_target(mem_conn, "topic-failed")
+        update_target_status(mem_conn, failed_id, "failed")
+
+        count = recover_stale_searching_targets(mem_conn)
+
+        assert count == 1
+        for tid, expected in [(done_id, "done"), (failed_id, "failed")]:
+            row = mem_conn.execute(
+                "SELECT status FROM curiosity_targets WHERE id=?", (tid,)
+            ).fetchone()
+            assert row["status"] == expected
+
+    def test_updates_updated_at_timestamp(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """復旧時に updated_at タイムスタンプが更新される."""
+        tid = create_curiosity_target(mem_conn, "topic")
+        update_target_status(mem_conn, tid, "searching")
+        row = mem_conn.execute(
+            "SELECT updated_at FROM curiosity_targets WHERE id=?", (tid,)
+        ).fetchone()
+        old_updated_at = row["updated_at"]
+        time.sleep(0.01)
+
+        recover_stale_searching_targets(mem_conn)
+
+        row = mem_conn.execute(
+            "SELECT updated_at FROM curiosity_targets WHERE id=?", (tid,)
+        ).fetchone()
+        assert row["updated_at"] > old_updated_at
+
+
+# ---------------------------------------------------------------------------
+# curiosity_topic_exists (HGA A-2, Task 3-2)
+# ---------------------------------------------------------------------------
+
+
+class TestCuriosityTopicExists:
+    """派生テーマ登録前の重複ガード検証."""
+
+    def test_returns_true_for_exact_match(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """完全一致で True を返す."""
+        create_curiosity_target(mem_conn, "Python asyncio")
+
+        assert curiosity_topic_exists(mem_conn, "Python asyncio") is True
+
+    def test_returns_true_for_case_mismatch(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """大文字小文字の違いを無視して True を返す."""
+        create_curiosity_target(mem_conn, "Python Asyncio")
+
+        assert curiosity_topic_exists(mem_conn, "python asyncio") is True
+        assert curiosity_topic_exists(mem_conn, "PYTHON ASYNCIO") is True
+
+    def test_returns_false_for_no_match(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """一致するレコードがなければ False を返す."""
+        create_curiosity_target(mem_conn, "Python asyncio")
+
+        assert curiosity_topic_exists(mem_conn, "Rust tokio") is False
+
+    def test_returns_false_for_partial_match(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """部分一致は False を返す（完全一致のみ）."""
+        create_curiosity_target(mem_conn, "Python asyncio programming")
+
+        assert curiosity_topic_exists(mem_conn, "Python") is False
+        assert curiosity_topic_exists(mem_conn, "asyncio") is False
+
+    def test_status_agnostic(self, mem_conn: sqlite3.Connection) -> None:
+        """status を問わず一致（done / failed の topic とも重複判定される）."""
+        tid = create_curiosity_target(mem_conn, "Topic X")
+        update_target_status(mem_conn, tid, "done", result_summary="x")
+
+        # done レコードとも重複判定される
+        assert curiosity_topic_exists(mem_conn, "topic x") is True
+
+    def test_empty_table_returns_false(
+        self, mem_conn: sqlite3.Connection,
+    ) -> None:
+        """空テーブルでは常に False."""
+        assert curiosity_topic_exists(mem_conn, "any topic") is False
+
+    def test_japanese_topic(self, mem_conn: sqlite3.Connection) -> None:
+        """日本語トピックの完全一致で True."""
+        create_curiosity_target(mem_conn, "Pythonの非同期処理")
+
+        assert curiosity_topic_exists(mem_conn, "Pythonの非同期処理") is True
+        assert curiosity_topic_exists(mem_conn, "Pythonの同期処理") is False

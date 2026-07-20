@@ -83,15 +83,21 @@ class TestAgenticSearchEngineProtocol:
             "返した: Protocol 制約が検出されていない"
         )
 
-    def test_has_required_four_methods(self) -> None:
-        """必須 4 メソッドが Protocol に callable として定義されていること (W-12).
+    def test_has_required_five_methods(self) -> None:
+        """必須 5 メソッドが Protocol に callable として定義されていること (W-12, Rev.2 W-1).
 
         `dir()` ではなく `hasattr` + `callable` で検証する（`object` 継承属性との
-        誤検知を防ぐ）。
+        誤検知を防ぐ）。search_parallel は 2026-07-20 design-review W-1 で Protocol に昇格。
         """
         from kage_shiki.agent.agentic_search import AgenticSearchEngine
 
-        required = ("decompose_query", "search", "summarize", "extract_noise_topics")
+        required = (
+            "decompose_query",
+            "search",
+            "search_parallel",
+            "summarize",
+            "extract_noise_topics",
+        )
         for method_name in required:
             assert hasattr(AgenticSearchEngine, method_name), (
                 f"Protocol に {method_name} が定義されていない"
@@ -163,6 +169,18 @@ class TestAgenticSearchEngineSignatures:
         assert hints.get("results") == list[SearchResult]
         assert hints.get("return") == list[str]
 
+    def test_search_parallel_signature(self) -> None:
+        """search_parallel(self, queries) -> list[list[SearchResult]] (Rev.2 W-1)."""
+        from kage_shiki.agent.agentic_search import AgenticSearchEngine, SearchResult
+
+        sig = inspect.signature(AgenticSearchEngine.search_parallel)
+        params = list(sig.parameters.keys())
+        assert params == ["self", "queries"], f"引数が異なる: {params}"
+
+        hints = typing.get_type_hints(AgenticSearchEngine.search_parallel)
+        assert hints.get("queries") == list[str]
+        assert hints.get("return") == list[list[SearchResult]]
+
 
 # --------------------------------------------------------------------------- #
 # isinstance チェック（runtime_checkable 動作確認）
@@ -173,7 +191,7 @@ class TestAgenticSearchEngineInstanceCheck:
     """isinstance() による Protocol 準拠チェックを検証する。"""
 
     def test_complete_implementation_passes_isinstance(self) -> None:
-        """4 メソッドをすべて実装したダミークラスが isinstance で True を返すこと。"""
+        """5 メソッドをすべて実装したダミークラスが isinstance で True を返すこと (Rev.2 W-1)."""
         from kage_shiki.agent.agentic_search import AgenticSearchEngine, SearchResult
 
         class _DummyEngine:
@@ -182,6 +200,9 @@ class TestAgenticSearchEngineInstanceCheck:
 
             def search(self, query: str) -> list[SearchResult]:
                 return []
+
+            def search_parallel(self, queries: list[str]) -> list[list[SearchResult]]:
+                return [[] for _ in queries]
 
             def summarize(self, topic: str, results: list[SearchResult]) -> str:
                 return ""

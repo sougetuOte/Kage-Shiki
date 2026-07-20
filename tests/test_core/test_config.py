@@ -780,6 +780,8 @@ class TestAgenticSearchConfigDefaults:
         assert cfg.search_api == "duckduckgo"
         assert cfg.max_subqueries == 3
         assert cfg.max_concurrent_searches == 3
+        # 2026-07-20 HGA A-2: 派生テーマ増殖抑止のための pending 上限
+        assert cfg.max_pending_targets == 20
 
 
 class TestAppConfigPhase2bFields:
@@ -847,6 +849,7 @@ engine = "local"
 search_api = "brave"
 max_subqueries = 5
 max_concurrent_searches = 4
+max_pending_targets = 15
 """,
             encoding="utf-8",
         )
@@ -855,6 +858,8 @@ max_concurrent_searches = 4
         assert cfg.agentic_search.search_api == "brave"
         assert cfg.agentic_search.max_subqueries == 5
         assert cfg.agentic_search.max_concurrent_searches == 4
+        # 2026-07-20 HGA A-2: max_pending_targets が toml から読み込まれる
+        assert cfg.agentic_search.max_pending_targets == 15
 
     def test_load_config_desire_fallback_on_invalid_type(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture,

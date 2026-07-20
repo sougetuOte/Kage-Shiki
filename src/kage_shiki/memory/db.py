@@ -610,6 +610,64 @@ def update_target_priority(
     conn.commit()
 
 
+@_retry_on_lock
+def recover_stale_searching_targets(conn: sqlite3.Connection) -> int:
+    """status='searching' レコードを一括で 'pending' に復旧する (HGA A-1).
+
+    パイプライン実行中のクラッシュ/シャットダウンで取り残された searching
+    レコードが永久にデッドロック状態になることを防ぐ。パイプライン起動時
+    (Wave 3 handle_autonomous_turn("curiosity") の先頭) および将来的な
+    アプリ起動時 (Wave 5 main.py) に呼ばれる。
+
+    Args:
+        conn: DB 接続。
+
+    Returns:
+        pending に復旧した件数。0 件時は何もログ出力しない。
+    """
+    now = time.time()
+    cursor = conn.execute(
+        "UPDATE curiosity_targets "
+        "SET status='pending', updated_at=? "
+        "WHERE status='searching'",
+        (now,),
+    )
+    conn.commit()
+    count = cursor.rowcount
+    if count > 0:
+        logger.warning(
+            "recover_stale_searching_targets: %d 件の searching を pending に復旧",
+            count,
+        )
+    return count
+
+
+@_retry_on_lock
+def curiosity_topic_exists(
+    conn: sqlite3.Connection,
+    topic: str,
+) -> bool:
+    """同名 topic の存在を返す (HGA A-2, 派生テーマ登録前の重複ガード).
+
+    大文字小文字を無視した完全一致 (LOWER(topic) = LOWER(?))。status は問わない
+    (done / failed の topic とも重複判定される — 一度調査したテーマの重複登録も
+    防ぐ意図)。
+
+    Args:
+        conn: DB 接続。
+        topic: 存在確認する topic 文字列。
+
+    Returns:
+        一致するレコードが 1 件以上あれば True。
+    """
+    row = conn.execute(
+        "SELECT 1 FROM curiosity_targets "
+        "WHERE LOWER(topic) = LOWER(?) LIMIT 1",
+        (topic,),
+    ).fetchone()
+    return row is not None
+
+
 # ---------------------------------------------------------------------------
 # FR-7.3: DB ロック時メモリバッファ
 # ---------------------------------------------------------------------------

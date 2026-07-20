@@ -22,7 +22,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from kage_shiki.agent.autonomous_prompt import AUTONOMOUS_PROMPTS
+from kage_shiki.agent.agentic_search import AgenticSearchEngine
+from kage_shiki.agent.autonomous_prompt import (
+    AUTONOMOUS_PROMPTS,
+    CURIOSITY_COMPLETION_PROMPT,
+)
 from kage_shiki.agent.desire_worker import DesireWorker
 from kage_shiki.agent.human_block_updater import parse_human_block_updates, validate_update
 from kage_shiki.agent.llm_client import LLMProtocol
@@ -30,9 +34,15 @@ from kage_shiki.agent.prompt_builder import PromptBuilder  # re-export for backw
 from kage_shiki.agent.trends_proposal import TrendsProposalManager
 from kage_shiki.core.config import AppConfig, get_max_tokens, get_model
 from kage_shiki.memory.db import (
+    count_pending_curiosity_targets,
+    create_curiosity_target,
+    curiosity_topic_exists,
+    get_pending_targets,
     get_recent_day_summaries,
+    recover_stale_searching_targets,
     save_observation_safe,
     search_observations_fts,
+    update_target_status,
 )
 from kage_shiki.persona.persona_system import PersonaSystem
 
@@ -239,6 +249,7 @@ class AgentCore:
         data_dir: Path | None = None,
         trends_manager: TrendsProposalManager | None = None,
         desire_worker: DesireWorker | None = None,
+        search_engine: AgenticSearchEngine | None = None,
     ) -> None:
         self._config = config
         self._db_conn = db_conn
@@ -265,6 +276,11 @@ class AgentCore:
         # main.py 統合は Wave 5 (Task 5-1) で行い、それまで handle_autonomous_turn は
         # 呼び出し元未接続。
         self._desire_worker = desire_worker
+
+        # Phase 2b Wave 3 (Task 3-2): curiosity 分岐で使用する AgenticSearch エンジン。
+        # main.py 統合は Wave 5 で HaikuEngine が注入される。Wave 3 では None のとき
+        # curiosity 分岐は None 返却で短絡する (テストは Mock を注入)。
+        self._search_engine = search_engine
 
     def generate_session_start_message(self) -> str:
         """セッション開始メッセージを LLM で生成する.
@@ -407,6 +423,12 @@ class AgentCore:
         LLM 呼び出し例外は呼び出し元 (`_run_background_loop`) に伝播させる
         (集約エラーハンドリング前提)。
 
+        Wave 3 Task 3-2 追加 (HGA A-3):
+            終端 (成功・破棄・失敗の全経路) で `_desire_worker.reset(desire_type)` を
+            呼び active フラグを False に戻す (要件書 Section 4.2「実行後 False」)。
+            try/finally で保証する。curiosity 分岐は `_handle_curiosity_pipeline()`
+            に委譲する (design.md §5.4)。
+
         Args:
             desire_type: "talk" | "curiosity" | "reflect" | "rest"
 
@@ -415,35 +437,64 @@ class AgentCore:
                 - desire_worker が未注入
                 - desire_type が AUTONOMOUS_PROMPTS に存在しない
                 - LLM 前または後で active=False (破棄)
+                - curiosity で pending なし / search_engine 未注入 / パイプライン失敗
 
         Raises:
             Exception: LLM 呼び出し例外は呼び出し元に伝播。
         """
-        # ガード 1: desire_worker 未注入
+        # ガード 1: desire_worker 未注入 (finally での reset 呼び出しを回避)
         if self._desire_worker is None:
             return None
 
-        # ガード 2: 無効な desire_type
+        # ガード 2: 無効な desire_type (finally での reset 前に KeyError を避ける)
         prompt_template = AUTONOMOUS_PROMPTS.get(desire_type)
         if prompt_template is None:
             return None
 
-        # 前チェック: active フラグ
-        # AUTONOMOUS_PROMPTS のキー集合と DesireWorker.desires のキー集合は同期している
-        # (TestAutonomousPromptsDesireWorkerSync.test_keys_match_desire_worker_initialization
-        #  で不変条件を検証)。同期が破綻した場合は KeyError で早期に失敗させる方が望ましく、
-        # silent skip (.get(...) + None 返却) は「自律発言が動かない」事象のデバッグを
-        # 困難にするため避ける (R-13: else デフォルト値禁止の精神)。
-        state = self._desire_worker.get_state()
-        if not state.desires[desire_type].active:
-            return None
+        try:
+            # curiosity 分岐: AgenticSearch パイプライン本実装 (Task 3-2 / design.md §5.4)
+            if desire_type == "curiosity":
+                return self._handle_curiosity_pipeline()
 
-        # reflect: day_summary を DB から取得して {day_summary} を置換 (FR-9.9)
-        autonomous_prompt = self._build_autonomous_prompt(
-            desire_type, prompt_template,
-        )
+            # talk / reflect / rest 分岐: 単一 LLM 呼び出しの自律発言
+            # 前チェック: active フラグ
+            # AUTONOMOUS_PROMPTS のキー集合と DesireWorker.desires のキー集合は同期
+            # している (TestAutonomousPromptsDesireWorkerSync で不変条件を検証)。
+            # 同期が破綻した場合は KeyError で早期失敗させる (R-13: silent skip 禁止)。
+            state = self._desire_worker.get_state()
+            if not state.desires[desire_type].active:
+                return None
 
-        # LLM 呼び出し (build_with_truncation 経由、autonomous_prompt 末尾注入)
+            # reflect: day_summary を DB から取得して {day_summary} を置換 (FR-9.9)
+            autonomous_prompt = self._build_autonomous_prompt(
+                desire_type, prompt_template,
+            )
+
+            response = self._generate_autonomous_tweet(autonomous_prompt)
+
+            # 後チェック: LLM 実行中に reset_all() が呼ばれていれば結果を破棄
+            post_state = self._desire_worker.get_state()
+            if not post_state.desires[desire_type].active:
+                return None
+
+            return response
+        finally:
+            # HGA A-3: 成功・破棄・失敗の全経路で active を False に戻す。
+            # 未知の desire_type は KeyError で即時失敗する (R-13 準拠)。
+            self._desire_worker.reset(desire_type)
+
+    def _generate_autonomous_tweet(self, autonomous_prompt: str) -> str:
+        """autonomous_prompt を SystemPrompt に注入して LLM でつぶやきを生成する.
+
+        curiosity パイプラインの starting/completion tweet および talk/reflect/rest
+        の自律発言で共用するヘルパ (build_with_truncation 経由・purpose=autonomous_talk)。
+
+        Args:
+            autonomous_prompt: SystemPrompt 末尾に注入する独り言指示テンプレート。
+
+        Returns:
+            LLM が生成したつぶやきテキスト。
+        """
         purpose = self._AUTONOMOUS_PURPOSE
         system_prompt, messages = self._prompt_builder.build_with_truncation(
             session_start_message=self.session_start_message,
@@ -454,20 +505,153 @@ class AgentCore:
             max_tokens_for_output=get_max_tokens(self._config, purpose),
             autonomous_prompt=autonomous_prompt,
         )
-
-        response = self._llm_client.send_message_for_purpose(
+        return self._llm_client.send_message_for_purpose(
             system=system_prompt,
             messages=messages,
             purpose=purpose,
         )
 
-        # 後チェック: LLM 実行中に reset_all() が呼ばれていれば結果を破棄
-        # (前チェックと同じく直参照、KeyError は同期テストで担保)
-        post_state = self._desire_worker.get_state()
-        if not post_state.desires[desire_type].active:
+    def _should_abort_autonomous(self, desire_type: str) -> bool:
+        """パイプラインの各ステージ境界で active フラグを確認する (HGA A-4 helper).
+
+        ユーザー入力が発生して reset_all() が呼ばれていれば True を返す。
+        パイプライン多段化時の active チェック挿入漏れを防ぐため共通化する。
+
+        Args:
+            desire_type: 確認する欲求タイプ。
+
+        Returns:
+            active=False (中断すべき) なら True。desire_worker が None なら True (中断)。
+        """
+        if self._desire_worker is None:
+            return True
+        state = self._desire_worker.get_state()
+        return not state.desires[desire_type].active
+
+    def _handle_curiosity_pipeline(self) -> str | None:
+        """curiosity 欲求の AgenticSearch パイプラインを実行する (Task 3-2 / design.md §5.4).
+
+        HGA A-1〜A-7 対応:
+            A-1: 起動時に searching 残骸を pending に復旧
+            A-2: 派生テーマ登録前に重複チェック + pending 上限チェック (2 段ガード)
+            A-3: 呼び出し元 (handle_autonomous_turn) の finally で reset("curiosity")
+            A-4: 各ステージ境界で _should_abort_autonomous → 中断時 status を pending に戻す
+            A-5: HaikuEngine 側でインジェクション防御 (実装済み)
+            A-6: HaikuEngine 側で decompose 0 件時に topic に fallback (実装済み)
+            A-7: 成功時の完了つぶやきを必須生成
+
+        Returns:
+            完了つぶやきテキスト。以下の場合は None:
+                - search_engine 未注入
+                - 前チェック時点で active=False
+                - pending トピックなし
+                - パイプライン中断 (abort)
+                - パイプライン例外 (failed)
+
+        Raises:
+            例外: パイプライン内例外は catch して failed に遷移し None を返すため
+                呼び出し元には伝播しない (呼び出し元 finally での reset 保証のため)。
+        """
+        # ガード: search_engine 未注入 (Wave 5 で main.py が HaikuEngine を注入する)
+        if self._search_engine is None:
+            logger.debug(
+                "curiosity: search_engine 未注入のため pipeline をスキップ "
+                "(Wave 5 で main.py 統合)",
+            )
             return None
 
-        return response
+        # 前チェック: active
+        if self._should_abort_autonomous("curiosity"):
+            return None
+
+        # HGA A-1: パイプライン起動時に searching 残骸を復旧
+        recover_stale_searching_targets(self._db_conn)
+
+        # priority 昇順で pending 1 件取得
+        pending = get_pending_targets(self._db_conn, limit=1)
+        if not pending:
+            # FR-9.6 (2): pending なしなら何もしない (つぶやきなし)
+            return None
+
+        target = pending[0]
+        tid = int(target["id"])
+        topic = str(target["topic"])
+
+        # 「調べ始める」つぶやき生成 (design.md §5.4: status 変更より先)
+        # Wave 3 は main.py 未接続のため戻り値には含めない。Wave 5 で
+        # main.py が LLM 呼び出しを傍観して response_queue に put する経路を追加する。
+        _starting_tweet = self._generate_autonomous_tweet(
+            AUTONOMOUS_PROMPTS["curiosity"],
+        )
+
+        # status → searching (以降の abort では pending に戻す — HGA A-4)
+        update_target_status(self._db_conn, tid, "searching")
+
+        try:
+            # ステージ境界 abort チェック #1: decompose 前
+            if self._should_abort_autonomous("curiosity"):
+                update_target_status(self._db_conn, tid, "pending")
+                return None
+
+            queries = self._search_engine.decompose_query(topic)
+
+            # ステージ境界 abort チェック #2: search_parallel 前
+            if self._should_abort_autonomous("curiosity"):
+                update_target_status(self._db_conn, tid, "pending")
+                return None
+
+            results_lists = self._search_engine.search_parallel(queries)
+            all_results = [r for sub in results_lists for r in sub]
+
+            # ステージ境界 abort チェック #3: summarize 前
+            if self._should_abort_autonomous("curiosity"):
+                update_target_status(self._db_conn, tid, "pending")
+                return None
+
+            summary = self._search_engine.summarize(topic, all_results)
+
+            # ステージ境界 abort チェック #4: extract_noise 前
+            if self._should_abort_autonomous("curiosity"):
+                update_target_status(self._db_conn, tid, "pending")
+                return None
+
+            noise_topics = self._search_engine.extract_noise_topics(all_results)
+        except Exception:
+            logger.warning(
+                "curiosity パイプライン例外, topic=%r → failed",
+                topic,
+                exc_info=True,
+            )
+            update_target_status(self._db_conn, tid, "failed")
+            return None
+
+        # 成功: done + result_summary 保存
+        update_target_status(self._db_conn, tid, "done", result_summary=summary)
+
+        # HGA A-2: 派生テーマ登録 (2 段ガード: 重複チェック + pending 上限チェック)
+        max_pending = self._config.agentic_search.max_pending_targets
+        for topic_candidate in noise_topics:
+            current_pending = count_pending_curiosity_targets(self._db_conn)
+            if current_pending >= max_pending:
+                logger.warning(
+                    "curiosity: pending 件数 %d >= max %d、以降の派生テーマ登録をスキップ",
+                    current_pending,
+                    max_pending,
+                )
+                break
+            if curiosity_topic_exists(self._db_conn, topic_candidate):
+                logger.info(
+                    "curiosity: 派生テーマ重複スキップ topic=%r",
+                    topic_candidate,
+                )
+                continue
+            create_curiosity_target(
+                self._db_conn, topic_candidate, parent_id=tid,
+            )
+
+        # HGA A-7: 完了つぶやき必須生成
+        completion_prompt = CURIOSITY_COMPLETION_PROMPT.format(summary=summary)
+        return self._generate_autonomous_tweet(completion_prompt)
 
     def _build_autonomous_prompt(
         self,

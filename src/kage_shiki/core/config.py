@@ -303,12 +303,15 @@ class AgenticSearchConfig:
         search_api: 検索 API（"duckduckgo" | "brave"）。
         max_subqueries: サブクエリ最大数。
         max_concurrent_searches: 並列検索数上限。
+        max_pending_targets: pending 総数上限。超過時は派生テーマ登録をスキップ
+            (2026-07-20 HGA A-2 追加。派生テーマ増殖抑止)。
     """
 
     engine: str = "haiku"
     search_api: str = "duckduckgo"
     max_subqueries: int = 3
     max_concurrent_searches: int = 3
+    max_pending_targets: int = 20
 
 
 @dataclass
@@ -853,6 +856,11 @@ def _parse_agentic_search(data: dict[str, Any]) -> AgenticSearchConfig:
             data.get("max_concurrent_searches", defaults.max_concurrent_searches),
             int, defaults.max_concurrent_searches, min_value=1,
         ),
+        max_pending_targets=_coerce_field(
+            "agentic_search", "max_pending_targets",
+            data.get("max_pending_targets", defaults.max_pending_targets),
+            int, defaults.max_pending_targets, min_value=1,
+        ),
     )
 
 
@@ -1003,6 +1011,8 @@ search_api = "{d.agentic_search.search_api}"
 max_subqueries = {d.agentic_search.max_subqueries}
 # 並列検索数上限
 max_concurrent_searches = {d.agentic_search.max_concurrent_searches}
+# pending 総数上限。超過時は派生テーマ登録をスキップ (HGA A-2 増殖抑止)
+max_pending_targets = {d.agentic_search.max_pending_targets}
 """
     config_path.write_text(content, encoding="utf-8")
 
