@@ -168,7 +168,7 @@ CASPAR の Convergence 結論に対し、**独立コンテキスト**で動作�
 
 **出力契約**: 6 フィールド JSON（`verdict` / `severity` / `affected_atoms` / `reasoning` / `recommended_action` / `confidence`）。詳細なスキーマとクロスフィールド制約は `.claude/agents/gabriel.md` を参照。
 
-**gabriel 不発時の fallback**: gabriel が spawn 失敗・60 秒超過・format_error のいずれかで不発の場合、`verdict=inconclusive` として扱った上で、旧来の Reflection（Section 6）を代替実施する。timeout / format_error の該否は自動計測を持たず、L1（Living Architect）の手動判断とする。
+**gabriel 不発時の fallback**: gabriel が spawn 失敗・240 秒超過（2026-07-20 実測再校正・暫定。旧 60 秒は dry-run 実測 171 秒と乖離）・format_error のいずれかで不発の場合、`verdict=inconclusive` として扱った上で、旧来の Reflection（Section 6）を代替実施する。timeout / format_error の該否は自動計測を持たず、L1（Living Architect）の手動判断とする。
 
 ### 5.4.2. verdict 別分岐処理
 

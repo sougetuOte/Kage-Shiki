@@ -71,7 +71,7 @@ Step 3: Convergence（収束）
 Step 4: gabriel adversarial probe（2026-07-18 改訂）
   └─ 別コンテキストの独立 subagent（.claude/agents/gabriel.md）が結論を敵対検証
   └─ 6 フィールド JSON verdict を宣言的分岐表（SKILL.md）で処理
-  └─ gabriel 不発（spawn 失敗 / 60 秒超過 / format_error）時は旧 Reflection を fallback 実施
+  └─ gabriel 不発（spawn 失敗 / 240 秒超過 / format_error）時は旧 Reflection を fallback 実施
 
 Step 5: AoT Synthesis（統合）
   └─ 各 Atom の結論を統合し、最終決定 + Action Items を導出
@@ -111,7 +111,7 @@ gabriel probe のルール:
 - **opt-out**: ユーザー（人間）の明示指示 + 理由記録の 2 条件。Auto mode 中の AI 自身による opt-out は禁止
 
 Reflection fallback のルール（gabriel 不発時のみ）:
-- **発動条件**: gabriel の spawn 失敗 / 60 秒超過 / format_error（L1 手動判定）
+- **発動条件**: gabriel の spawn 失敗 / 240 秒超過（2026-07-20 実測再校正・暫定。実測 3 回蓄積後に再校正） / format_error（L1 手動判定）
 - **内容**: 旧 Step 4 Reflection（全員で結論を検証・1 回限り・致命的な見落としのみ修正・
   Bikeshedding 防止・Reflection の Reflection 禁止）を代替実施する
 - **廃止条件**: 影式での gabriel 実発火の安定を確認後、Reflection 廃止を PM 級で判断する

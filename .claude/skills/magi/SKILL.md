@@ -105,7 +105,8 @@ CASPAR の Convergence 結論に対し、**独立コンテキスト**で動作�
 
 **呼び出し方法**: Task ツール経由で `subagent_type=gabriel` を起動する。gabriel は独立コンテキストで動作し、Read/Glob/Grep のみ利用可（Write・Edit・Bash・Agent ツール禁止 / 暴走リスク抑制）。
 
-**タイムアウト**: 60 秒を目安とする（SHOULD）。呼び出し元で経過時間を計測し、超過時は下記「gabriel 不発時の fallback」を実施する。
+**タイムアウト**: 240 秒を目安とする（SHOULD・暫定）。呼び出し元で経過時間を計測し、超過時は下記「gabriel 不発時の fallback」を実施する。
+（2026-07-20 再校正: 旧 60 秒は影式 dry-run 実測 171 秒（有効 JSON 完走）と乖離していたため、実測 ×1.4 マージンで 240 秒に改訂。本家実測 73-81 秒も包含。サンプル 1 件のため暫定値 — 実測 3 回蓄積後に再校正する）
 
 **gabriel 出力**: 6 フィールド JSON（`.claude/agents/gabriel.md` 参照）:
 - `verdict`: `confirmed` / `refuted` / `inconclusive`
@@ -117,7 +118,7 @@ CASPAR の Convergence 結論に対し、**独立コンテキスト**で動作�
 
 #### gabriel 不発時の fallback（Reflection）
 
-AoT 適用モードでは Convergence 直後に gabriel 検証を実施する。gabriel が **不発**（spawn 失敗 / 60 秒超過 / format_error（JSON 必須フィールド欠損・型不一致）のいずれか）の場合は `inconclusive` 扱いとし、旧 Step 4 Reflection（全員で結論を検証・1 回限り）を代替実施する。影式での gabriel 実発火成功が確認された後、Reflection 廃止を別途 PM 級で判断する。
+AoT 適用モードでは Convergence 直後に gabriel 検証を実施する。gabriel が **不発**（spawn 失敗 / 240 秒超過 / format_error（JSON 必須フィールド欠損・型不一致）のいずれか）の場合は `inconclusive` 扱いとし、旧 Step 4 Reflection（全員で結論を検証・1 回限り）を代替実施する。影式での gabriel 実発火成功が確認された後、Reflection 廃止を別途 PM 級で判断する。
 
 Reflection のルール（gabriel 不発時のみ適用）:
 - **修正条件**: 致命的な見落とし（セキュリティ、データ損失、仕様違反）が見つかった場合のみ結論を修正する

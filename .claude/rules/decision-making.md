@@ -16,7 +16,7 @@
 1. **Divergence**: MELCHIOR と BALTHASAR が意見を出し尽くす
 2. **Debate**: 対立ポイントについて解決策を検討
 3. **Convergence**: CASPAR が最終決定を下す
-4. **gabriel 検証（AoT 適用時）**: AoT 適用モードでは Convergence 直後に gabriel 検証を実施する。gabriel が不発（spawn 失敗 / 60 秒超過 / format_error）の場合は inconclusive 扱いとし、旧 Step 4 Reflection（全員で結論を検証・1 回限り）を代替実施する。影式での gabriel 実発火成功が確認された後、Reflection 廃止を別途 PM 級で判断する。
+4. **gabriel 検証（AoT 適用時）**: AoT 適用モードでは Convergence 直後に gabriel 検証を実施する。gabriel が不発（spawn 失敗 / 240 秒超過（2026-07-20 実測再校正・暫定） / format_error）の場合は inconclusive 扱いとし、旧 Step 4 Reflection（全員で結論を検証・1 回限り）を代替実施する。影式での gabriel 実発火成功が確認された後、Reflection 廃止を別途 PM 級で判断する。
 
 ## AoT（Atom of Thought）
 
