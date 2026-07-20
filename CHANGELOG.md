@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **docs**: post-ship 消化 (2026-07-20 / Fable メインセッション)
+  - **gabriel timeout 再校正**: 60 秒 → **240 秒 (暫定)** (dry-run 実測 171 秒 ×1.4 マージン / 実測 3 回蓄積後に再校正)。magi SKILL.md / decision-making.md / 06_DECISION_MAKING.md / magi-skill-spec.md の 4 規範に反映 (PM 級 Auto 進行)
+  - **Wave 3 実装ブリーフ** (`docs/artifacts/wave3-briefing-2026-07-20.md`): Opus セッション引き継ぎ用 tight brief 5-slot。ddgs 9.x API 裏取り結果 (timeout は init 引数 / text() シグネチャ / 戻り値 dict) を同梱
 - **docs**: Wave 3 着手前レビュー 2 本 + 仕様 Rev.3 反映 (2026-07-20 / Fable メインセッション)
   - **設計書レビュー ①〜⑥** (`docs/artifacts/design-review-2026-07-20.md`): Critical 1 / Warning 4 / Info 3
     - C-1: 依存 `duckduckgo-search` → **`ddgs`** に変更 (2025-07 凍結・リネームを Web 裏取り)
