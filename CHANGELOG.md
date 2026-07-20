@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **docs**: Wave 3 着手前レビュー 2 本 + 仕様 Rev.3 反映 (2026-07-20 / Fable メインセッション)
+  - **設計書レビュー ①〜⑥** (`docs/artifacts/design-review-2026-07-20.md`): Critical 1 / Warning 4 / Info 3
+    - C-1: 依存 `duckduckgo-search` → **`ddgs`** に変更 (2025-07 凍結・リネームを Web 裏取り)
+    - W-1: `search_parallel` を AgenticSearchEngine Protocol に昇格 (US-19 差し替え性の保全)
+    - W-2/W-3: asyncio.to_thread 補記 + §5.2 スレッド記述訂正
+  - **HGA 敵対的レビュー #K2** (`docs/artifacts/hga-adversarial-wave3-2026-07-20.md`): Critical 3 / Warning 3 / Info 4 (全件コード裏付け)
+    - A-1: searching 取り残しの永久デッドロック → `recover_stale_searching_targets` 新設
+    - A-2: 派生テーマ無限増殖 → 重複ガード + `max_pending_targets` (20) 上限
+    - A-3: 要件書 §4.2「実行後 active=False」未実装 → `DesireWorker.reset(desire_type)` 新設
+    - A-4〜A-8: ステージ境界 abort / インジェクション防御 / decompose fallback / 完了つぶやき必須化 等
+  - 反映: design.md **Rev.3** / requirements.md **Rev.3** / tasks.md **改訂 2** (Task 3-2 見積 M → M+)。PM 級 Auto 進行 (ユーザー包括指示・事後確認前提)
+- **docs(rules)**: Fable 運用方針改訂 (2026-07-20 ユーザー指示)
+  - Fable サブスクは定額期限後も継続 (週間上限の半分)。HGA 利用は「必要とあればためらわない程度」に可
+  - モデル運用: 設計/tasks 完了まではメイン = Fable、BUILDING で Opus に切替 (注意喚起必須)、AUDITING は要相談
+  - 反映先: `CLAUDE.md` / `.claude/rules/hga-summoning.md` (旧移行期注記の更新)
+
 - **feat**: LAM 現代化 delta 適用 (2026-07-18 休眠復帰セッション / 復帰パッケージ v1 + 本家 10 日ドリフト補正)
   - **CLAUDE.md 改訂**: §作業体制 (3.5 層委譲モデル + 担当層判断基準 + Fable HGA 参照) / §Execution Permission Modes (AutoMode advisory) / §Context Management 絶対値閾値化 (180K/200K・1M 環境注記) / Memory Policy Layer 2 公式機構化
   - **HGA 型 Fable 召喚規律** (`.claude/rules/hga-summoning.md`, 新規): 召喚ゲート・2 段召喚・currency push・下調べパイプライン・tight brief 5-slot。召喚ログ `docs/artifacts/hga-summon-log.md` 新設 (#K1 記録済)
