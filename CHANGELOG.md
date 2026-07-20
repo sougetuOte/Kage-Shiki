@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **feat**: Phase 2b **Wave 3** (AgenticSearch 統合) 実装完了 (2026-07-20 / Opus BUILDING セッション)
+  - **HaikuEngine** (`agent/agentic_search.py` 変更): AgenticSearchEngine Protocol の Anthropic Haiku 実装
+    - Protocol に `search_parallel(queries: list[str]) -> list[list[SearchResult]]` を昇格 (Rev.2 W-1)
+    - `decompose_query` — LLM 出力を箇条書きパース、0 件時は topic 自体を単一クエリに fallback (HGA A-6)
+    - `search` — ddgs 9.14.4 の `DDGS(timeout=10).text(query, max_results=5)` を同期呼び出し、
+      dict → SearchResult (title/url/snippet) にマップ、例外は空リストで防御的に握る
+    - `search_parallel` — `asyncio.to_thread` + `asyncio.gather` + `asyncio.wait_for(30 秒)` で並列制御
+      (HGA A-8: timeout はスレッド停止不可、結果破棄のみ)
+    - `summarize` / `extract_noise_topics` — インジェクション防御指示を system prompt に必須 (HGA A-5)
+    - `_validate_noise_topics` 純関数 — 50 字上限 + 大文字小文字無視の重複排除 + 3 件上限 (HGA A-5)
+    - purpose: agentic_decompose / agentic_summarize / agentic_noise (Wave 2 Task 5-2 で追加済)
+  - **db.py 拡張** (HGA A-1/A-2):
+    - `recover_stale_searching_targets(conn) -> int` — searching 残骸を pending に一括復旧
+    - `curiosity_topic_exists(conn, topic) -> bool` — 大文字小文字無視の完全一致重複ガード
+  - **DesireWorker.reset(desire_type)** (`agent/desire_worker.py` 変更, HGA A-3):
+    - 単一欲求の active=False を _lock 保護下で設定、未知 type は KeyError 即時失敗 (R-13 準拠)
+  - **AgentCore パイプライン統合** (`agent/agent_core.py` 変更, design.md §5.4):
+    - `__init__` に `search_engine: AgenticSearchEngine | None = None` DI 追加 (Wave 5 で main.py 注入)
+    - `_should_abort_autonomous(desire_type)` helper — ステージ境界の active チェック共通化 (HGA A-4)
+    - `_handle_curiosity_pipeline()` — recover → pending → 開始 tweet → searching → decompose → search_parallel
+      → summarize → extract_noise → done → 派生登録 (2 段ガード: 重複 + pending 上限) → 完了 tweet (必須, HGA A-7)
+    - abort 検知時は status を pending に戻す (failed ではない — 次サイクルで再試行可能)
+    - `handle_autonomous_turn` を try/finally でラップし、終端で必ず `reset(desire_type)` を呼ぶ (HGA A-3)
+    - `_generate_autonomous_tweet` helper — 開始/完了 tweet と talk/reflect/rest で共用
+  - **config.py 拡張**: `AgenticSearchConfig.max_pending_targets: int = 20` 追加 (HGA A-2) + toml パーサ + 生成テンプレ
+  - **autonomous_prompt.py 拡張**: `CURIOSITY_COMPLETION_PROMPT` 定数 (完了つぶやき用テンプレ, HGA A-7)
+  - **依存追加**: `ddgs>=9.0.0` (旧 duckduckgo-search、C-1 で確定)
+  - **テスト**: 新規 `test_haiku_engine.py` (28 tests) + curiosity/reset/recover/topic_exists 各テストクラス + curiosity パイプライン統合テスト 14 件 (計 +80 テスト前後)
+  - **カバレッジ**: agentic_search.py 99% / desire_worker.py 100% / agent_core.py 94% (全て目標 90% 以上)
+  - **PM 級 pending**: design.md §2.2 の AgentCore.__init__ に `search_engine` 引数追記 + §4.2 に
+    `CURIOSITY_COMPLETION_PROMPT` 補記 (仕様の意味を変えない実装詳細補記だが、
+    brief §4 の指示に従い Auto 進行せずユーザー確認へ)
+
 - **docs**: post-ship 消化 (2026-07-20 / Fable メインセッション)
   - **gabriel timeout 再校正**: 60 秒 → **240 秒 (暫定)** (dry-run 実測 171 秒 ×1.4 マージン / 実測 3 回蓄積後に再校正)。magi SKILL.md / decision-making.md / 06_DECISION_MAKING.md / magi-skill-spec.md の 4 規範に反映 (PM 級 Auto 進行)
   - **Wave 3 実装ブリーフ** (`docs/artifacts/wave3-briefing-2026-07-20.md`): Opus セッション引き継ぎ用 tight brief 5-slot。ddgs 9.x API 裏取り結果 (timeout は init 引数 / text() シグネチャ / 戻り値 dict) を同梱

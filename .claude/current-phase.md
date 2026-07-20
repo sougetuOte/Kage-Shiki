@@ -2,7 +2,7 @@
 
 **BUILDING**
 
-_Phase 2b: 自律性コア — Wave 2 実装_
+_Phase 2b: 自律性コア — Wave 3 実装（Task 3-1 HaikuEngine → Task 3-2 パイプライン統合）_
 
 ---
 
