@@ -1,8 +1,13 @@
 # Phase 2b 自律性コア タスク定義
 
 **文書種別**: Task Decomposition
-**根拠**: `docs/specs/phase2b-autonomy/requirements.md` (Rev.1 承認済み) + `docs/specs/phase2b-autonomy/design.md` (初版)
+**根拠**: `docs/specs/phase2b-autonomy/requirements.md` (Rev.2) + `docs/specs/phase2b-autonomy/design.md` (Rev.2)
 **作成日**: 2026-03-31
+**改訂**: 2026-07-20 — 設計レビュー反映（依存を `ddgs` に変更 / `search_parallel` を Protocol に追加。
+`docs/artifacts/design-review-2026-07-20.md` C-1/W-1）
+**改訂 2**: 2026-07-20 — HGA 敵対的レビュー #K2 反映（searching 復旧 / 派生テーマ増殖抑止 /
+`DesireWorker.reset(desire_type)` / ステージ境界 abort / 完了つぶやき必須化。
+`docs/artifacts/hga-adversarial-wave3-2026-07-20.md` A-1〜A-8。Task 3-2 見積 M → M+）
 
 ---
 
@@ -47,6 +52,7 @@ class AgenticSearchConfig:
     search_api: str = "duckduckgo"
     max_subqueries: int = 3
     max_concurrent_searches: int = 3
+    max_pending_targets: int = 20  # 改訂 2 追加 (HGA A-2)。Task 3-2 で config.py に追補
 
 @dataclass
 class AppConfig:
@@ -69,6 +75,7 @@ class SearchResult:
 class AgenticSearchEngine(typing.Protocol):
     def decompose_query(self, topic: str) -> list[str]: ...
     def search(self, query: str) -> list[SearchResult]: ...
+    def search_parallel(self, queries: list[str]) -> list[list[SearchResult]]: ...  # Rev.2 追加 (W-1)
     def summarize(self, topic: str, results: list[SearchResult]) -> str: ...
     def extract_noise_topics(self, results: list[SearchResult]) -> list[str]: ...
 ```
@@ -335,17 +342,21 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 **TDD Red（テスト観点）**:
 - HaikuEngine が AgenticSearchEngine Protocol を実装する（静的型チェック）
 - decompose_query が 2〜max_subqueries 個のサブクエリを返す
-- search が duckduckgo-search (DDGS) を呼び出して SearchResult リストを返す
+- search が ddgs（旧 duckduckgo-search、Rev.2 で依存名変更）の DDGS を呼び出して SearchResult リストを返す
+- AgenticSearchEngine Protocol に search_parallel が追加されている（Rev.2 W-1。Wave 1 実装の Protocol/テストを本タスクで更新）
 - search_parallel が複数クエリを asyncio.run() で並列実行する
 - search_parallel のタイムアウト（30秒）が機能する
 - summarize が LLMClient を呼び出して要約を返す
 - extract_noise_topics が 0〜3 個の派生テーマを返す
 - 各メソッドがタイムアウト設定に準拠する（設計書 Table 5.2 Section 5）
 - LLM呼び出し失敗時に例外が送出される（Status=failed に遷移は A5 で実装）
+- decompose_query のパース結果が 0 件のとき topic 自体を単一クエリとして fallback する（HGA A-6）
+- summarize / extract_noise_topics のプロンプトにインジェクション防御指示が含まれる（HGA A-5）
+- extract_noise_topics の戻り値検証（件数 ≤3・各 50 字以内、違反分は破棄 + WARNING）（HGA A-5）
 
 **完了条件**:
 - [x] HaikuEngine クラスを実装
-- [x] 4 つのメソッドが Protocol に準拠
+- [x] 5 つのメソッドが Protocol に準拠（Rev.2: search_parallel 含む）
 - [x] decompose_query のプロンプトが設計書に準拠
 - [x] search_parallel が asyncio で並列化される
 - [x] テスト: 全メソッドをモック (DDGS, LLMClient) で検証
@@ -362,7 +373,10 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 **対応FR**: FR-9.6, FR-9.7, FR-9.8
 **新規/変更ファイル**:
 - `src/kage_shiki/agent/agent_core.py` (変更)
-- `src/kage_shiki/memory/db.py` (既存 curiosity_targets CRUD を使用)
+- `src/kage_shiki/memory/db.py` (変更 — `recover_stale_searching_targets` / `curiosity_topic_exists` 追加。改訂 2)
+- `src/kage_shiki/agent/desire_worker.py` (変更 — `reset(desire_type)` 追加。改訂 2 / HGA A-3。
+  Wave 1 実装の拡張だが同一パイプラインの帰責のため本タスクに含める — S-3 準拠注記)
+- `src/kage_shiki/core/config.py` (変更 — `max_pending_targets` 追加。改訂 2)
 
 **TDD Red（テスト観点）**:
 - handle_autonomous_turn("curiosity") が呼ばれると AgenticSearch が起動する
@@ -373,17 +387,28 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 - 調査完了時に result_summary が curiosity_targets に保存される
 - extract_noise_topics で派生テーマが返された場合、各テーマが parent_id付きで登録される
 - 検索失敗時に status=failed に遷移する
-- 検索失敗時に curiosity レベルがリセットされる
-- つぶやきが response_queue に投入される（「調べ始める」「調査完了」）
+- 検索失敗時に desire_worker.reset("curiosity") が呼ばれる（改訂 2 / HGA A-3）
+- つぶやきが response_queue に投入される（「調べ始める」「調査完了」— 完了つぶやきは必須。改訂 2 / HGA A-7）
+- パイプライン起動時に recover_stale_searching_targets() が呼ばれ、searching 残骸が pending に復旧する（HGA A-1）
+- 各ステージ境界の _should_abort_autonomous() で中断され、中断時は status が pending に戻る（HGA A-4）
+- handle_autonomous_turn 終端（成功・破棄・失敗）で reset(desire_type) が呼ばれ active が False になる（HGA A-3）
+- 派生テーマ登録: 同名 topic（大文字小文字無視・status 不問）はスキップされる（HGA A-2）
+- 派生テーマ登録: pending 件数 >= max_pending_targets のときスキップ + WARNING（HGA A-2）
+- DesireWorker.reset(desire_type): 単一欲求のみ active=False、他欲求は不変、未知 type は KeyError（HGA A-3）
 
 **完了条件**:
 - [x] handle_autonomous_turn("curiosity") の処理を実装
-- [x] AgenticSearch パイプラインの順序実装
+- [x] AgenticSearch パイプラインの順序実装（pending 確認 → つぶやきの順。設計書 Rev.3 §5.4）
 - [x] db.update_target_status, db.create_curiosity_target を使用
+- [x] db.recover_stale_searching_targets / db.curiosity_topic_exists を実装（改訂 2）
+- [x] DesireWorker.reset(desire_type) を実装 + handle_autonomous_turn 終端で呼び出し（改訂 2）
+- [x] _should_abort_autonomous() helper へ active チェックを共通化（改訂 2）
+- [x] config.py に max_pending_targets を追加（改訂 2）
 - [x] テスト: パイプイン全体の実行フロー、success/failure パス、派生テーマ登録
+- [x] テスト: searching 復旧、重複スキップ、pending 上限、ステージ中断 → pending 復帰（改訂 2）
 - [x] 統合テスト: response_queue への投入、DB 状態遷移
 
-**見積もり**: M (2〜4時間)
+**見積もり**: M+ (3〜5時間。改訂 2 で HGA 対応分 +1h)
 
 ---
 
@@ -479,6 +504,9 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 - autonomous_queue に投入された desire_type が handle_autonomous_turn に渡される
 - DesireWorker.stop() がシャットダウン時に呼ばれる（スレッド終了）
 - 進行中の自律行動がユーザー入力で中断される（active フラグ破棄ロジック）
+- アプリ起動時に db.recover_stale_searching_targets() が呼ばれる（改訂 2 / HGA A-1）
+- 統合テストに HGA A-1（searching 復旧）/ A-3（実行後 reset）/ A-4（パイプライン中断）の
+  実運用経路シナリオを含める（改訂 2 / HGA A-10 — Wave 3 の単体検証は main.py 未接続のため）
 
 **完了条件**:
 - [x] main.py に DesireWorker 初期化コードを追加
@@ -617,7 +645,7 @@ def handle_autonomous_turn(self, desire_type: str) -> str | None:
 | FR-9.10 | Task 1-3, Task 3-1 | ✓ |
 | FR-9.11 | Task 1-4 | ✓ |
 | FR-9.12 | Task 4-2 | ✓ |
-| NFR-13 (duckduckgo-search) | Task 3-1, Task 5-3 | ✓ |
+| NFR-13 (ddgs / 旧 duckduckgo-search) | Task 3-1, Task 5-3 | ✓ |
 | NFR-14 (CPU負荷) | Task 1-2, Task 5-3 | ✓ |
 | NFR-15 (カバレッジ) | Task 5-3 | ✓ |
 
@@ -769,7 +797,7 @@ graph LR
 - [ ] インターフェース契約 4 項目が確定している
 - [ ] config.toml のテンプレートが `config/config.template.toml` に追加されている
 - [ ] pytest-freezegun がテスト依存に含まれている
-- [ ] duckduckgo-search が pyproject.toml に追加されている（NFR-13）
+- [ ] ddgs（旧 duckduckgo-search）が pyproject.toml に追加されている（NFR-13）
 - [ ] 既存テストスイート（Phase 2a）が全て PASS している
 - [ ] カバレッジが 92% を確認している（Task 5-3 実施前の baseline）
 
@@ -801,7 +829,7 @@ Task 1-2 で以下のいずれかを実施:
 
 Task 5-3 で以下の NFR を確認する:
 
-- NFR-13: duckduckgo-search がただ 1 つの依存パッケージ追加か
+- NFR-13: ddgs がただ 1 つの依存パッケージ追加か
 - NFR-14: DesireWorker.update_desires() < 1ms の CPU 負荷か
 - NFR-15: Phase 2b 追加モジュール 90%+、全体 92% 以上か
 

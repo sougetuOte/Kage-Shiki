@@ -10,7 +10,9 @@
 - `docs/memos/middle-draft/03-architecture.md`（アーキテクチャ全体図）
 
 **作成日**: 2026-03-11
-**状態**: 承認済み Rev.1
+**状態**: 承認済み Rev.1 → **Rev.3**（2026-07-20 設計レビュー + HGA 敵対的レビュー #K2 反映:
+依存を `ddgs` に変更 / `search_parallel` を Protocol に追加 / `max_pending_targets` 追加 —
+`docs/artifacts/design-review-2026-07-20.md` / `docs/artifacts/hga-adversarial-wave3-2026-07-20.md`）
 
 ---
 
@@ -42,7 +44,7 @@ Phase 2a との差分:
 |---|---------|------|
 | 1 | DesireWorker | 4欲求（talk/curiosity/reflect/rest）のレベル計算エンジン（LLM 不要） |
 | 2 | 自律発言（つぶやき） | DesireWorker の閾値超過通知を受けて AgentCore が自律発言テキストを生成 |
-| 3 | AgenticSearch パイプライン | HaikuEngine Protocol + duckduckgo-search による Web 調査 |
+| 3 | AgenticSearch パイプライン | HaikuEngine Protocol + ddgs（旧 duckduckgo-search）による Web 調査 |
 | 4 | curiosity_targets CRUD | pending/searching/done/failed の状態管理 + priority 更新 |
 | 5 | 可変層 L1 運用 | curiosity_targets の蓄積に連動した「興味の広がり」管理 |
 | 6 | config.toml 拡張 | DesireWorker 閾値・AgenticSearch 設定の追加 |
@@ -132,6 +134,7 @@ DesireLevel:
     search_api = "duckduckgo"       # "duckduckgo" | "brave"（将来）
     max_subqueries = 3              # サブクエリ最大数
     max_concurrent_searches = 3     # 並列検索数上限
+    max_pending_targets = 20        # pending 総数上限（派生テーマ増殖抑止、Rev.3 HGA A-2）
 
 具体的な閾値・間隔の数値は設計フェーズで確定する（D-21）。
 
@@ -168,11 +171,12 @@ DesireWorker -> AgentCore の通知は、AgentCore が登録するコールバ�
     AgenticSearchEngine (typing.Protocol)
     +-- decompose_query(topic: str) -> list[str]     # トピックをサブクエリに分解（LLM）
     +-- search(query: str) -> list[SearchResult]      # 単一クエリの検索実行
+    +-- search_parallel(queries: list[str]) -> list[list[SearchResult]]  # 複数クエリの並列検索（Rev.2 追加）
     +-- summarize(topic: str, results: list[SearchResult]) -> str  # 検索結果の要約（LLM）
     +-- extract_noise_topics(results) -> list[str]    # 派生テーマ候補の抽出（LLM）
 
     HaikuEngine
-    +-- AgenticSearchEngine を実装（anthropic SDK + duckduckgo-search）
+    +-- AgenticSearchEngine を実装（anthropic SDK + ddgs（旧 duckduckgo-search））
 
     SearchResult:
         title: str
@@ -248,7 +252,7 @@ Phase 1 の通信モデルに以下の経路を追加する:
 
 | ID | 要件 | 優先度 | 受入条件 |
 |----|------|--------|---------|
-| FR-9.10 | AgenticSearchEngine を typing.Protocol として定義し、HaikuEngine がこれを実装する | Should | (1) AgenticSearchEngine が typing.Protocol として定義されている、(2) HaikuEngine が AgenticSearchEngine を静的型チェックで満足する、(3) decompose_query(), search(), summarize(), extract_noise_topics() の 4 メソッドが定義されている |
+| FR-9.10 | AgenticSearchEngine を typing.Protocol として定義し、HaikuEngine がこれを実装する | Should | (1) AgenticSearchEngine が typing.Protocol として定義されている、(2) HaikuEngine が AgenticSearchEngine を静的型チェックで満足する、(3) decompose_query(), search(), search_parallel(), summarize(), extract_noise_topics() の 5 メソッドが定義されている（Rev.2: search_parallel を Protocol に追加） |
 
 #### FR-9.11〜9.12: curiosity_targets 運用
 
@@ -265,7 +269,7 @@ Phase 2a の NFR-1〜NFR-12 を引き継ぐ。Phase 2b で追加・変更する�
 
 | ID | カテゴリ | 要件 | 基準 |
 |----|---------|------|------|
-| NFR-13 | 依存追加 | Phase 2b での追加依存は `duckduckgo-search` のみ | pip install で追加。pyproject.toml に記載 |
+| NFR-13 | 依存追加 | Phase 2b での追加依存は `ddgs`（旧 duckduckgo-search、2025-07 リネーム）のみ | pip install で追加。pyproject.toml に記載 |
 | NFR-14 | CPU 負荷 | DesireWorker の定期更新が CPU を過度に消費しない | 更新間隔 5-10 秒、1回の更新は < 1ms（純粋な算術計算）。常駐時の CPU 使用率が Phase 2a 比で有意に増加しないこと |
 | NFR-15 | テスト | Phase 2b のカバレッジ | Phase 2b 追加モジュールのカバレッジ 90% 以上。全体カバレッジが Phase 2a 完了時点（92%）を下回らない |
 
@@ -279,7 +283,7 @@ Phase 2a の NFR-1〜NFR-12 を引き継ぐ。Phase 2b で追加・変更する�
 |---|------|
 | P-1 | Phase 2a が完了していること（822テスト、92%カバレッジ） |
 | P-2 | `ANTHROPIC_API_KEY` が環境変数に設定されていること（AgenticSearch の HaikuEngine が使用） |
-| P-3 | インターネット接続があること（duckduckgo-search API が外部通信を行う） |
+| P-3 | インターネット接続があること（ddgs が外部通信を行う） |
 
 ### 8.2 技術制約
 
@@ -312,7 +316,7 @@ Phase 2a の NFR-1〜NFR-12 を引き継ぐ。Phase 2b で追加・変更する�
 | D-22 | rest 欲求の発現形式 | 応答テンポの低下 / 短文化 / 「眠い」つぶやき。テキストベースでどう「休息状態」を表現するか | FR-9.1 の UI 詳細 |
 | D-23 | 自律発言のプロンプトテンプレート | autonomous_turn=True 時のシステムプロンプト。つぶやきの長さ・トーンの制御方法 | FR-9.3, FR-9.4 の実装詳細 |
 | D-24 | AgenticSearch の HaikuEngine 実装設計 | decompose_query のプロンプト、並列度制御、タイムアウト設計 | FR-9.7, FR-9.10 の実装詳細 |
-| D-25 | duckduckgo-search の利用方式 | DDGS().text() の呼び出し方式、レート制限対策、フォールバック | FR-9.7 の実装詳細 |
+| D-25 | ddgs（旧 duckduckgo-search）の利用方式 | DDGS().text() の呼び出し方式、レート制限対策、フォールバック | FR-9.7 の実装詳細 |
 | D-26 | DesireWorker と AgentCore の接続設計 | コールバック方式の具体的実装、asyncio イベントループ内の配置 | FR-9.2 の実装詳細 |
 | D-27 | ユーザー入力と自律行動の排他制御 | 進行中の LLM 呼び出しのキャンセル方式（結果破棄 vs 即座中断） | FR-9.5 の実装詳細 |
 | D-28 | curiosity_targets のトピック照合方式 | 単純なキーワード一致 vs FTS5 利用 vs LLM 分類 | FR-9.12 の実装詳細 |
